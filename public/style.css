@@ -1,0 +1,34 @@
+/* Zehn Kronen – gemeinsames Aussehen für Spiel und Admin-Seite */
+:root{
+  --bg:#1b1f24; --panel:#232830; --panel-2:#2c323b; --line:#3a414b;
+  --ink:#ebe5d6; --muted:#a29b8b; --brass:#d2a94e; --brass-ink:#1b1f24;
+  --good:#86b56f; --bad:#e3765f;
+  --food:#d9b44a; --wood:#a06c3c; --stone:#a7a49c; --ore:#7b95ad; --gold:#e6c35c;
+  --f-display:"IM Fell English SC", Georgia, "Times New Roman", serif;
+  --f-body:"Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+h1,h2{font-family:var(--f-display);font-weight:400}
+
+.r{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none;vertical-align:-1px}
+.r-food{background:var(--food)}.r-wood{background:var(--wood)}.r-stone{background:var(--stone)}.r-ore{background:var(--ore)}.r-gold{background:var(--gold);border-radius:50%}
+
+.btn{background:var(--brass);color:var(--brass-ink);border:0;border-radius:8px;padding:9px 16px;font-weight:700}
+.btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ink);font-weight:500}
+.btn.danger{background:var(--bad);color:var(--brass-ink)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:13px;color:var(--muted)}
+.field input{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.note{font-size:12px;color:var(--muted);margin:0}
+.err{color:var(--bad);font-size:14px;margin:0;min-height:1.2em}
+.block{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.block h3{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}

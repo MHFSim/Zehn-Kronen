@@ -1,0 +1,156 @@
+// Zehn Kronen – Spielregeln der Stadt.
+// Dieses Modul läuft auf dem Server (maßgeblich) und im Browser (nur für flüssige Anzeige).
+// Alle Werte sind Startwerte aus dem Designdokument und werden im Test angepasst.
+
+export const RES = ['food', 'wood', 'stone', 'ore'];
+export const RES_DE = { food: 'Nahrung', wood: 'Holz', stone: 'Stein', ore: 'Erz', gold: 'Gold' };
+
+export const B = {
+  rathaus:  { name: 'Rathaus', x: 5, y: 5, w: 3, unlock: 1, base: [200, 250, 150, 0], time: 80,
+              desc: 'Herz der Stadt. Seine Stufe begrenzt alle anderen Gebäude und bringt Steuergold.' },
+  farm:     { name: 'Farm', x: 1, y: 1, w: 2, unlock: 1, base: [0, 60, 20, 0], time: 8, prod: 'food',
+              desc: 'Erzeugt Nahrung. Jede Einheit isst eine Nahrung pro Stunde.' },
+  saege:    { name: 'Sägewerk', x: 1, y: 4, w: 2, unlock: 1, base: [50, 30, 20, 0], time: 8, prod: 'wood',
+              desc: 'Erzeugt Holz für Gebäude, Speere, Bögen und Rammen.' },
+  stein:    { name: 'Steinbruch', x: 1, y: 7, w: 2, unlock: 2, base: [50, 80, 0, 0], time: 10, prod: 'stone',
+              desc: 'Erzeugt Stein für Mauer und späte Gebäude.' },
+  mine:     { name: 'Erzmine', x: 1, y: 10, w: 2, unlock: 3, base: [60, 100, 40, 0], time: 12, prod: 'ore',
+              desc: 'Erzeugt Erz für Schwerter, Reiterei und Forschung.' },
+  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80, 0], time: 15,
+              desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können.' },
+  kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60, 0], time: 20, units: ['speer', 'schwert'],
+              desc: 'Bildet Speerträger und Schwertkämpfer aus. Jede Stufe verkürzt die Ausbildung.' },
+  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 60, 20], time: 25, units: ['bogen'],
+              desc: 'Bildet Bogenschützen aus.' },
+  stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 100, 150], time: 40, units: ['leicht', 'schwer'],
+              desc: 'Bildet Reiterei aus. Schwere Reiterei ab Stall Stufe 5.' },
+  lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80, 0], time: 20,
+              desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind. Wird mit dem Kampfsystem aktiv.' },
+  akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 150, 80], time: 40,
+              desc: 'Forschung für Wirtschaft und Militär. Folgt in Schritt 4 des Entwicklungsplans.' },
+  mauer:    { name: 'Mauer & Tor', x: 6, y: 11, w: 2, unlock: 3, base: [0, 100, 200, 0], time: 20,
+              desc: 'Die Mauer-Haltbarkeit entscheidet später, wann eine Belagerung beginnen kann.' }
+};
+
+export const U = {
+  speer:   { name: 'Speerträger',      cost: [40, 50, 0, 0],   t: 30, a: 8,  v: 14, l: 30, s: 6,  req: 1 },
+  schwert: { name: 'Schwertkämpfer',   cost: [50, 0, 0, 40],   t: 40, a: 14, v: 10, l: 35, s: 6,  req: 1 },
+  bogen:   { name: 'Bogenschützen',    cost: [40, 60, 0, 0],   t: 35, a: 12, v: 8,  l: 22, s: 6,  req: 1 },
+  leicht:  { name: 'Leichte Reiterei', cost: [80, 0, 0, 60],   t: 60, a: 12, v: 6,  l: 30, s: 12, req: 1 },
+  schwer:  { name: 'Schwere Reiterei', cost: [120, 0, 0, 120], t: 90, a: 20, v: 14, l: 45, s: 9,  req: 5 }
+};
+
+export const MAX_TRAIN_ORDERS = 3;
+export const MAX_TRAIN_COUNT = 1000;
+
+export function freshState(now) {
+  const lv = {}; for (const k in B) lv[k] = 0;
+  lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
+  const troops = {}; for (const k in U) troops[k] = 0;
+  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, at: now };
+}
+
+const round5 = n => Math.max(0, Math.round(n / 5) * 5);
+export const costOf = (id, t) => B[id].base.map(c => round5(c * Math.pow(1.5, t - 1)));
+export const timeOf = (id, t) => B[id].time * Math.pow(1.6, t - 1);
+export const capFor = l => Math.round(1500 * Math.pow(1.6, l));
+export const cap = S => capFor(S.lv.lager);
+export const protectedPct = S => S.lv.lager ? Math.min(40, 20 + S.lv.lager) : 20;
+export const prodAt = (id, l) => l <= 0 ? 0 : Math.round(120 * l * Math.pow(1.15, l - 1));
+export const troopCount = S => Object.values(S.troops).reduce((a, b) => a + b, 0);
+export const queuedTroops = S => Object.values(S.train).flat().reduce((a, o) => a + o.count, 0);
+export const maxQueues = S => S.lv.rathaus >= 10 ? 2 : 1;
+export const inQueue = (S, id) => S.queue.find(q => q.id === id);
+export const afford = (S, c) => c.every((v, i) => S.res[RES[i]] >= v);
+export const unitTime = (S, u, bid) => U[u].t * Math.pow(0.95, Math.max(0, S.lv[bid] - 1));
+
+export function rate(S, r) {
+  if (r === 'gold') return 5 + 10 * S.lv.rathaus;
+  const id = Object.keys(B).find(k => B[k].prod === r);
+  let v = 15 + prodAt(id, S.lv[id]);
+  if (r === 'food') v -= troopCount(S);
+  return v;
+}
+
+export function blocker(S, id) {
+  const b = B[id], t = S.lv[id] + 1;
+  if (S.lv.rathaus < b.unlock) return 'Freigeschaltet ab Rathaus Stufe ' + b.unlock;
+  if (id === 'rathaus' && t > 20) return 'Höchststufe erreicht';
+  if (id !== 'rathaus' && t > S.lv.rathaus) return 'Erst das Rathaus auf Stufe ' + t + ' ausbauen';
+  if (inQueue(S, id)) return 'Wird bereits gebaut';
+  if (S.queue.length >= maxQueues(S)) return 'Alle Bauschleifen belegt';
+  if (!afford(S, costOf(id, t))) return 'Nicht genug Ressourcen';
+  return '';
+}
+
+// g = vergangene Spielsekunden
+function step(S, g) {
+  const c = cap(S);
+  for (const r of RES) { // über der Lagergrenze wächst nichts mehr; Verbrauch zieht immer ab
+    const v = S.res[r], delta = rate(S, r) / 3600 * g;
+    if (delta >= 0) { if (v < c) S.res[r] = Math.min(c, v + delta); }
+    else S.res[r] = Math.max(0, v + delta);
+  }
+  S.res.gold += rate(S, 'gold') / 3600 * g;
+  for (const q of S.queue) q.left -= g;
+  for (const q of S.queue.filter(q => q.left <= 0)) S.lv[q.id] = q.target;
+  S.queue = S.queue.filter(q => q.left > 0);
+  for (const bid of Object.keys(S.train)) {
+    const list = S.train[bid]; let rem = g;
+    while (list.length && rem > 0) {
+      const o = list[0];
+      if (o.left > rem) { o.left -= rem; rem = 0; break; }
+      rem -= o.left; S.troops[o.unit]++; o.count--; o.left = o.per;
+      if (o.count <= 0) list.shift();
+    }
+    if (!list.length) delete S.train[bid];
+  }
+}
+
+// Bringt den Zustand auf den Zeitpunkt `now` (ms). speed = Spieltempo der Partie.
+export function advanceTo(S, now, speed) {
+  let gap = Math.min(Math.max(0, now - S.at) / 1000, 60 * 86400) * speed;
+  while (gap > 0) {
+    const st = Math.min(gap, Math.max(60, gap / 4000));
+    step(S, st); gap -= st;
+  }
+  S.at = now;
+  return S;
+}
+
+// Befehle des Spielers. Gibt '' bei Erfolg zurück, sonst eine Fehlermeldung.
+export function applyCommand(S, cmd) {
+  if (!cmd || typeof cmd !== 'object') return 'Ungültiger Befehl';
+  const id = cmd.id;
+  if (cmd.type === 'upgrade') {
+    if (!B[id]) return 'Unbekanntes Gebäude';
+    const why = blocker(S, id); if (why) return why;
+    const t = S.lv[id] + 1, tm = timeOf(id, t);
+    costOf(id, t).forEach((v, i) => S.res[RES[i]] -= v);
+    S.queue.push({ id, target: t, left: tm, total: tm });
+    return '';
+  }
+  if (cmd.type === 'cancel') {
+    const q = B[id] && inQueue(S, id); if (!q) return 'Kein Bauauftrag';
+    costOf(id, q.target).forEach((v, i) => S.res[RES[i]] += v);
+    S.queue = S.queue.filter(x => x !== q);
+    return '';
+  }
+  if (cmd.type === 'train') {
+    const b = B[id], u = cmd.unit, n = Math.floor(Number(cmd.count));
+    if (!b || !b.units || !b.units.includes(u)) return 'Diese Einheit wird hier nicht ausgebildet';
+    if (!(n >= 1 && n <= MAX_TRAIN_COUNT)) return 'Ungültige Anzahl';
+    if (S.lv[id] < 1) return 'Gebäude noch nicht gebaut';
+    if (S.lv[id] < U[u].req) return 'Erst ' + b.name + ' auf Stufe ' + U[u].req + ' ausbauen';
+    const list = S.train[id] || [];
+    if (list.length >= MAX_TRAIN_ORDERS) return 'Ausbildungsschleife voll';
+    const total = U[u].cost.map(c => c * n);
+    if (!afford(S, total)) return 'Nicht genug Ressourcen';
+    total.forEach((v, i) => S.res[RES[i]] -= v);
+    const per = unitTime(S, u, id);
+    list.push({ unit: u, count: n, per, left: per });
+    S.train[id] = list;
+    return '';
+  }
+  return 'Unbekannter Befehl';
+}

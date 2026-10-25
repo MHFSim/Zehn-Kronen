@@ -1,0 +1,12 @@
+{
+  "name": "zehn-kronen",
+  "version": "0.2.0",
+  "description": "Browser-Strategiespiel für bis zu 10 Spieler",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning test/rules.test.js"
+  }
+}

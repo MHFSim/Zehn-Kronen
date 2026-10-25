@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zehn Kronen · Admin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/public/style.css">
+<style>
+/* Layout: eine schmale Spalte mit Partien als Karten */
+.wrap{max-width:720px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:30px;color:var(--brass)}
+header span{color:var(--muted);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.match h2{margin:0;font-size:22px}
+.invite{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.invite code{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;word-break:break-all;flex:1;min-width:0;-webkit-user-select:all;user-select:all}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 8px;border-top:1px solid var(--line)}
+th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.06em;border-top:0}
+.tbl{overflow-x:auto}
+.inline{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.inline .field{flex:1;min-width:140px}
+.small{padding:5px 10px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Zehn Kronen</h1><span>Admin</span></header>
+
+  <section class="block" id="login" hidden>
+    <h3>Anmelden</h3>
+    <form id="loginForm" class="inline" novalidate>
+      <div class="field"><label for="pw">Admin-Passwort</label><input id="pw" type="password" autocomplete="current-password"></div>
+      <button class="btn" type="submit">Anmelden</button>
+    </form>
+    <p class="err" id="loginErr" role="alert"></p>
+    <p class="note">Das Passwort steht beim ersten Serverstart in der Konsole, oder du setzt es mit ADMIN_PASSWORD.</p>
+  </section>
+
+  <div id="panel" hidden>
+    <section class="block">
+      <h3>Neue Partie</h3>
+      <form id="createForm" class="inline" novalidate>
+        <div class="field"><label for="mName">Name</label><input id="mName" maxlength="40" placeholder="z. B. Herbstfeldzug"></div>
+        <div class="field" style="flex:0 0 110px;min-width:110px"><label for="mSpeed">Tempo</label><input id="mSpeed" type="number" min="1" max="1000" value="1"></div>
+        <button class="btn" type="submit">Erstellen</button>
+      </form>
+      <p class="note">Tempo 1 = echte Spielzeiten. Für Tests z. B. 10 oder 100.</p>
+    </section>
+    <div id="matches" style="display:flex;flex-direction:column;gap:16px"></div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let data = {}; try { data = await r.json(); } catch {}
+  return { ok: r.ok, status: r.status, data };
+}
+function ago(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 2) return 'gerade eben'; if (m < 60) return 'vor ' + m + ' min';
+  const h = Math.floor(m / 60); if (h < 48) return 'vor ' + h + ' h';
+  return 'vor ' + Math.floor(h / 24) + ' Tagen';
+}
+const armed = {};
+async function load() {
+  const r = await api('/api/admin/overview');
+  if (r.status === 401) { $('login').hidden = false; $('panel').hidden = true; return; }
+  $('login').hidden = true; $('panel').hidden = false;
+  const { matches, now } = r.data;
+  $('matches').innerHTML = matches.length ? matches.map(m => {
+    const link = location.origin + '/?einladung=' + m.invite;
+    return `<section class="block match">
+      <div class="row" style="justify-content:space-between"><h2>${esc(m.name)}</h2><span class="note">${m.players.length} von ${m.max_players} Spielern · Tempo ×${m.speed}</span></div>
+      <div class="invite"><code>${esc(link)}</code><button class="btn small" data-act="copy" data-link="${esc(link)}" type="button">Kopieren</button><button class="btn ghost small" data-act="invite" data-id="${m.id}" type="button">Neuer Link</button></div>
+      ${m.players.length ? `<div class="tbl"><table><thead><tr><th>Spieler</th><th>Rathaus</th><th>Truppen</th><th>Zuletzt da</th><th></th></tr></thead><tbody>
+        ${m.players.map(p => `<tr><td>${esc(p.name)}</td><td>${p.rathaus}</td><td>${p.troops}</td><td>${ago(now - p.lastSeen)}</td>
+          <td><button class="btn ${armed['k' + p.id] ? 'danger' : 'ghost'} small" data-act="kick" data-id="${p.id}" type="button">${armed['k' + p.id] ? 'Wirklich entfernen' : 'Entfernen'}</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="note">Noch niemand beigetreten. Schick den Link oben an deine Mitspieler.</p>'}
+      <div class="inline">
+        <div class="field" style="flex:0 0 110px;min-width:110px"><label for="sp${m.id}">Tempo</label><input id="sp${m.id}" type="number" min="1" max="1000" value="${m.speed}"></div>
+        <button class="btn ghost" data-act="speed" data-id="${m.id}" type="button">Tempo setzen</button>
+        <button class="btn ${armed['d' + m.id] ? 'danger' : 'ghost'}" data-act="delete" data-id="${m.id}" type="button" style="margin-left:auto">${armed['d' + m.id] ? 'Partie wirklich löschen' : 'Partie löschen'}</button>
+      </div>
+    </section>`;
+  }).join('') : '<p class="note">Noch keine Partie. Erstelle oben die erste.</p>';
+}
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const r = await api('/api/admin/login', { password: $('pw').value });
+  if (!r.ok) { $('loginErr').textContent = r.data.error || 'Anmeldung fehlgeschlagen.'; return; }
+  load();
+});
+$('createForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  await api('/api/admin/match', { action: 'create', name: $('mName').value, speed: $('mSpeed').value });
+  $('mName').value = ''; load();
+});
+$('matches').addEventListener('click', async e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  if (act === 'copy') {
+    try { await navigator.clipboard.writeText(el.dataset.link); el.textContent = 'Kopiert'; }
+    catch { const c = el.previousElementSibling; const sel = getSelection(), rg = document.createRange(); rg.selectNodeContents(c); sel.removeAllRanges(); sel.addRange(rg); el.textContent = 'Markiert'; }
+    setTimeout(() => { el.textContent = 'Kopieren'; }, 1500); return;
+  }
+  if (act === 'kick' || act === 'delete') {
+    const k = (act === 'kick' ? 'k' : 'd') + id;
+    if (!armed[k]) { armed[k] = true; setTimeout(() => { delete armed[k]; load(); }, 4000); return load(); }
+    delete armed[k];
+    await api('/api/admin/match', act === 'kick' ? { action: 'kick', playerId: id } : { action: 'delete', id });
+    return load();
+  }
+  if (act === 'invite') await api('/api/admin/match', { action: 'invite', id });
+  if (act === 'speed') await api('/api/admin/match', { action: 'speed', id, speed: $('sp' + id).value });
+  load();
+});
+load();
+setInterval(() => { if (!$('panel').hidden) load(); }, 30000);
+</script>
+</body>
+</html>
