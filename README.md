@@ -1,6 +1,6 @@
 # Zehn Kronen
 
-Browser-Strategiespiel für bis zu 10 Spieler. Stand: Schritt 2 des Entwicklungsplans – eigener Stadt-Ausbau mit Server, Anmeldung, Admin-Bereich und Einladungslink.
+Browser-Strategiespiel für bis zu 10 Spieler. Stand: Schritt 3 des Entwicklungsplans – Stadt-Ausbau plus gemeinsame Weltkarte (96 x 96 Felder, Nebel des Krieges, Felder, Banditenlager, Ruinen, Heere mit Marsch und Kampf, Berichte, Lazarett).
 
 ## Was du brauchst
 
@@ -43,10 +43,15 @@ Dann im Browser:
 ```
 server/index.js    Webserver, Anmeldung, Admin, Live-Verbindung
 server/db.js       Datenbank (SQLite, in Node.js eingebaut)
-shared/rules.js    Spielregeln – laufen auf dem Server und im Browser
-public/            Spielseite, Admin-Seite, Aussehen
-test/              Regeltests (npm test)
+shared/rules.js    Stadtregeln – laufen auf dem Server und im Browser
+shared/mapgen.js   Kartenerzeugung aus einem Seed und Wegfindung (identisch auf Server und Client)
+shared/world.js    Weltregeln: Märsche, Sammeln, Kämpfe, Berichte, Nebel
+public/map.js      Kartendarstellung (PixiJS, eigener Gelände-Shader, Wasser, Nebel)
+public/art.js      Bilder der Karte, beim Start per Canvas gemalt (kein Download)
+test/              Regel- und Welttests (npm test)
 ```
+
+Die Karte entsteht aus dem Seed der Partie und ist auf allen Rechnern gleich. Der Nebel des Krieges wird pro Spieler gespeichert.
 
 Der Server ist maßgeblich: Bauaufträge, Ausbildung und Ressourcen werden dort geprüft und gespeichert. Der Browser rechnet mit denselben Regeln nur zur flüssigen Anzeige mit. Alle Abläufe hängen an Zeitstempeln in der Datenbank, deshalb übersteht das Spiel auch einen Neustart des Servers.
 

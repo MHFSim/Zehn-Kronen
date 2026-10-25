@@ -34,5 +34,9 @@ export function openDb(file) {
       created INTEGER NOT NULL
     );
   `);
+  // Spalten, die mit der Weltkarte dazugekommen sind (bei älteren Datenbanken nachtragen)
+  const cols = db.prepare("PRAGMA table_info(matches)").all().map(c => c.name);
+  if (!cols.includes('seed')) db.exec('ALTER TABLE matches ADD COLUMN seed INTEGER');
+  if (!cols.includes('world')) db.exec('ALTER TABLE matches ADD COLUMN world TEXT');
   return db;
 }

@@ -18,19 +18,39 @@ def must_rep(old, new, text):
         raise SystemExit('Text nicht gefunden: ' + old[:70])
     return text.replace(old, new)
 
-# --- Regeln: export entfernen ---
-rules = re.sub(r'^export ', '', rd('shared/rules.js'), flags=re.M)
+# --- Module: jedes in eigenen Gültigkeitsbereich, Imports/Exports umgeschrieben ---
+def wrap(name, src):
+    exports = []
+    def imp(m):
+        mod = re.search(r"/?([\w-]+)\.js$", m.group(2)).group(1)
+        return 'const {' + m.group(1) + '} = __M.' + mod + ';'
+    src = re.sub(r"import\s*\{(.*?)\}\s*from\s*'([^']+)';", imp, src, flags=re.S)
+    def ex(m):
+        exports.append(m.group(2))
+        if m.group(1) != 'function':
+            for e in re.finditer(r",\s*([A-Za-z_]\w*)\s*=\s", re.split(r'[(\[{]|=>', m.group(0).split('\n')[0])[0]):
+                exports.append(e.group(1))
+        return m.group(0).replace('export ', '', 1)
+    src = re.sub(r"^export (const|let|function|class) ([A-Za-z_]\w*)[^\n]*", ex, src, flags=re.M)
+    exports = list(dict.fromkeys(exports))
+    return f"__M.{name} = (() => {{\n{src}\nreturn {{{', '.join(exports)}}};\n}})();"
 
-# --- Server-Nachbildung ---
-sim = rd('tools/sim.js')
+import os
+mods = []
+for name, path in [('mapgen', 'shared/mapgen.js'), ('rules', 'shared/rules.js'), ('world', 'shared/world.js'),
+                   ('art', 'public/art.js'), ('map', 'public/map.js')]:
+    if (root / path).exists():
+        mods.append(wrap(name, rd(path)))
+sim = wrap('sim', rd('tools/sim.js'))
 
-# --- Spiel: Import entfernen, Anpassungen für die Testversion ---
-game = must_sub(r"import \{.*?\} from '/shared/rules\.js';\n", '', rd('public/game.js'), flags=re.S)
+# --- Spiel: Anpassungen für die Testversion ---
+game = rd('public/game.js')
 game = must_rep("const invite = params.get('einladung') || '';", "let invite = window.zkSimInvite();", game)
 game = must_rep("document.getElementById('toLogin').onclick = () => { location.href = '/'; };",
   "document.getElementById('toLogin').onclick = () => { invite = ''; document.getElementById('authLead').textContent = 'Melde dich an, um deine Stadt zu regieren.'; document.getElementById('authBtn').textContent = 'Anmelden'; document.getElementById('authNote').textContent = ''; $err.textContent = ''; };", game)
 game = must_rep("  if (invite) history.replaceState(null, '', '/');\n", '', game)
 game = game.replace("location.href = '/'", 'location.reload()')
+game = wrap('game', game)
 
 # --- Admin: Seite und Skript übernehmen ---
 adm = rd('public/admin.html')
@@ -52,7 +72,7 @@ idx = rd('public/index.html')
 g_css = re.search(r'<style>(.*?)</style>', idx, re.S).group(1)
 auth_html = re.search(r'(<main class="auth".*?</main>)', idx, re.S).group(1)
 auth_html = must_rep('<p class="note" id="authNote">', '<p class="note" id="simNote">Testversion im Chat: Der Server wird in deinem Browser nachgebildet. Mit „Admin“ unten rechts erstellst du Partien und lädst weitere Spieler ein.</p>\n    <p class="note" id="authNote">', auth_html)
-game_html = re.search(r'(<div id="game" hidden>.*?</header>\n  <div class="hud" id="hud"></div>\n  <section class="sheet".*?</section>\n</div>)', idx, re.S).group(1)
+game_html = re.search(r'(<div id="game" hidden>.*?</nav>\n</div>)', idx, re.S).group(1)
 
 base_css = rd('public/style.css')
 
@@ -64,7 +84,7 @@ page = f'''<title>Zehn Kronen Testversion</title>
 {g_css}
 /* Testversion: Umschalter und Admin-Ebene */
 .hud{{right:max(112px,env(safe-area-inset-right,0px))}}
-.swap{{position:fixed;z-index:30;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);background:var(--panel-2);border:1px solid var(--brass);color:var(--ink);border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px}}
+.swap{{position:fixed;z-index:30;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(var(--nav) + 12px);background:var(--panel-2);border:1px solid var(--brass);color:var(--ink);border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px}}
 body.sheet-open:not(.admin-on) .swap{{display:none}}
 #adminView .wrap{{padding-bottom:88px}}
 #adminView .invite code{{flex:1 1 100%}}
@@ -87,13 +107,11 @@ body.sheet-open:not(.admin-on) .swap{{display:none}}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 <script type="module">
-/* ===== Spielregeln ===== */
-{rules}
+const __M = {{}};
+{chr(10).join(mods)}
 
 /* ===== Nachbildung des Node.js-Servers (nur Testversion) ===== */
-{{
 {sim}
-}}
 
 /* ===== Spiel ===== */
 {game}

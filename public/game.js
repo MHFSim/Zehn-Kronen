@@ -2,11 +2,15 @@
 // und zwischen zwei Server-Antworten mit denselben Regeln flüssig weitergerechnet.
 import {
   RES, RES_DE, B, U, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
-  maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo
+  maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots
 } from '/shared/rules.js';
+import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos, battle, campTroops, campMult, campLoot, capacityOf, sum } from '/shared/world.js';
+import { NODE_MAX } from '/shared/mapgen.js';
+import { WorldMap } from '/public/map.js';
 
 /* ---------- Verbindung zum Server ---------- */
-let S = null, speed = 1, offset = 0, me = null, match = null, live = false;
+let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
+let mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -16,9 +20,10 @@ async function api(path, body) {
 }
 function accept(v) {
   if (!v || !v.state) return;
-  S = v.state; speed = v.match.speed; me = v.me; match = v.match;
+  S = v.state; speed = v.match.speed; me = v.me; match = v.match; view = v;
   offset = v.now - Date.now();
   dirty = true;
+  if (wm && mapReady) wm.sync(v, me.id, offset);
 }
 const serverNow = () => Date.now() + offset;
 
@@ -288,20 +293,30 @@ function redraw() {
   if (sel) { const b = B[sel]; selG.lineStyle(3, BRASS, 1); selG.drawPolygon(diamond(b.x + .04, b.y + .04, b.w - .08, b.w - .08).flatMap(p => [p.x, p.y])); selG.lineStyle(0); }
 }
 
-/* ---------- Kamera ---------- */
+/* ---------- Kamera (Stadt und Karte teilen sich die Bedienung) ---------- */
+const cam = () => mode === 'map' && wm ? wm.root : world;
 function clampCam() {
-  const s = world.scale.x, W = app.screen.width, H = app.screen.height;
-  world.x = Math.min(W * .85 + N * TW / 2 * s, Math.max(W * .15 - N * TW / 2 * s, world.x));
-  world.y = Math.min(H * .85 + 40 * s, Math.max(H * .2 - (N * TH + 40) * s, world.y));
+  const c = cam(), s = c.scale.x, W = app.screen.width, H = app.screen.height;
+  if (mode === 'map') {
+    c.x = Math.min(W / 2 + 3072 * s, Math.max(W / 2 - 3072 * s, c.x));
+    c.y = Math.min(H * .7, Math.max(H * .3 - 3300 * s, c.y));
+    return;
+  }
+  c.x = Math.min(W * .85 + N * TW / 2 * s, Math.max(W * .15 - N * TW / 2 * s, c.x));
+  c.y = Math.min(H * .85 + 40 * s, Math.max(H * .2 - (N * TH + 40) * s, c.y));
 }
 function zoomAt(p, ns) {
-  const s = world.scale.x; ns = Math.min(1.8, Math.max(.32, ns));
-  const wx = (p.x - world.x) / s, wy = (p.y - world.y) / s;
-  world.scale.set(ns); world.x = p.x - wx * ns; world.y = p.y - wy * ns; clampCam();
+  const c = cam(), s = c.scale.x; ns = mode === 'map' ? Math.min(1.7, Math.max(.14, ns)) : Math.min(1.8, Math.max(.32, ns));
+  const wx = (p.x - c.x) / s, wy = (p.y - c.y) / s;
+  c.scale.set(ns); c.x = p.x - wx * ns; c.y = p.y - wy * ns; clampCam();
 }
 function centerCam() {
   const s = Math.min(1, Math.max(.42, app.screen.width / 760)), c = iso(6.5, 6.5);
   world.scale.set(s); world.x = app.screen.width / 2 - c.x * s; world.y = app.screen.height * .56 - c.y * s; clampCam();
+}
+function focusMap(tx, ty, zoom) {
+  const c = wm.root, s = zoom || c.scale.x, p = wm.worldPos(tx, ty);
+  c.scale.set(s); c.x = app.screen.width / 2 - p.x * s; c.y = app.screen.height * (document.body.classList.contains('sheet-open') ? .26 : .46) - p.y * s; clampCam();
 }
 function setupInput() {
   const view = app.view, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lastMid = null;
@@ -309,15 +324,15 @@ function setupInput() {
   view.addEventListener('pointerdown', e => {
     view.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 1) { moved = false; downAt = { x: e.clientX, y: e.clientY }; }
-    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), s: world.scale.x }; lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; moved = true; }
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), s: cam().scale.x }; lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; moved = true; }
   });
   view.addEventListener('pointermove', e => {
     const prev = ptrs.get(e.pointerId); if (!prev) return;
     const cur = { x: e.clientX, y: e.clientY }; ptrs.set(e.pointerId, cur);
-    if (ptrs.size === 1) { world.x += cur.x - prev.x; world.y += cur.y - prev.y; clampCam(); if (dist(cur, downAt) > 8) moved = true; }
+    if (ptrs.size === 1) { cam().x += cur.x - prev.x; cam().y += cur.y - prev.y; clampCam(); if (dist(cur, downAt) > 8) moved = true; }
     else if (ptrs.size === 2 && pinch) {
       const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      world.x += mid.x - lastMid.x; world.y += mid.y - lastMid.y; lastMid = mid;
+      cam().x += mid.x - lastMid.x; cam().y += mid.y - lastMid.y; lastMid = mid;
       zoomAt(mid, pinch.s * dist(a, b) / pinch.d);
     }
   });
@@ -328,12 +343,13 @@ function setupInput() {
     if (ptrs.size < 2) { pinch = null; lastMid = null; }
   };
   view.addEventListener('pointerup', end); view.addEventListener('pointercancel', end);
-  view.addEventListener('wheel', e => { e.preventDefault(); zoomAt({ x: e.clientX, y: e.clientY }, world.scale.x * (e.deltaY < 0 ? 1.12 : .89)); }, { passive: false });
+  view.addEventListener('wheel', e => { e.preventDefault(); zoomAt({ x: e.clientX, y: e.clientY }, cam().scale.x * (e.deltaY < 0 ? 1.12 : .89)); }, { passive: false });
   window.addEventListener('resize', () => setTimeout(clampCam, 50));
 }
 let hinted = false;
 try { hinted = localStorage.getItem('zk-hint') === '1'; } catch {}
 function tap(sx, sy) {
+  if (mode === 'map') return mapTap(sx, sy);
   const s = world.scale.x, wx = (sx - world.x) / s, wy = (sy - world.y) / s;
   let best = null;
   for (const id in bounds) { const r = bounds[id]; if (wx >= r.x0 && wx <= r.x1 && wy >= r.y0 && wy <= r.y1 && (!best || r.d > bounds[best].d)) best = id; }
@@ -360,6 +376,7 @@ function renderHud() {
   if (!S.queue.length) parts.push(`<div class="chip hint">Bauschleife frei (${maxQueues(S)})</div>`);
   const tq = queuedTroops(S);
   parts.push(`<div class="chip">Truppen ${fmtN(troopCount(S))}${tq ? ' · ' + fmtN(tq) + ' in Ausbildung' : ''}</div>`);
+  for (const m of ownMarches()) parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}</button>`);
   if (!hinted) parts.push('<div class="chip hint">Tippe ein Gebäude an</div>');
   $('hud').innerHTML = parts.join('');
 }
@@ -408,21 +425,24 @@ function troopsHTML() {
 }
 function matchHTML() {
   return `<div class="block"><h3>Partie „${esc(match.name)}“</h3>
-    <p class="note">Angemeldet als <b>${esc(me.name)}</b>. Mitspieler: ${match.players.map(esc).join(', ')}.</p>
+    <p class="note">Angemeldet als <b>${esc(me.name)}</b>. Mitspieler: ${match.players.map(p => esc(p.name)).join(', ')}.</p>
     <div class="row"><button class="btn ghost" type="button" data-act="logout">Abmelden</button></div></div>`;
 }
 function signature() {
+  if (msel) return mapSignature();
   if (!sel) return '';
   return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy]);
 }
 function renderSheet() {
+  if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
   $('sheetInner').innerHTML = `<div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${id === 'rathaus' || (b.units && L) ? troopsHTML() : ''}${id === 'rathaus' ? matchHTML() : ''}`;
+    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${id === 'rathaus' || (b.units && L) ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'rathaus' ? matchHTML() : ''}`;
   sheetSig = signature();
 }
 function updateSheet() {
+  if (msel) return updateMapSheet();
   if (!sel) return;
   if (signature() !== sheetSig) return renderSheet();
   const q = inQueue(S, sel);
@@ -435,21 +455,23 @@ function openSheet(id) {
   world.x = app.screen.width / 2 - c.x * s; world.y = app.screen.height * .26 - c.y * s; clampCam();
   sel = id; document.body.classList.add('sheet-open'); renderSheet(); dirty = true;
 }
-function closeSheet() { sel = null; document.body.classList.remove('sheet-open'); dirty = true; }
+function closeSheet() { sel = null; msel = null; if (wm) wm.select(null); document.body.classList.remove('sheet-open'); dirty = true; }
 
 async function command(cmd) {
-  if (busy) return; busy = true;
+  if (busy) return false; busy = true;
   const r = await api('/api/cmd', cmd).catch(() => ({ ok: false, data: { error: 'Keine Verbindung zum Server.' } }));
   busy = false;
   if (r.data && r.data.state) accept(r.data);
   if (!r.ok) toast(r.data.error || 'Das hat nicht geklappt.');
-  renderSheet(); renderTop(); renderHud();
+  renderSheet(); renderTop(); renderHud(); renderNav();
+  return r.ok;
 }
 function setupSheet() {
   $('sheetInner').addEventListener('click', async e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
     if (act === 'close') return closeSheet();
+    if (mapAct(act, el)) return;
     if (act === 'upgrade') return command({ type: 'upgrade', id });
     if (act === 'cancel') return command({ type: 'cancel', id });
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
@@ -457,7 +479,198 @@ function setupSheet() {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
       pick[u] = Math.max(5, Math.min(1000, act === 'plus' ? n + step : n - step)); renderSheet();
     }
+    if (act === 'heal') return command({ type: 'heal', unit: u, count: Math.min(S.wounded[u] || 0, Number(el.dataset.n) || 1e9) });
     if (act === 'logout') { await api('/api/logout', {}); location.href = '/'; }
+  });
+}
+
+/* ---------- Karte: Bedienung ---------- */
+const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', ore: 'Erzmine', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', start: 'Burg' };
+const KIND_SHORT = { farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron' };
+const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
+const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
+function marchRemain(m) { const L = m.arr[m.arr.length - 1], g = gtNow(); return m.phase === 'gather' ? m.tEnd - g : m.t0 + L - g; }
+function marchLine(m) {
+  const ph = m.phase === 'out' ? 'Marsch' : m.phase === 'gather' ? 'Sammelt' : 'Rückweg';
+  return `${ph} · ${KIND_SHORT[m.tk] || ''} · ${fmtT(real(Math.max(0, marchRemain(m))))}`;
+}
+const lootHTML = l => Object.keys(l).filter(r => l[r] > 0).map(r => `<span class="cost"><i class="r r-${r}"></i>${fmtN(l[r])}</span>`).join('');
+const troopsLine = t => Object.keys(t).filter(u => t[u] > 0 && U[u]).map(u => `${fmtN(t[u])} ${U[u].name}`).join(', ') || '—';
+function healHTML() {
+  const ws = Object.keys(S.wounded || {}).filter(u => S.wounded[u] > 0);
+  const queue = (S.train.lazarett || []).map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name} werden geheilt</span>${i === 0 ? `<div class="prog"><i id="trProg" style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" id="trTime">${fmtT(real(o.left + (o.count - 1) * o.per))}</span>` : '<span class="time">wartet</span>'}</div>`).join('');
+  const rows = ws.map(u => {
+    const n = S.wounded[u], all = U[u].cost.map(c => Math.ceil(c * n * .3)), ten = Math.min(n, 10);
+    return `<div class="unit"><div><div class="unit-name">${fmtN(n)}× ${U[u].name} verwundet</div><div class="unit-stats">Heilen kostet 30 % der Ausbildung · ${fmtT(real(U[u].t * .25))} je Einheit</div></div>
+      <div class="row" style="grid-column:1/-1"><span class="costs">${costHTML(all)}</span>${n > 10 ? `<button class="btn ghost" type="button" data-act="heal" data-u="${u}" data-n="10">10 heilen</button>` : ''}<button class="btn" type="button" data-act="heal" data-u="${u}" data-n="${n}" ${afford(S, all) && (S.train.lazarett || []).length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>${n > 10 ? 'Alle' : 'Heilen'}</button></div></div>`;
+  }).join('');
+  return `<div class="block"><h3>Verwundete (${fmtN(woundedCount(S))} von ${fmtN(lazarettCap(S))} Plätzen)</h3>${rows || '<p class="note">Niemand verwundet. Nach Kämpfen überleben bis zu 30 % der Verluste hier, wenn Platz ist.</p>'}${queue ? `<div class="block" style="padding:10px">${queue}</div>` : ''}</div>`;
+}
+
+function mapTap(sx, sy) {
+  if (!wm || !mapReady) return;
+  const c = wm.root, s = c.scale.x, hit = wm.pickAt((sx - c.x) / s, (sy - c.y) / s);
+  if (!hit) { closeSheet(); return; }
+  selectMap(hit, false);
+}
+function selectMap(hit, keepSend) {
+  sel = null; msel = hit; wm.select(hit);
+  if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; }
+  document.body.classList.add('sheet-open');
+  if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; focusMap(o.x + .5, o.y + .5); }
+  else { const m = view.world.marches.find(x => x.id === hit.id); if (m) { const p = marchPos(m, gtNow()); focusMap(p.x, p.y); } }
+  renderSheet();
+}
+function mapSignature() {
+  const w = view.world, id = msel.id;
+  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], w.ruins[id], RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).length]);
+}
+function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
+function planFor(o) {
+  const t = sendList(), key = o.id + JSON.stringify(t) + S.pos;
+  if (!sum(t)) return null;
+  if (planCache.key !== key) planCache = { key, plan: planMarch(wm.map, S, o, t) };
+  return planCache.plan;
+}
+function pickerHTML() {
+  const us = Object.keys(U).filter(u => S.troops[u] > 0);
+  if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
+  return `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => `<div class="unit"><div><div class="unit-name">${U[u].name}</div><div class="unit-stats">daheim ${fmtN(S.troops[u])} · trägt ${U[u].c}</div></div>
+    <div class="stepper"><button type="button" data-act="sminus" data-u="${u}" aria-label="Weniger">−</button><output>${fmtN(send[u] || 0)}</output><button type="button" data-act="splus" data-u="${u}" aria-label="Mehr">+</button></div></div>`).join('')}</div>`;
+}
+function renderMapSheet() {
+  const w = view.world; let h = '';
+  if (msel.type === 'march') {
+    const m = w.marches.find(x => x.id === msel.id);
+    if (!m) { closeSheet(); return; }
+    const tgt = wm.map.byId[m.tid], ph = m.phase === 'out' ? 'auf dem Weg zum Ziel' : m.phase === 'gather' ? 'sammelt' : 'auf dem Rückweg';
+    h = `<div class="sh-head"><h2>${m.own ? 'Dein Heer' : 'Heer von ' + esc(m.name)}</h2><span class="lvl">${ph}</span><button class="close" type="button" data-act="close">Schließen</button></div>
+      <dl class="stats"><dt>Ziel</dt><dd>${tgt ? OBJ_NAME[tgt.k] + (tgt.lv ? ' ' + tgt.lv : '') : '—'}</dd><dt>Noch</dt><dd id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</dd>
+      <dt>Truppen</dt><dd>${m.own ? troopsLine(m.troops) : fmtN(m.troops.n || 0) + ' Einheiten'}</dd>${m.own && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
+      ${m.phase === 'gather' && m.own ? `<dt>Sammelt</dt><dd class="costs">${lootHTML({ [m.res]: Math.floor(m.amount * Math.max(0, Math.min(1, (gtNow() - m.tStart) / (m.tEnd - m.tStart || 1)))) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
+      ${m.own && m.phase !== 'back' ? `<div class="row"><button class="btn ghost" type="button" data-act="recall">${m.phase === 'gather' ? 'Heimrufen (Beute bis jetzt)' : 'Zurückrufen'}</button></div>` : ''}`;
+  } else {
+    const o = wm.map.byId[msel.id], k = o.k, id = o.id, free = ownMarches().length < armySlots(S);
+    const title = k === 'start' ? ((view.match.players.find(p => p.slot === o.slot) || {}).name ? 'Burg von ' + esc(view.match.players.find(p => p.slot === o.slot).name) : 'Freier Burgplatz') : OBJ_NAME[k];
+    const lv = o.lv ? `<span class="lvl">Stufe ${o.lv}</span>` : '';
+    let body = '';
+    if (['farm', 'wood', 'stone', 'ore'].includes(k)) {
+      const max = NODE_MAX(o.lv), left = w.nodes[id] == null ? max : w.nodes[id], res = { farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' }[k], plan = planFor(o);
+      body = `<dl class="stats"><dt>Vorrat</dt><dd>${fmtN(left)} von ${fmtN(max)} ${RES_DE[res]}</dd></dl>${pickerHTML()}`;
+      if (plan && !plan.error) {
+        const amount = Math.floor(Math.min(plan.capacity, left)), gather = amount ? GATHER_FULL * amount / plan.capacity : 0;
+        body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Traglast</dt><dd>${fmtN(plan.capacity)}</dd><dt>Ertrag</dt><dd class="costs">${lootHTML({ [res]: amount })}</dd><dt>Sammeln</dt><dd>${fmtT(real(gather))}</dd><dt>Gesamt</dt><dd>${fmtT(real(2 * plan.duration + gather))}</dd></dl>`;
+      }
+      body += actionRow('Sammeln', plan, left < 50 ? 'Das Feld ist erschöpft.' : '', free);
+    } else if (k === 'camp') {
+      const dead = (w.camps[id] || 0) > gtNow(), def = campTroops(o.lv), mult = campMult(o.lv), plan = planFor(o), sel_ = sendList();
+      body = `<dl class="stats"><dt>Verteidiger</dt><dd>${troopsLine(def)}</dd><dt>Stärke</dt><dd>+${Math.round((mult - 1) * 100)} %</dd><dt>Beute</dt><dd class="costs">${lootHTML(campLoot(o.lv))}</dd></dl>`;
+      if (dead) body += '<p class="why">Dieses Lager ist gerade zerstört.</p>';
+      else {
+        body += pickerHTML();
+        if (plan && !plan.error) {
+          const r = battle(sel_, def, mult), lost = sum(sel_) - sum(r.attLeft);
+          body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(lost)} von ${fmtN(sum(sel_))}` : 'Niederlage · dein Heer wird aufgerieben'}</dd></dl>`;
+        }
+        body += actionRow('Angreifen', plan, '', free);
+      }
+    } else if (k === 'ruin') {
+      const done = !!w.ruins[id], plan = planFor(o), loot = { food: 200 * o.lv, wood: 200 * o.lv, stone: 300 * o.lv, ore: 300 * o.lv, gold: 150 * o.lv };
+      body = `<dl class="stats"><dt>Beute (einmalig)</dt><dd class="costs">${lootHTML(loot)}</dd></dl>`;
+      if (done) body += '<p class="why">Diese Ruine ist schon geplündert.</p>';
+      else { body += pickerHTML(); if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`; body += actionRow('Plündern', plan, '', free); }
+    } else if (k === 'start') {
+      const p = view.match.players.find(x => x.slot === o.slot);
+      body = p ? `<p class="desc">Rathaus Stufe ${p.rathaus}. ${p.id === me.id ? 'Das ist deine Burg.' : 'Angriffe auf andere Spieler kommen in einem späteren Schritt.'}</p>${p.id === me.id ? '<div class="row"><button class="btn" type="button" data-act="toCity">Zur Stadt</button></div>' : ''}`
+        : '<p class="desc">Hier ist noch niemand eingezogen. Mit dem Einladungslink kann ein Mitspieler diesen Platz besetzen.</p>';
+    } else if (k === 'sanct') body = '<p class="desc">Ein altes Heiligtum an den vier Wegen zum Thron. Wer es hält, soll später Vorteile bekommen – das kommt in einem späteren Schritt.</p>';
+    else body = '<p class="desc">In der Mitte der Welt wartet der Thron. Wer ihn am Ende hält, trägt die Zehn Kronen. Der Kampf darum kommt in einem späteren Schritt.</p>';
+    h = `<div class="sh-head"><h2>${title}</h2>${lv}<button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
+  }
+  $('sheetInner').innerHTML = h; sheetSig = mapSignature();
+}
+function actionRow(label, plan, why, free) {
+  const bad = why || (!sum(sendList()) ? 'Wähle Truppen aus.' : !free ? 'Alle Heere sind unterwegs.' : plan && plan.error ? plan.error : '');
+  return `<div class="row"><button class="btn" type="button" data-act="march" ${bad ? 'disabled' : ''}>${label}</button>${bad ? `<span class="why">${bad}</span>` : ''}</div>`;
+}
+function updateMapSheet() {
+  if (!msel) return;
+  if (mapSignature() !== sheetSig) return renderSheet();
+  if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
+}
+function mapAct(act, el) {
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity'].includes(act)) return false;
+  const u = el.dataset.u;
+  if (act === 'splus' || act === 'sminus') {
+    const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
+    send[u] = Math.max(0, Math.min(home, act === 'splus' ? n + step : n - step)); renderSheet();
+  } else if (act === 'sall') { send = {}; for (const k in S.troops) if (S.troops[k] > 0) send[k] = S.troops[k]; renderSheet(); }
+  else if (act === 'snone') { send = {}; renderSheet(); }
+  else if (act === 'toCity') setMode('city');
+  else if (act === 'march') command({ type: 'march', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer ist unterwegs.'); closeSheet(); } });
+  else if (act === 'recall') command({ type: 'recall', id: msel.id });
+  return true;
+}
+
+/* ---------- Berichte ---------- */
+const unread = () => S.reports.filter(r => !r.read).length;
+function ago(t) { const s = Math.max(0, (Date.now() + offset - t) / 1000); return s < 90 ? 'gerade eben' : s < 5400 ? Math.round(s / 60) + ' Min.' : s < 129600 ? Math.round(s / 3600) + ' Std.' : Math.round(s / 86400) + ' Tage'; }
+function reportHTML(r) {
+  let d = '';
+  if (r.att) {
+    const rows = Object.keys(r.att.start).map(u => `<tr><td>${U[u].name}</td><td>${fmtN(r.att.start[u])}</td><td>${fmtN(r.att.left[u] || 0)}</td><td>${fmtN((r.att.wounded || {})[u] || 0)}</td><td>${fmtN((r.att.dead || {})[u] || 0)}</td></tr>`).join('');
+    const drows = Object.keys(r.def.start).map(u => `<tr><td>${U[u].name}</td><td>${fmtN(r.def.start[u])}</td><td>${fmtN(r.def.left[u] || 0)}</td></tr>`).join('');
+    d += `<table class="rep"><thead><tr><th>Dein Heer</th><th>Vor</th><th>Übrig</th><th>Verw.</th><th>Gef.</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="rep"><thead><tr><th>Banditen</th><th>Vor</th><th>Übrig</th></tr></thead><tbody>${drows}</tbody></table>
+      <p class="note">${r.rounds ? r.rounds.length + ' Kampfrunden.' : ''}</p>`;
+  }
+  if (r.text) d += `<p class="desc">${esc(r.text)}</p>`;
+  if (r.loot && Object.keys(r.loot).length) d += `<div class="costs">${lootHTML(r.loot)}</div>`;
+  return `<details class="report ${r.read ? '' : 'new'} ${r.win ? 'win' : 'loss'}"><summary><b>${esc(r.title)}</b><span class="time">${ago(r.t)}</span></summary>${d}</details>`;
+}
+function renderReports() {
+  const list = S.reports.map(reportHTML).join('') || '<p class="note">Noch keine Berichte. Schicke ein Heer zu einem Feld oder Banditenlager.</p>';
+  $('reportsInner').innerHTML = `<div class="sh-head"><h2>Berichte</h2><button class="close" type="button" data-act="rclose">Schließen</button></div>${list}`;
+}
+function openReports() {
+  closeSheet(); renderReports(); $('reports').hidden = false; document.body.classList.add('reports-open'); setNav('reports');
+  if (unread()) api('/api/cmd', { type: 'readReports' }).then(r => { if (r.data && r.data.state) { S.reports.forEach(x => { x.read = true; }); renderNav(); } });
+}
+function closeReports() { $('reports').hidden = true; document.body.classList.remove('reports-open'); setNav(mode); }
+function renderNav() { const n = S ? unread() : 0, b = $('navBadge'); if (b) { b.textContent = n; b.hidden = !n; } }
+function setNav(m) { document.querySelectorAll('.nav button[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === m)); }
+
+/* ---------- Umschalten Stadt / Karte ---------- */
+async function buildMap() {
+  if (mapReady) return true;
+  const el = $('loading'); el.hidden = false; await new Promise(r => setTimeout(r, 40));
+  try {
+    const r = await api('/api/map'); if (!r.ok) throw new Error(r.data.error || 'Karte nicht verfügbar');
+    wm = new WorldMap(PIXI, app); wm.load(r.data); mapReady = true; wm.sync(view, me.id, offset);
+    const own = wm.map.starts[S.slot] || { x: 48, y: 48 };
+    wm.root.scale.set(Math.min(.8, Math.max(.45, app.screen.width / 640)));
+    mode = 'map'; focusMap(own.x + .5, own.y + .5); mode = 'city';
+  } catch (e) { toast(String(e.message || e)); el.hidden = true; return false; }
+  el.hidden = true; return true;
+}
+async function setMode(m) {
+  if (!$('reports').hidden) closeReports();
+  if (m === mode && (m === 'city' || mapReady)) return;
+  if (m === 'map' && !(await buildMap())) return;
+  closeSheet(); mode = m;
+  app.stage.removeChildren(); app.stage.addChild(m === 'map' ? wm.root : world);
+  document.body.classList.toggle('mode-map', m === 'map'); setNav(m); dirty = true; renderHud();
+}
+function setupNav() {
+  $('nav').addEventListener('click', e => {
+    const b = e.target.closest('button[data-nav]'); if (!b) return;
+    if (b.dataset.nav === 'reports') return openReports();
+    setMode(b.dataset.nav);
+  });
+  $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); });
+  $('hud').addEventListener('click', async e => {
+    const c = e.target.closest('[data-march]'); if (!c) return;
+    await setMode('map'); if (mode === 'map') selectMap({ type: 'march', id: Number(c.dataset.march) }, true);
   });
 }
 
@@ -484,7 +697,7 @@ function startGame() {
   world = new PIXI.Container(); app.stage.addChild(world);
   ground = new PIXI.Graphics(); selG = new PIXI.Graphics(); og = new PIXI.Graphics(); badges = new PIXI.Container();
   world.addChild(ground, selG, og, badges);
-  setupInput(); setupSheet(); drawGround(); centerCam(); live = true; redraw(); renderTop(); renderHud();
+  setupInput(); setupSheet(); setupNav(); renderNav(); drawGround(); centerCam(); live = true; redraw(); renderTop(); renderHud();
   connect();
   setInterval(resync, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resync(); });
@@ -492,8 +705,14 @@ function startGame() {
   app.ticker.add(() => {
     advanceTo(S, serverNow(), speed); // dieselben Regeln wie auf dem Server, nur zur Anzeige
     acc += app.ticker.deltaMS / 1000;
-    if (acc >= .25) { acc = 0; redraw(); renderTop(); renderHud(); updateSheet(); dirty = false; }
+    const slow = acc >= .25;
+    if (mode === 'map' && mapReady) {
+      const c = wm.root, s = c.scale.x, H = app.screen.height;
+      wm.frame(app.ticker.deltaMS / 1000, s, { y0: -c.y / s, y1: (H - c.y) / s });
+      if (slow) { acc = 0; renderTop(); renderHud(); updateSheet(); }
+    } else if (slow) { acc = 0; redraw(); renderTop(); renderHud(); updateSheet(); dirty = false; }
     else if (dirty) { redraw(); dirty = false; }
   });
 }
+window.__zk = { get wm() { return wm; }, get cam() { return cam(); }, get sel() { return msel; } };   // nur für Tests
 boot();

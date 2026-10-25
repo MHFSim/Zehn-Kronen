@@ -25,7 +25,7 @@ export const B = {
   stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 100, 150], time: 40, units: ['leicht', 'schwer'],
               desc: 'Bildet Reiterei aus. Schwere Reiterei ab Stall Stufe 5.' },
   lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80, 0], time: 20,
-              desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind. Wird mit dem Kampfsystem aktiv.' },
+              desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind.' },
   akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 150, 80], time: 40,
               desc: 'Forschung für Wirtschaft und Militär. Folgt in Schritt 4 des Entwicklungsplans.' },
   mauer:    { name: 'Mauer & Tor', x: 6, y: 11, w: 2, unlock: 3, base: [0, 100, 200, 0], time: 20,
@@ -33,11 +33,11 @@ export const B = {
 };
 
 export const U = {
-  speer:   { name: 'Speerträger',      cost: [40, 50, 0, 0],   t: 30, a: 8,  v: 14, l: 30, s: 6,  req: 1 },
-  schwert: { name: 'Schwertkämpfer',   cost: [50, 0, 0, 40],   t: 40, a: 14, v: 10, l: 35, s: 6,  req: 1 },
-  bogen:   { name: 'Bogenschützen',    cost: [40, 60, 0, 0],   t: 35, a: 12, v: 8,  l: 22, s: 6,  req: 1 },
-  leicht:  { name: 'Leichte Reiterei', cost: [80, 0, 0, 60],   t: 60, a: 12, v: 6,  l: 30, s: 12, req: 1 },
-  schwer:  { name: 'Schwere Reiterei', cost: [120, 0, 0, 120], t: 90, a: 20, v: 14, l: 45, s: 9,  req: 5 }
+  speer:   { name: 'Speerträger',      cost: [40, 50, 0, 0],   t: 30, a: 8,  v: 14, l: 30, s: 6,  c: 15, req: 1 },
+  schwert: { name: 'Schwertkämpfer',   cost: [50, 0, 0, 40],   t: 40, a: 14, v: 10, l: 35, s: 6,  c: 20, req: 1 },
+  bogen:   { name: 'Bogenschützen',    cost: [40, 60, 0, 0],   t: 35, a: 12, v: 8,  l: 22, s: 6,  c: 10, req: 1 },
+  leicht:  { name: 'Leichte Reiterei', cost: [80, 0, 0, 60],   t: 60, a: 12, v: 6,  l: 30, s: 12, c: 40, req: 1 },
+  schwer:  { name: 'Schwere Reiterei', cost: [120, 0, 0, 120], t: 90, a: 20, v: 14, l: 45, s: 9,  c: 25, req: 5 }
 };
 
 export const MAX_TRAIN_ORDERS = 3;
@@ -47,7 +47,7 @@ export function freshState(now) {
   const lv = {}; for (const k in B) lv[k] = 0;
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
-  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, at: now };
+  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now };
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);
@@ -57,7 +57,12 @@ export const capFor = l => Math.round(1500 * Math.pow(1.6, l));
 export const cap = S => capFor(S.lv.lager);
 export const protectedPct = S => S.lv.lager ? Math.min(40, 20 + S.lv.lager) : 20;
 export const prodAt = (id, l) => l <= 0 ? 0 : Math.round(120 * l * Math.pow(1.15, l - 1));
-export const troopCount = S => Object.values(S.troops).reduce((a, b) => a + b, 0);
+export const homeTroops = S => Object.values(S.troops).reduce((a, b) => a + b, 0);
+export const awayTroops = S => Object.values(S.away || {}).reduce((a, b) => a + b, 0);
+export const troopCount = S => homeTroops(S) + awayTroops(S);
+export const woundedCount = S => Object.values(S.wounded || {}).reduce((a, b) => a + b, 0);
+export const lazarettCap = S => 200 * S.lv.lazarett;
+export const armySlots = S => 2 + (S.lv.rathaus >= 8 ? 1 : 0) + (S.lv.rathaus >= 14 ? 1 : 0);
 export const queuedTroops = S => Object.values(S.train).flat().reduce((a, o) => a + o.count, 0);
 export const maxQueues = S => S.lv.rathaus >= 10 ? 2 : 1;
 export const inQueue = (S, id) => S.queue.find(q => q.id === id);
@@ -150,6 +155,22 @@ export function applyCommand(S, cmd) {
     const per = unitTime(S, u, id);
     list.push({ unit: u, count: n, per, left: per });
     S.train[id] = list;
+    return '';
+  }
+  if (cmd.type === 'heal') {
+    const u = cmd.unit, n = Math.floor(Number(cmd.count));
+    if (!U[u]) return 'Unbekannte Einheit';
+    if (S.lv.lazarett < 1) return 'Erst das Lazarett bauen';
+    if (!(n >= 1) || n > (S.wounded[u] || 0)) return 'So viele Verwundete gibt es nicht';
+    const list = S.train.lazarett || [];
+    if (list.length >= MAX_TRAIN_ORDERS) return 'Heilschleife voll';
+    const total = U[u].cost.map(c => Math.ceil(c * n * 0.3));
+    if (!afford(S, total)) return 'Nicht genug Ressourcen';
+    total.forEach((v, i) => S.res[RES[i]] -= v);
+    S.wounded[u] -= n; if (!S.wounded[u]) delete S.wounded[u];
+    const per = U[u].t * 0.25;
+    list.push({ unit: u, count: n, per, left: per, heal: true });
+    S.train.lazarett = list;
     return '';
   }
   return 'Unbekannter Befehl';
