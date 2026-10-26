@@ -63,7 +63,7 @@ void main(){
   gl_FragColor=vec4(outc,1.0);
 }`;
 
-const CASTLE_SCALE = 2.0;   // Burgen sind deutlich größer und höher als alle anderen Orte
+const CASTLE_SCALE = 1.35;   // Burgen sind deutlich größer und höher als alle anderen Orte
 const SHOW_NAMES = false;
 export class WorldMap {
   constructor(PIXI, app) {
@@ -254,14 +254,14 @@ export class WorldMap {
       const tx = o.x + .5, ty = o.y + .5;
       const nameFor = { throne: 'throne', sanct: 'sanct', farm: 'farm', wood: 'wood', stone: 'stone', ore: 'ore', camp: 'camp', ruin: 'ruin', start: 'slot' }[o.k];
       const s = mk(nameFor, tx, ty, o.k === 'farm' || o.k === 'wood' || o.k === 'stone' || o.k === 'ore' ? .95 + .05 * o.lv : 1);
-      s.depth = tx + ty; s.own = holder; holder.main = s; items.push(s); holder.spr.push(s);
+      s.depth = tx + ty + (o.k === 'start' ? 2.5 : 0); s.own = holder; holder.main = s; items.push(s); holder.spr.push(s);
       if (o.k === 'camp') {
         const dead = mk('campDead', tx, ty, 1); dead.depth = tx + ty; dead.own = holder; dead.visible = false; holder.dead = dead; items.push(dead); holder.spr.push(dead);
         const fire = mk('fire0', tx, ty, .8); fire.x += -3; fire.y += 6; fire.depth = tx + ty + .05; fire.own = holder; holder.fire = fire; items.push(fire); holder.spr.push(fire);
       }
       if (o.k === 'start') {
-        const flag = mk('flag', tx, ty, 1); flag.depth = tx + ty + .1; flag.own = holder; flag.visible = false; holder.flag = flag; items.push(flag); holder.spr.push(flag);
-        const flag2 = mk('flag', tx, ty, .8); flag2.depth = tx + ty + .1; flag2.own = holder; flag2.visible = false; holder.flag2 = flag2; items.push(flag2); holder.spr.push(flag2);
+        const flag = mk('flag', tx, ty, 1); flag.depth = tx + ty + 2.6; flag.own = holder; flag.visible = false; holder.flag = flag; items.push(flag); holder.spr.push(flag);
+        const flag2 = mk('flag', tx, ty, .8); flag2.depth = tx + ty + 2.6; flag2.own = holder; flag2.visible = false; holder.flag2 = flag2; items.push(flag2); holder.spr.push(flag2);
       }
     }
     // in die Streifen einsortieren
@@ -319,7 +319,7 @@ export class WorldMap {
     const tx = x + .5, ty = y + .5, p = this.worldPos(tx, ty);
     for (const sp of h.spr) {
       const dx = sp === h.main ? 0 : sp.x - h.main.x, dy = sp === h.main ? 0 : sp.y - h.main.y;
-      sp.position.set(p.x + dx, p.y + dy); sp.tx = tx; sp.ty = ty; sp.depth = tx + ty + (sp === h.main ? 0 : .1);
+      sp.position.set(p.x + dx, p.y + dy); sp.tx = tx; sp.ty = ty; sp.depth = tx + ty + (sp === h.main ? 2.5 : 2.6);
       const b = Math.min(NB - 1, Math.floor(sp.depth / BW)), par = this.bands[b].sprites;
       if (sp.parent) sp.parent.removeChild(sp);
       let at = par.children.length; for (let i = 0; i < par.children.length; i++) if ((par.children[i].depth || 0) > sp.depth) { at = i; break; }
@@ -409,7 +409,7 @@ export class WorldMap {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, y = -46;
       if (o.k === 'start' && h.player) {
         const pl = h.player, al = pl.ally && (view.match.alliances || []).find(a => a.id === pl.ally), gt = this.gtNow();
-        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[135, 180, 235][(h.tier || 1) - 1] * CASTLE_SCALE - 14;
+        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[105, 140, 180][(h.tier || 1) - 1] * CASTLE_SCALE - 14;
         if (pl.id === this.myId) txt = '★ ' + txt;
         if (pl.out) { txt = '✖ ' + txt; col = 0x4a4036; }
         else if (pl.vassalOf) txt += ' (Vasall)';
