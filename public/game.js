@@ -3,10 +3,10 @@
 import {
   RES, RES_DE, B, U, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, techLv, techReq, techCost, techTime, techBlocker
+  T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
-import { checkSite, touches, opCost, OP_MIN_TROOPS, OP_BUILD, OP_R, OP_MAX_LV, maxOutposts, opGuard, opReady } from '/shared/outpost.js';
+import { checkSite, checkRaid, checkTeleport, touches, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
@@ -85,7 +85,7 @@ function fmtT(s) {
   return m + ':' + p(x);
 }
 const real = g => g / speed;
-const costHTML = c => c.map((v, i) => v ? `<span class="cost ${S.res[RES[i]] >= v ? '' : 'short'}"><i class="r r-${RES[i]}"></i>${RES_DE[RES[i]]} ${fmtN(v)}</span>` : '').join('');
+const costHTML = (c, have = S.res) => c.map((v, i) => v ? `<span class="cost ${have[RES[i]] >= v ? '' : 'short'}"><i class="r r-${RES[i]}"></i>${RES_DE[RES[i]]} ${fmtN(v)}</span>` : '').join('');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let toastTimer;
 function toast(msg, kind) {
@@ -180,7 +180,7 @@ function upgradeHTML(id) {
   const L = S.lv[id], t = L + 1, q = inQueue(S, id);
   if (q) return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + q.target : 'Wird gebaut'}</h3>
     <div class="row"><div class="prog"><i id="upProg" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" id="upTime">${fmtT(real(q.left))}</span></div>
-    <div class="row"><button class="btn ghost" data-act="cancel" type="button">Abbrechen (volle Erstattung)</button></div></div>`;
+    <div class="row"><button class="btn" data-speed="build:${id}" type="button">⚡ Beschleunigen</button><button class="btn ghost" data-act="cancel" type="button">Abbrechen (volle Erstattung)</button></div></div>`;
   if (id === 'rathaus' && L >= 20) return '<div class="block"><h3>Ausbau</h3><p class="note">Höchststufe erreicht.</p></div>';
   const c = costOf(id, t), why = blocker(S, id), tm = timeOf(id, t);
   return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + t : 'Bauen'}</h3>
@@ -200,13 +200,13 @@ function unitsHTML(id) {
     </div>`;
   }).join('');
   const list = (S.train[id] || []).map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0
-    ? `<div class="prog"><i id="trProg" style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" id="trTime">${fmtT(real(o.left + (o.count - 1) * o.per))}</span>`
+    ? `<div class="prog"><i id="trProg" style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" id="trTime">${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${id}" aria-label="Beschleunigen">⚡</button>`
     : '<span class="time">wartet</span>'}</div>`).join('');
   return `<div class="block"><h3>Ausbildung</h3>${rows}${list ? `<div class="block" style="padding:10px">${list}</div>` : ''}</div>`;
 }
 function researchHTML() {
   const r = S.research;
-  return `<div class="block"><h3>Forschung</h3>${r ? `<div class="row"><b>${T[r.id].name}</b> → Stufe ${r.target}<div class="prog"><i id="rsProg" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div><span class="time">${fmtT(real(r.left))}</span></div><div class="row"><button class="btn ghost" type="button" data-act="cancelResearch">Abbrechen (volle Erstattung)</button></div>` : '<p class="note">Im Moment wird nichts erforscht.</p>'}
+  return `<div class="block"><h3>Forschung</h3>${r ? `<div class="row"><b>${T[r.id].name}</b> → Stufe ${r.target}<div class="prog"><i id="rsProg" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div><span class="time">${fmtT(real(r.left))}</span></div><div class="row"><button class="btn" type="button" data-speed="research:1">⚡ Beschleunigen</button><button class="btn ghost" type="button" data-act="cancelResearch">Abbrechen (volle Erstattung)</button></div>` : '<p class="note">Im Moment wird nichts erforscht.</p>'}
     <div class="row"><button class="btn" type="button" data-act="toTech" ${S.lv.akademie ? '' : 'disabled'}>Zur Forschung</button></div></div>`;
 }
 function troopsHTML() {
@@ -341,10 +341,10 @@ function renderCity(force) {
   const sig = citySig(); if (!force && sig === citySigV) return; citySigV = sig;
   const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('city').scrollTop;
   const tr = []; for (const k in S.train) for (const [i, o] of S.train[k].entries()) tr.push({ k, o, first: i === 0 });
-  const row = (img, main, prog, time) => `<div class="ord"><img alt="" src="${img}"><div class="qmain">${main}${prog}</div>${time}</div>`;
-  const orders = q.map(x => row(imgOf(x.id), `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`))
-    .concat(S.research ? [row(imgOf(T[S.research.id].icon), `<b>${T[S.research.id].name}</b> → Stufe ${S.research.target} <span class="note">(Forschung)</span>`, `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div>`, `<span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span>`)] : [])
-    .concat(tr.map(({ k, o, first }) => row(imgOf(k), `<b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}`, first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : '', `<span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span>`)))
+  const row = (img, main, prog, time, sp) => `<div class="ord"><img alt="" src="${img}"><div class="qmain">${main}${prog}</div>${time}${sp ? `<button class="spd" type="button" data-speed="${sp}" aria-label="Beschleunigen">⚡</button>` : ''}</div>`;
+  const orders = q.map(x => row(imgOf(x.id), `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`, 'build:' + x.id))
+    .concat(S.research ? [row(imgOf(T[S.research.id].icon), `<b>${T[S.research.id].name}</b> → Stufe ${S.research.target} <span class="note">(Forschung)</span>`, `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div>`, `<span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span>`, 'research:1')] : [])
+    .concat(tr.map(({ k, o, first }) => row(imgOf(k), `<b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}`, first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : '', `<span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span>`, first && !o.heal ? 'train:' + k : '')))
     .concat(marches.map(m => `<button class="ord go" type="button" data-march="${m.id}"><div class="qmain"><b>Heer</b> · ${KIND_SHORT[m.tk] || ''}</div><span class="time" data-mtime="${m.id}">${marchLine(m)}</span></button>`));
   const freeSlots = q.length < maxQueues(S) ? '<div class="ord free">Baumeister frei: wähle unten ein Gebäude.</div>' : '';
   const stRow = stationTotal() ? `<div class="ord free">Verbündete Truppen in deiner Burg: <b>${fmtN(stationTotal())}</b> (Tab Bündnis)</div>` : '';
@@ -521,7 +521,7 @@ function tutorialHTML() {
     ['Ein Heer zu einem Feld schicken', rp.some(r => r.kind === 'gather' || r.kind === 'return'), 'Karte → Feld antippen, Truppen wählen, Sammeln.'],
     ['Ein Banditenlager besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Stufe 1 und 2 sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
-    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Karte → freies Feld antippen → Außenposten bauen. Er vergrößert dein Revier und ist nötig, um Heiligtümer und den Thron zu erreichen.'],
+    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Mehr → Revier & Lager). Karte → freies Feld antippen → Außenposten bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
     ['Ein Heiligtum besetzen', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Die vier Heiligtümer geben dir und deinem Bündnis +15 % auf einen Rohstoff.']
   ];
@@ -533,7 +533,7 @@ function rulesHTML() {
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
-  <p class="desc"><b>Revier:</b> Jede Burg und jeder Außenposten beansprucht ein Viereck auf der Karte. Neue Außenposten müssen dein Revier (oder das des Bündnisses) berühren und dürfen kein fremdes überlappen. Gegner können Außenposten zerstören.</p>
+  <p class="desc"><b>Revier:</b> Jede Burg und jeder Außenposten beansprucht ein Viereck auf der Karte. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und müssen das eigene Revier berühren. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
   <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Viereck deiner Gruppe den Ort berühren. Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {
@@ -558,20 +558,25 @@ function moreHTML() {
       <p class="note">Pro Person ist ein Konto vorgesehen. Mehrfachkonten fallen dem Admin auf und können entfernt werden.</p></div>
     <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
-  const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow();
-  const revier = `<p class="note">Jede Burg und jeder Außenposten beansprucht ein Viereck. Neue Außenposten müssen das Revier von dir oder deinem Bündnis berühren. Heiligtümer und den Thron kannst du nur besetzen, wenn dein Revier sie berührt. Du hältst ${myOps.length} von ${maxOutposts(S)} möglichen Außenposten (wächst mit dem Rathaus).</p>`
-    + (myOps.map(o => `<div class="mrow"><div><b>Außenposten Stufe ${o.lv}</b>${o.upg ? ' <span class="tag">Ausbau</span>' : ''}<div class="note">${gt2 < o.done ? 'im Bau, noch ' + fmtT(real(o.done - gt2)) : 'fertig'} · Besatzung ${fmtN(o.total)} · Revier ${2 * OP_R[o.lv] + 1}×${2 * OP_R[o.lv] + 1}</div></div><button class="btn ghost small" type="button" data-act="opGoto" data-id="${o.id}">Auf der Karte</button></div>`).join('') || '<p class="note">Du hast noch keinen Außenposten. Tippe auf der Karte ein freies Feld an, das dein Revier berührt.</p>');
+  const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow(), al0 = view.ally, st = al0 ? al0.store : null;
+  const revier = !al0 ? '<p class="note">Außenposten, Bündnislager und gemeinsames Revier gibt es nur im Bündnis. Gründe eines oder tritt einem bei (Tab Bündnis).</p>' : `
+    <p class="note">Das Revier gehört dem Bündnis: Jede Burg und jeder Außenposten beansprucht ein Viereck. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} von ${maxOutposts(al0)} möglichen.</p>
+    <div class="block"><h3>🏛 Bündnislager</h3><div class="costs">${costHTML(RES.map(r => st[r]), { food: 1e12, wood: 1e12, stone: 1e12, ore: 1e12 })}</div>
+      <p class="note">Ein neuer Außenposten kostet:</p><div class="costs">${costHTML(OP_COST, st)}</div><p class="note">Wer im Bündnisgebiet Felder, Wälder, Brüche oder Minen abbaut, füllt das Lager zusätzlich um ${Math.round(CLAN_SHARE * 100)} % der Beute; dir wird nichts abgezogen.</p>
+      <div class="donate">${RES.map(r => `<label>${RES_DE[r]}<input id="dn_${r}" type="number" inputmode="numeric" min="0" placeholder="0"></label>`).join('')}</div>
+      <div class="row"><button class="btn" type="button" data-act="donate">In das Lager einzahlen</button></div></div>`
+    + (myOps.map(o => `<div class="mrow"><div><b>Außenposten</b><div class="note">${gt2 < o.done ? 'im Bau, noch ' + fmtT(real(o.done - gt2)) : 'fertig'} · Besatzung ${fmtN(o.total || 0)}</div></div><button class="btn ghost small" type="button" data-act="opGoto" data-id="${o.id}">Auf der Karte</button></div>`).join('') || (al0 ? '<p class="note">Noch kein Außenposten. Tippe auf der Karte ein freies Feld an, das euer Revier berührt (nur mit gefülltem Lager).</p>' : ''));
   const tasks = tutorialHTML(), taskDone = (tasks.match(/class="chk done"/g) || []).length, taskAll = (tasks.match(/class="chk/g) || []).length;
   const SUBS = {
     game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], revier: ['🏰', 'Revier', revier], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], revier: ['🏰', 'Revier & Lager', revier], shop: ['🛒', 'Shop', shopHTML()], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('revier', '🏰', 'Revier', myOps.length + ' von ' + maxOutposts(S) + ' Außenposten')}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('revier', '🏰', 'Revier & Lager', view.ally ? myOps.length + ' von ' + maxOutposts(view.ally) + ' Außenposten' : 'braucht ein Bündnis')}${tile('shop', '🛒', 'Shop', 'Teleporter, Beschleuniger', itemN('teleport') + SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -593,7 +598,7 @@ function trainHTML() {
         ${ok ? `<div class="uact"><div class="stepper"><button type="button" data-act="minus" data-u="${u}" aria-label="Weniger">−</button><output>${n}</output><button type="button" data-act="plus" data-u="${u}" aria-label="Mehr">+</button></div>
           <button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && q.length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div><div class="costs">${costHTML(total)}</div>` : `<p class="note">Ab ${b.name} Stufe ${d.req}</p>`}</div>`;
     }).join('');
-    const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span>` : '<span class="time">wartet</span>'}</div>`).join('');
+    const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
     body = rows + `<div class="block"><h3>Ausbildungsschleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
   }
   return phead('⚔️', 'Ausbilden', `${b.name}${L ? ' · Stufe ' + L : ''}`) + strip + ptabs(TRAIN_B.map(x => [x, B[x].name, (S.train[x] || []).length]), tab, 'ttab') + body;
@@ -609,7 +614,7 @@ let panelName = '', panelSig = '';
 function panelSignature() {
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
-  return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
+  return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
@@ -642,6 +647,8 @@ function setupPanel() {
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }
+    if (act === 'donate') { const amounts = {}; for (const r of RES) { const v = Math.floor(Number(val('dn_' + r)) || 0); if (v > 0) amounts[r] = v; } if (!Object.keys(amounts).length) return void toast('Gib an, wie viel du einzahlen willst.'); return void command({ type: 'donate', amounts }).then(ok => { if (ok) { for (const r of RES) { const i = document.getElementById('dn_' + r); if (i) i.value = ''; } toast('Eingezahlt. Danke!', 'info'); } }); }
+    if (act === 'shopBuy') return void command({ type: 'buy', item: d.i, n: 1 }).then(ok => ok && toast(ITEMS[d.i].name + ' gekauft.', 'info'));
     if (act === 'opGoto') { closePanel(); await setMode('map'); if (mode === 'map') selectMap({ type: 'op', id: d.id }, false); return; }
     if (act === 'allyCreate') return void command({ type: 'allyCreate', name: val('alName'), tag: val('alTag') });
     if (act === 'allyRequest') return void command({ type: 'allyRequest', al: Number(d.al) });
@@ -664,6 +671,46 @@ function setupPanel() {
     }
   });
   $('sidePanelInner').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'alMsg') { e.preventDefault(); $('sidePanelInner').querySelector('[data-act=allyChat]').click(); } });
+}
+
+
+/* ---------- Shop, Beutel, Beschleuniger ---------- */
+const SPEED_IDS = ['sp5', 'sp60', 'sp480'];
+let speedCtx = null;
+const itemN = id => (S.items || {})[id] || 0;
+function speedTarget(kind, ref) {
+  if (kind === 'build') { const q = inQueue(S, ref); return q ? { name: B[ref].name + ' → Stufe ' + q.target, left: q.left } : null; }
+  if (kind === 'research') return S.research ? { name: T[S.research.id].name + ' → Stufe ' + S.research.target, left: S.research.left } : null;
+  const l = S.train[ref]; return l && l.length ? { name: B[ref].name + ': ' + l.reduce((a, o) => a + o.count, 0) + ' Einheiten', left: l.reduce((a, o, i) => a + o.left + (o.count - 1) * o.per, 0) } : null;
+}
+function speedHTML() {
+  const t = speedTarget(speedCtx.kind, speedCtx.ref);
+  if (!t) return `<h2>⚡ Beschleunigen</h2><p class="note">Dieser Auftrag ist fertig.</p><div class="row"><button class="btn" type="button" data-act="mClose">Schließen</button></div>`;
+  return `<h2>⚡ Beschleunigen</h2><p class="desc"><b>${esc(t.name)}</b><br>Noch ${fmtT(real(t.left))}</p>
+    ${SPEED_IDS.map(id => { const it = ITEMS[id], n = itemN(id); return `<div class="mrow"><div><b>${it.icon} ${it.name}</b><div class="note">Im Beutel: ${n}</div></div>
+      <div class="row">${n ? `<button class="btn small" type="button" data-act="mUse" data-i="${id}">Benutzen</button>` : ''}<button class="btn ghost small" type="button" data-act="mBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>Kaufen · ${it.price} 🪙</button></div></div>`; }).join('')}
+    <p class="note">Gold: ${fmtN(Math.floor(S.res.gold))} 🪙. Gekaufte Beschleuniger kannst du auch später benutzen.</p>
+    <div class="row"><button class="btn ghost" type="button" data-act="mClose">Schließen</button></div>`;
+}
+function openSpeed(kind, ref) { speedCtx = { kind, ref }; $('modalIn').innerHTML = speedHTML(); $('modal').hidden = false; }
+function refreshSpeed() { if (!speedCtx || $('modal').hidden) return; $('modalIn').innerHTML = speedHTML(); }
+function setupModal() {
+  document.addEventListener('click', async e => {
+    const sp = e.target.closest('[data-speed]'); if (sp) { const [k, r] = sp.dataset.speed.split(':'); return openSpeed(k, r); }
+    const el = e.target.closest('#modalIn [data-act]'); if (!el || !speedCtx) return;
+    const act = el.dataset.act, i = el.dataset.i;
+    if (act === 'mClose') { $('modal').hidden = true; speedCtx = null; }
+    else if (act === 'mBuy') { await command({ type: 'buy', item: i, n: 1 }); refreshSpeed(); }
+    else if (act === 'mUse') { const ok = await command({ type: 'useSpeed', item: i, kind: speedCtx.kind, ref: speedCtx.ref }); if (ok) toast('Beschleunigt um ' + ITEMS[i].name.replace('Beschleuniger ', '') + '.', 'info'); refreshSpeed(); }
+  });
+}
+function shopHTML() {
+  const tp = ITEMS.teleport, cd = Math.max(0, TELEPORT_COOLDOWN - (gtNow() - S.tpAt));
+  const card = (id) => { const it = ITEMS[id]; return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div><div class="note">Im Beutel: <b>${itemN(id)}</b></div></div>
+    <button class="btn small" type="button" data-act="shopBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>${it.price} 🪙</button></div>`; };
+  return `<p class="note">Du hast <b>${fmtN(Math.floor(S.res.gold))} 🪙 Gold</b>. Gold bekommst du aus Heiligtümern, Lagern und Beute.</p>
+    <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte ein freies Feld in eurem Bündnisgebiet antippen.'}</p>` : ''}</div>
+    <div class="block"><h3>Beschleuniger</h3>${SPEED_IDS.map(card).join('')}<p class="note">Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
 }
 
 /* ---------- Ergebnis ---------- */
@@ -735,55 +782,69 @@ function pickerHTML() {
     <div class="stepper"><button type="button" data-act="sminus" data-u="${u}" aria-label="Weniger">−</button><output>${fmtN(send[u] || 0)}</output><button type="button" data-act="splus" data-u="${u}" aria-label="Mehr">+</button></div></div>`).join('')}</div>`;
 }
 
-/* ---------- Revier: Bauplatz und Außenposten ---------- */
+/* ---------- Revier: Bauplatz und Außenposten (gehören dem Bündnis) ---------- */
 function siteCtx() {
-  const m = view.match;
-  return { mt: { seed: m.seed, world: { alliances: Object.fromEntries((m.alliances || []).map(a => [a.id, a])), outposts: Object.fromEntries((view.world.outposts || []).map(o => [o.id, o])) } },
+  const m = view.match, gt = gtNow();
+  return { mt: { seed: m.seed, world: { gt, alliances: Object.fromEntries((m.alliances || []).map(a => [a.id, a])), outposts: Object.fromEntries((view.world.outposts || []).map(o => [o.id, o])) } },
     pls: m.players.map(p => ({ id: p.id, name: p.name, state: { out: p.out, slot: p.slot, pos: p.pos, lv: { rathaus: p.rathaus } } })) };
 }
-const opOwnerName = o => pname(o.owner);
+const opOwnerName = o => { const a = (view.match.alliances || []).find(x => x.id === o.al); return a ? '[' + a.tag + '] ' + a.name : '?'; };
 function siteSheet(w) {
-  const { mt, pls } = siteCtx(), mine = (w.outposts || []).filter(o => o.mine).length, free = ownMarches().length < armySlots(S);
-  let why = checkSite(mt, pls, { id: me.id }, msel.x, msel.y, 1, gtNow());
-  if (!why && mine >= maxOutposts(S)) why = 'Du kannst höchstens ' + maxOutposts(S) + ' Außenposten halten (wächst mit dem Rathaus).';
+  const { mt, pls } = siteCtx(), gt = gtNow(), al = view.ally, free = ownMarches().length < armySlots(S), st = al ? al.store : null;
+  const mineN = (w.outposts || []).filter(o => o.mine).length;
+  let why = checkSite(mt, pls, { id: me.id }, msel.x, msel.y, gt);
   if (!why && view.match.phase !== 'running') why = 'Die Partie läuft nicht.';
-  wm.setPreview({ x: msel.x, y: msel.y, r: OP_R[1], ok: !why });
-  const o = { id: 'site', x: msel.x, y: msel.y }, plan = !why ? planFor(o) : null, c = opCost(1);
-  let body = `<p class="desc">Ein Außenposten vergrößert dein Revier um ein Viereck (9×9 Felder, mit Ausbau bis 17×17). Mit Revier kannst du Heiligtümer und den Thron erreichen. Gegner können den Außenposten zerstören.</p>
-    <dl class="stats"><dt>Kosten</dt><dd class="costs">${costHTML(c)}</dd><dt>Bauzeit</dt><dd>${fmtT(real(OP_BUILD[1]))} nach der Ankunft</dd><dt>Deine Außenposten</dt><dd>${mine} von ${maxOutposts(S)}</dd></dl>`;
+  const poor = al && OP_COST.some((c, i) => st[RES[i]] < c);
+  wm.setPreview({ x: msel.x, y: msel.y, r: OP_R, ok: !why });
+  const o = { id: 'site', x: msel.x, y: msel.y }, plan = !why ? planFor(o) : null;
+  let body = '';
+  const tpWhy = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, msel.x, msel.y, gt);
+  if (al && (!tpWhy || itemN('teleport') > 0)) {
+    const cd = TELEPORT_COOLDOWN - (gt - S.tpAt), has = itemN('teleport') > 0;
+    body += `<div class="block tpbox"><h3>🌀 Teleportieren</h3><p class="note">Versetze deine Burg hierher, mitten in euer Bündnisgebiet.</p><div class="row"><button class="btn" type="button" data-act="teleport" ${has && cd <= 0 && !tpWhy ? '' : 'disabled'}>Hierher teleportieren</button>
+      <span class="${has && cd <= 0 && !tpWhy ? 'note' : 'why'}">${tpWhy ? esc(tpWhy) : !has ? 'Du hast keinen Teleporter (Mehr → Shop).' : cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) : 'Teleporter im Beutel: ' + itemN('teleport')}</span></div></div>`;
+  }
+  body += `<p class="desc">Ein Außenposten gehört eurem Bündnis und erweitert das gemeinsame Revier um ein Viereck (13×13 Felder). Es gibt nur eine Stufe. Mitglieder können ihn mit Truppen bewachen. Feinde können ihn zerstören, wenn ihr Außenposten an seinen grenzt.</p>
+    <dl class="stats"><dt>Kosten (Bündnislager)</dt><dd class="costs">${costHTML(OP_COST, st || {})}</dd><dt>Bauzeit</dt><dd>${fmtT(real(OP_BUILD))} nach der Ankunft</dd><dt>Außenposten des Bündnisses</dt><dd>${mineN} von ${maxOutposts(al)}</dd></dl>`;
   if (why) body += `<p class="why">${esc(why)}</p>`;
   else {
     body += pickerHTML();
     if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
-    const short = RES.some((r, i) => S.res[r] < c[i]) ? 'Nicht genug Rohstoffe.' : '';
-    body += actionRow('Außenposten bauen', plan, short, free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Mindestens ${OP_MIN_TROOPS} Truppen bleiben als Besatzung dort und verteidigen ihn.</p>`;
+    body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Mehr → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Mindestens ${OP_MIN_TROOPS} Truppen bleiben als Besatzung dort. Du kannst sie jederzeit abziehen.</p>`;
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
 function opSheet(w) {
   const o = (w.outposts || []).find(x => x.id === msel.id); if (!o) return '';
-  const gt = gtNow(), ready = opReady(o, gt), lvNow = o.upg && gt >= o.upg.done ? o.upg.to : o.lv, g = opGuard(lvNow), free = ownMarches().length < armySlots(S);
-  const side = 2 * OP_R[lvNow] + 1, friend = o.mine || (view.match.players.find(p => p.id === o.owner) || {}).ally === (view.match.players.find(p => p.id === me.id) || {}).ally && o.group[0] === 'a';
+  const gt = gtNow(), ready = opReady(o, gt), g = opGuard(), free = ownMarches().length < armySlots(S);
   wm.setPreview(null);
-  let body = `<dl class="stats"><dt>Besitzer</dt><dd>${o.mine ? 'du' : esc(opOwnerName(o))}</dd><dt>Revier</dt><dd>${side}×${side} Felder</dd>
-    <dt>Zustand</dt><dd>${ready ? 'fertig' : 'im Bau, noch ' + fmtT(real(o.done - gt))}${o.upg ? ' · Ausbau auf Stufe ' + o.upg.to + ' in ' + fmtT(real(Math.max(0, o.upg.done - gt))) : ''}</dd>
-    <dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>${o.mine ? `<dt>Besatzung</dt><dd>${troopsLine(o.garr || {})}</dd>` : ''}</dl>`;
+  const names = id => pname(id);
+  let body = `<dl class="stats"><dt>Gehört</dt><dd>${esc(opOwnerName(o))}</dd><dt>Revier</dt><dd>${2 * OP_R + 1}×${2 * OP_R + 1} Felder</dd>
+    <dt>Zustand</dt><dd>${ready ? 'fertig' : 'im Bau, noch ' + fmtT(real(o.done - gt))}</dd><dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>`;
+  if (o.mine) {
+    const gr = o.garr || {}, ids = Object.keys(gr).filter(k => sum(gr[k]) > 0);
+    body += `<dt>Besatzung</dt><dd>${ids.length ? ids.map(k => `<div><b>${esc(names(Number(k)))}</b>${Number(k) === me.id ? ' (du)' : ''}: ${troopsLine(gr[k])}</div>`).join('') : 'niemand'}</dd></dl>`;
+  } else body += '</dl>';
   if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
   else if (o.mine) {
-    const next = lvNow + 1, c = opCost(next), can = !o.upg && ready && lvNow < OP_MAX_LV, short = can && RES.some((r, i) => S.res[r] < c[i]);
-    body += can ? `<div class="block"><h3>Ausbau auf Stufe ${next}</h3><p class="note">Revier ${2 * OP_R[next] + 1}×${2 * OP_R[next] + 1} Felder · ${fmtT(real(OP_BUILD[next]))}</p><div class="costs">${costHTML(c)}</div><div class="row"><button class="btn" type="button" data-act="opUp" ${short ? 'disabled' : ''}>Ausbauen</button>${short ? '<span class="why">Nicht genug Rohstoffe.</span>' : ''}</div></div>`
-      : lvNow >= OP_MAX_LV ? '<p class="note">Höchste Stufe erreicht.</p>' : '';
-    body += pickerHTML() + actionRow('Besatzung verstärken', planFor({ id: o.id, x: o.x, y: o.y }), '', free, '', 'garrison');
-    body += `<div class="row">${sum(o.garr || {}) ? '<button class="btn ghost" type="button" data-act="opRecall">Besatzung abziehen</button>' : ''}<button class="btn ${armedKey === 'opdis' + o.id ? 'danger' : 'ghost'}" type="button" data-act="opDis">${armedKey === 'opdis' + o.id ? 'Wirklich aufgeben' : 'Aufgeben'}</button></div>`;
-  } else if (friend) body += '<p class="note">Der Außenposten gehört einem Verbündeten und erweitert euer gemeinsames Revier.</p>';
-  else {
-    const plan = planFor({ id: o.id, x: o.x, y: o.y }), pl = view.match.players.find(p => p.id === o.owner), prot = pl && pl.protUntil > gt;
-    body += '<p class="note">Wie viele Truppen als Besatzung dort stehen, siehst du erst im Kampf. Gewinnst du, verschwindet der Außenposten samt Revier und du erbeutest einen Teil der Baukosten.</p>' + pickerHTML();
-    if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
-    const why = prot ? 'Der Besitzer steht unter Schutz.' : '';
-    body += (S.protUntil > gt ? '<p class="why">Wenn du angreifst, endet dein Schutz sofort.</p>' : '') + actionRow(armedKey === 'raid' + o.id ? 'Jetzt wirklich angreifen' : 'Außenposten angreifen', plan, why, free, armedKey === 'raid' + o.id ? 'danger' : '', 'raid');
+    const mineG = (o.garr || {})[me.id], others = (w.outposts || []).filter(x => x.mine && x.id !== o.id && opReady(x, gt));
+    body += pickerHTML() + actionRow('Truppen hierher schicken', planFor({ id: o.id, x: o.x, y: o.y }), '', free, '', 'garrison');
+    if (mineG && sum(mineG)) {
+      body += `<div class="block"><h3>Deine Truppen hier</h3><div class="row"><button class="btn ghost" type="button" data-act="opRecall">Alle abziehen</button></div>`
+        + (others.length ? `<p class="note">Oder zu einem anderen Außenposten schicken:</p><div class="row">${others.map(x => `<button class="btn ghost small" type="button" data-act="opMove" data-to="${x.id}">Nach ${x.x} | ${x.y}</button>`).join('')}</div>` : '') + '</div>';
+    }
+    body += `<div class="row"><button class="btn ${armedKey === 'opdis' + o.id ? 'danger' : 'ghost'}" type="button" data-act="opDis">${armedKey === 'opdis' + o.id ? 'Wirklich abreißen' : 'Abreißen'}</button></div><p class="note">Beim Abreißen kehren alle Besatzungen heim und ein Teil der Kosten fließt ins Bündnislager zurück.</p>`;
+  } else {
+    const { mt, pls } = siteCtx(), why0 = checkRaid({ match: mt, players: pls }, { id: me.id }, o), plan = why0 ? null : planFor({ id: o.id, x: o.x, y: o.y });
+    body += '<p class="note">Wie viele Truppen als Besatzung dort stehen, siehst du erst im Kampf. Gewinnst du, verschwindet der Außenposten samt Revier.</p>';
+    if (why0) body += `<p class="why">${esc(why0)}</p>`;
+    else {
+      body += pickerHTML();
+      if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
+      body += (S.protUntil > gt ? '<p class="why">Wenn du angreifst, endet dein Schutz sofort.</p>' : '') + actionRow(armedKey === 'raid' + o.id ? 'Jetzt wirklich angreifen' : 'Außenposten angreifen', plan, '', free, armedKey === 'raid' + o.id ? 'danger' : '', 'raid');
+    }
   }
-  return `<div class="sh-head"><h2>Außenposten</h2><span class="lvl">Stufe ${lvNow}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
+  return `<div class="sh-head"><h2>Außenposten</h2><span class="lvl">${o.mine ? 'Bündnis' : esc(opOwnerName(o))}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
 function renderMapSheet() {
   const w = view.world; let h = '';
@@ -889,7 +950,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'garrison', 'opUp', 'opRecall', 'opDis', 'opGoto'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -908,7 +969,8 @@ function mapAct(act, el) {
   else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
   else if (act === 'raid') { if (!twice('raid' + msel.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'raid', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff auf den Außenposten.', 'info'); closeSheet(); } }); }
   else if (act === 'garrison') command({ type: 'march', mode: 'garrison', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Verstärkung ist unterwegs.', 'info'); closeSheet(); } });
-  else if (act === 'opUp') command({ type: 'opUpgrade', id: msel.id }).then(ok => ok && toast('Der Ausbau hat begonnen.', 'info'));
+  else if (act === 'opMove') { const from = msel.id, to = el.dataset.to; command({ type: 'opMove', from, to }).then(ok => ok && toast('Deine Truppen ziehen um.', 'info')); }
+  else if (act === 'teleport') { const from = [...S.pos], x = msel.x, y = msel.y; command({ type: 'teleport', x, y }).then(ok => { if (ok) { closeSheet(); wm.teleportFx(from, [x, y]); } }); }
   else if (act === 'opRecall') command({ type: 'opRecall', id: msel.id }).then(ok => ok && toast('Die Besatzung kehrt heim.', 'info'));
   else if (act === 'opDis') { if (!twice('opdis' + msel.id)) { renderSheet(); return true; } command({ type: 'opDismantle', id: msel.id }).then(ok => { if (ok) closeSheet(); }); }
   else if (act === 'recall') command({ type: 'recall', id: msel.id });
@@ -970,7 +1032,7 @@ async function buildMap() {
     document.body.classList.add('mode-map');   // damit die Zeichenfläche eine Größe hat
     app = new PIXI.Application({ resizeTo: window, backgroundColor: 0x05182d, antialias: true, resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true });
     $('stage').appendChild(app.view);
-    wm = new WorldMap(PIXI, app); wm.load(r.data); app.stage.addChild(wm.root); mapReady = true; wm.sync(view, me.id, offset);
+    wm = new WorldMap(PIXI, app); wm.onFlash = () => { const f = document.createElement('div'); f.className = 'tpflash'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }; wm.load(r.data); app.stage.addChild(wm.root); mapReady = true; wm.sync(view, me.id, offset);
     const own = wm.map.starts[S.slot] || { x: 48, y: 48 };
     wm.root.scale.set(Math.min(.8, Math.max(.45, app.screen.width / 640)));
     focusMap(own.x + .5, own.y + .5);
@@ -1022,7 +1084,7 @@ async function resync() {
 function startGame() {
   $auth.hidden = true; $('game').hidden = false; document.body.classList.add('playing');
   $('matchName').textContent = match.name;
-  setupSheet(); setupNav(); setupCity(); setupPanel(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
+  setupSheet(); setupModal(); setupNav(); setupCity(); setupPanel(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
   connect(); afterAccept();
   setInterval(resync, 60000);
   window.zkRefresh = resync;

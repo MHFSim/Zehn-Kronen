@@ -77,8 +77,16 @@ Der Server ist maßgeblich: Bauaufträge, Ausbildung und Ressourcen werden dort 
 ## Forschung
 In der Akademie laufen acht Forschungen (Ackerbau, Forstwirtschaft, Steinmetzkunst, Bergbau, Handel, Kriegskunst, Marschordnung, Lasten) mit je fünf Stufen. Es läuft immer nur eine; Stufe n braucht Akademie 2n−1. Sie steigern Erträge, Gold, Kampfkraft, Marschtempo und Beutekapazität. Die Stadtansicht (Holz und Pergament) hat Reiter Wirtschaft, Militär, Verwaltung, Forschung.
 
-## Revier und Außenposten
-Jede Burg beansprucht ein Viereck (Seitenlänge wächst mit dem Rathaus). Mit **Außenposten** vergrößerst du dein Revier: auf der Karte ein freies Feld antippen, mindestens 50 Truppen als Besatzung schicken, Rohstoffe zahlen. Der Posten muss das Revier von dir oder deinem Bündnis berühren und darf kein fremdes überlappen. Stufe 1 bis 3 gibt 9×9, 13×13 und 17×17 Felder. Wie viele Posten du halten darfst, wächst mit dem Rathaus (2 + Rathaus÷2). Gegner können Außenposten angreifen und zerstören; dann verschwindet das Revier. **Heiligtümer und der Thron** lassen sich nur besetzen, solange ein Viereck deiner Gruppe sie berührt; geht das Revier verloren, geht auch der Ort verloren. Die Regeln stehen in `shared/outpost.js`, die Zahlen oben in dieser Datei.
+## Revier, Außenposten und Bündnislager
+Jede Burg beansprucht ein Viereck (Seitenlänge wächst mit dem Rathaus). **Außenposten gehören immer dem Bündnis** und haben nur eine Stufe (13×13 Felder). Man baut sie nur an das Revier des eigenen Bündnisses, bezahlt aus dem **Bündnislager** (400 Nahrung, 1000 Holz, 1200 Stein, 200 Erz) und schickt mindestens 50 Truppen als Bautrupp, der als Besatzung bleibt. Bündnisse halten höchstens 3 + 2 × Mitglieder Außenposten.
+
+- **Wachen:** Jedes Mitglied kann Truppen in Außenposten des Bündnisses stellen, jederzeit abziehen oder zu einem anderen Außenposten schicken.
+- **Lager:** Wer im Bündnisgebiet Felder, Wälder, Brüche oder Minen abbaut, füllt das Lager zusätzlich um 25 % der Beute (dem Spieler wird nichts abgezogen). Eigene Rohstoffe kann man jederzeit einzahlen (Mehr → Revier & Lager).
+- **Angriff:** Einen feindlichen Außenposten kann nur angreifen, wer einen eigenen, fertigen Außenposten direkt daneben gebaut hat. Gewinnt der Angreifer, verschwindet der Posten samt Revier.
+- **Heiligtümer und Thron** lassen sich nur besetzen, solange ein Viereck der Gruppe sie berührt.
+- **Shop** (Mehr → Shop, bezahlt mit Gold): *Teleporter* (800 Gold, versetzt die Burg an einen freien Ort im Bündnisgebiet, danach 12 Stunden Pause, mit Lichteffekt) und *Beschleuniger* (5 Min. 15 Gold, 1 Std. 150, 8 Std. 1000), die Bau, Ausbildung oder Forschung verkürzen (⚡ beim jeweiligen Auftrag).
+
+Die Regeln stehen in `shared/outpost.js` und `shared/rules.js` (ITEMS), die Zahlen oben in diesen Dateien.
 
 ## Datensicherung
 

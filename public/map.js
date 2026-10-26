@@ -269,6 +269,7 @@ export class WorldMap {
       const h = this.obj[id], o = h.o;
       if (o.k !== 'start') continue;
       const p = bySlot[o.slot], tier = p ? (p.rathaus >= 14 ? 3 : p.rathaus >= 7 ? 2 : 1) : 0;
+      if (p && p.pos && (p.pos[0] !== o.x || p.pos[1] !== o.y)) this.moveStart(h, p.pos[0], p.pos[1]);
       h.player = p || null; h.tier = tier;
       const nm = p ? 'castle' + tier : 'slot', s = h.main;
       if (h.nm !== nm) {
@@ -292,6 +293,52 @@ export class WorldMap {
     this.syncOutposts(view);
     this.syncMarches(view);
     this.dirtyLabels = true;
+  }
+  // Burg an einen neuen Ort setzen (Teleporter): Bilder neu sortieren, damit sie richtig verdeckt werden
+  moveStart(h, x, y) {
+    const o = h.o; o.x = x; o.y = y;
+    const tx = x + .5, ty = y + .5, p = this.worldPos(tx, ty);
+    for (const sp of h.spr) {
+      const dx = sp === h.main ? 0 : sp.x - h.main.x, dy = sp === h.main ? 0 : sp.y - h.main.y;
+      sp.position.set(p.x + dx, p.y + dy); sp.tx = tx; sp.ty = ty; sp.depth = tx + ty + (sp === h.main ? 0 : .1);
+      const b = Math.min(NB - 1, Math.floor(sp.depth / BW)), par = this.bands[b].sprites;
+      if (sp.parent) sp.parent.removeChild(sp);
+      let at = par.children.length; for (let i = 0; i < par.children.length; i++) if ((par.children[i].depth || 0) > sp.depth) { at = i; break; }
+      par.addChildAt(sp, at);
+    }
+    h.lab && (h.lab.visible = false); h.labTxt = null; this.terrDirty = true; this.dirtyLabels = true;
+  }
+  // Der Teleporter-Effekt: Lichtsäule und Ringe am alten Ort, Funkenregen und Aufleuchten am neuen
+  teleportFx(from, to) {
+    const PIXI = this.PIXI, a = this.worldPos(from[0] + .5, from[1] + .5), b = this.worldPos(to[0] + .5, to[1] + .5);
+    this.fx = this.fx || [];
+    const mkRing = (pt, col, delay, big) => { const g = new PIXI.Graphics(); g.position.set(pt.x, pt.y); g.scale.y = .5; g.zIndex = 1e6; this.armies.addChild(g); this.fx.push({ k: 'ring', g, t: -delay, col, big }); };
+    const mkBeam = (pt, col, delay, rev) => { const g = new PIXI.Graphics(); g.position.set(pt.x, pt.y); g.zIndex = 1e6; this.armies.addChild(g); this.fx.push({ k: 'beam', g, t: -delay, col, rev }); };
+    mkBeam(a, 0x8fd6ff, 0, false); for (let i = 0; i < 3; i++) mkRing(a, 0x8fd6ff, i * .18, 90);
+    mkBeam(b, 0xffe08a, .55, true); for (let i = 0; i < 4; i++) mkRing(b, 0xffe08a, .55 + i * .16, 110);
+    for (let i = 0; i < 46; i++) {
+      const g = new PIXI.Graphics(); g.beginFill(i % 2 ? 0xffffff : 0xffd66b).drawCircle(0, 0, 1.6 + Math.random() * 2).endFill();
+      g.position.set(b.x, b.y); g.zIndex = 1e6; this.armies.addChild(g);
+      const ang = Math.random() * 6.283, sp = 40 + Math.random() * 130;
+      this.fx.push({ k: 'spark', g, t: -(.6 + Math.random() * .25), vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp * .5 - 90 - Math.random() * 90 });
+    }
+    for (let i = 0; i < 26; i++) {
+      const g = new PIXI.Graphics(); g.beginFill(0x9fe0ff).drawCircle(0, 0, 1.4 + Math.random() * 1.8).endFill();
+      g.position.set(a.x + (Math.random() - .5) * 40, a.y); g.zIndex = 1e6; this.armies.addChild(g);
+      this.fx.push({ k: 'spark', g, t: -Math.random() * .3, vx: (Math.random() - .5) * 30, vy: -80 - Math.random() * 160 });
+    }
+    if (this.onFlash) this.onFlash();
+  }
+  stepFx(dt) {
+    if (!this.fx || !this.fx.length) return;
+    for (const f of this.fx) {
+      f.t += dt; if (f.t < 0) { f.g.visible = false; continue; } f.g.visible = true;
+      if (f.k === 'ring') { const u = f.t / .9; f.g.clear(); if (u < 1) f.g.lineStyle(4 * (1 - u) + 1, f.col, 1 - u).drawCircle(0, 0, 8 + f.big * u); f.done = u >= 1; }
+      else if (f.k === 'beam') { const u = f.t / 1.3, h = 360 * Math.sin(Math.min(1, u) * Math.PI) ; f.g.clear(); if (u < 1) { f.g.beginFill(f.col, .55 * (1 - u * .4)).drawRect(-16, -h, 32, h).endFill().beginFill(0xffffff, .65).drawRect(-6, -h, 12, h).endFill().beginFill(f.col, .35).drawEllipse(0, 0, 34, 14).endFill(); } f.done = u >= 1; }
+      else { f.g.x += f.vx * dt; f.g.y += f.vy * dt; f.vy += 220 * dt; f.g.alpha = Math.max(0, 1 - f.t / 1.1); f.done = f.t >= 1.1; }
+    }
+    for (const f of this.fx) if (f.done) { this.armies.removeChild(f.g); f.g.destroy(); }
+    this.fx = this.fx.filter(f => !f.done);
   }
   gtNow() { const w = this.view.world; return w.gt + (Date.now() + this.offset - w.at) / 1000 * this.speed; }
   exploredBit() { return 1; }   // kein Nebel: die ganze Karte ist sichtbar
@@ -451,8 +498,8 @@ export class WorldMap {
     for (const o of ops) {
       keep.add(o.id); let s = this.opSprites[o.id]; if (!s) s = this.opSprites[o.id] = this.towerSprite(o);
       s.o = o; const wp = this.worldPos(o.x + .5, o.y + .5); s.position.set(wp.x, wp.y); s.zIndex = wp.y;
-      const col = this.ownerColor(o.owner); s.flag.tint = col; s.lab.t.text = String(o.lv);
-      s.scale.set(1 + .12 * (o.lv - 1)); s.alpha = gt >= o.done ? 1 : .55;
+      const col = this.ownerColor(o.owner); s.flag.tint = col; s.lab.visible = false;
+      s.alpha = gt >= o.done ? 1 : .55;
     }
     for (const id in this.opSprites) if (!keep.has(id)) { this.opSprites[id].destroy({ children: true }); delete this.opSprites[id]; }
     const sig = JSON.stringify([ops, view.match.players.map(p => p.id + ':' + p.rathaus + p.out + p.ally)]); if (sig !== this.terrSig) { this.terrSig = sig; this.terrDirty = true; }
@@ -460,7 +507,7 @@ export class WorldMap {
 
   /* ---------- Bild für Bild ---------- */
   frame(dt, zoom, camRect) {
-    this.time += dt; this.zoom = zoom; this.shader.uniforms.uTime = this.time;
+    this.time += dt; this.stepFx(dt); this.zoom = zoom; this.shader.uniforms.uTime = this.time;
     // Streifen außerhalb des Bildes weglassen
     for (const b of this.bands) { const vis = b.y1 >= camRect.y0 && b.y0 <= camRect.y1; b.mesh.visible = vis; b.sprites.visible = vis; }
     const t = this.time;

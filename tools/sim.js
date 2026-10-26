@@ -3,7 +3,7 @@
 // Benutzt dieselbe Spiel-Engine (shared/world.js) wie der echte Server.
 import { syncMatch, addPlayer, command, viewFor, setSpeed, setWeeks, startMatch, pauseMatch, resumeMatch, endMatch, removePlayer } from '/shared/world.js';
 import { newWorld, mapOf, takeNotes } from '/shared/core.js';
-const KEY = 'zk-sim-v5';
+const KEY = 'zk-sim-v6';
 const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[b % 57]).join('');
 let mem = null;
 function load() {
