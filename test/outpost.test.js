@@ -1,60 +1,114 @@
-// Prüfung von Revier und Außenposten: `npm test`
+// Prüfung von Revier, Außenposten, Bündnislager, Teleporter und Shop: `npm test`
 import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command, viewFor } from '../shared/world.js';
 import { newWorld, mapOf, DAY } from '../shared/core.js';
-import { checkSite, territory, touches, cityR, OP_R, OP_BUILD } from '../shared/outpost.js';
+import { NODE_KINDS } from '../shared/mapgen.js';
+import { checkSite, checkTeleport, territory, touches, inside, cityR, OP_R, OP_BUILD, OP_COST, storeOf } from '../shared/outpost.js';
 
 const T0 = 1_000_000_000_000;
 const match = { id: 1, name: 'T', speed: 100, seed: 4242, world: newWorld(T0) }, players = [];
-for (let i = 1; i <= 3; i++) { const S = addPlayer(match, players, i, 'P' + i, T0); players.push({ id: i, name: 'P' + i, state: S }); }
-const [a, b, c] = players; let clock = T0;
+for (let i = 1; i <= 4; i++) { const S = addPlayer(match, players, i, 'P' + i, T0); players.push({ id: i, name: 'P' + i, state: S }); }
+const [a, b, c, d] = players; let clock = T0;
 const adv = sec => { clock += sec / match.speed * 1000; syncMatch(match, players, clock); };
 const run = (p, cmd) => command(match, players, p, cmd, clock);
 const give = (p, t) => { for (const u in t) p.state.troops[u] = (p.state.troops[u] || 0) + t[u]; };
-const rich = p => { for (const r of ['food', 'wood', 'stone', 'ore']) p.state.res[r] = 99999; };
+const rich = p => { for (const r of ['food', 'wood', 'stone', 'ore']) p.state.res[r] = 99999; p.state.res.gold = 99999; };
+const map = mapOf(match), w = match.world;
+const gt = () => w.gt;
 
-// Revier der Burg und Prüfung eines Bauplatzes
-const [cx, cy] = a.state.pos, R = cityR(a.state.lv.rathaus), map = mapOf(match);
-assert.ok(touches(territory(match, players, 0), 'p1', cx + R + 1, cy), 'Burg-Viereck samt Rand');
-const toward = (x, y, d) => { const dx = 100 - x, dy = 100 - y, l = Math.hypot(dx, dy); return [Math.round(x + dx / l * d), Math.round(y + dy / l * d)]; };
-let site = null;
-for (let d = R + OP_R[1]; d >= 2 && !site; d--) { for (let o = -3; o <= 3 && !site; o++) { const [x, y] = toward(cx, cy, d); if (!checkSite(match, players, a, x + o, y, 1, 0)) site = [x + o, y]; } }
-assert.ok(site, 'es gibt einen Bauplatz nahe der Burg');
-assert.match(checkSite(match, players, a, ...toward(cx, cy, 40), 1, 0), /berühren|Wasser|Zu nah/, 'zu weit weg');
-assert.match(checkSite(match, players, a, cx, cy, 1, 0), /Zu nah/, 'nicht auf der Burg');
+// Ohne Bündnis kein Außenposten
+const [cx, cy] = a.state.pos, R = cityR(a.state.lv.rathaus);
+const toward = (x, y, dd) => { const dx = 100 - x, dy = 100 - y, l = Math.hypot(dx, dy); return [Math.round(x + dx / l * dd), Math.round(y + dy / l * dd)]; };
+const findSite = (p, from, ds) => { for (const dd of ds) for (let o = -4; o <= 4; o++) { const [x, y] = toward(from[0], from[1], dd); if (!checkSite(match, players, p, x + o, y, gt())) return [x + o, y]; } return null; };
+assert.match(checkSite(match, players, a, cx + 9, cy, 0), /Bündnis/);
 
-// Bauen: Heer losschicken, Besatzung bleibt, nach der Bauzeit zählt das Revier
-give(a, { speer: 100 });
+// Bündnis a+b, Rivale c
+assert.equal(run(a, { type: 'allyCreate', name: 'Rote', tag: 'ROT' }), '');
+assert.equal(run(a, { type: 'allyInvite', name: 'P2' }), ''); assert.equal(run(b, { type: 'allyAnswer', id: viewFor(match, players, b, clock).invites[0].id, accept: true }), '');
+assert.equal(run(c, { type: 'allyCreate', name: 'Blaue', tag: 'BLA' }), '');
+const al = w.alliances[1];
+assert.ok(touches(territory(match, players, 0), 'a1', cx + R + 1, cy), 'Burg-Viereck samt Rand');
+const site = findSite(a, [cx, cy], [R + OP_R, R + OP_R - 2, R + 2]); assert.ok(site, 'Bauplatz nahe der Burg');
+assert.match(checkSite(match, players, a, ...toward(cx, cy, 45), gt()), /berühren|Wasser|Zu nah/);
+
+// Bündnislager: ohne Rohstoffe geht nichts, Einzahlen füllt es
+give(a, { speer: 200 }); give(b, { speer: 200, schwert: 100 }); rich(a); rich(b);
+assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), /Bündnislager/);
+assert.match(run(a, { type: 'donate', amounts: { food: 1e9 } }), /nicht/);
+assert.equal(run(a, { type: 'donate', amounts: { food: 1000, wood: 2000, stone: 2000, ore: 500 } }), '');
+assert.equal(storeOf(al).wood, 2000); assert.equal(a.state.res.wood, 99999 - 2000);
+assert.equal(viewFor(match, players, b, clock).ally.store.food, 1000, 'alle Mitglieder sehen das Lager');
 assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 20 } }), /mindestens/);
-a.state.res.wood = 0; assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), /Rohstoffe/);
-rich(a);
+
+// Bauen aus dem Lager
 assert.equal(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), '');
+assert.equal(storeOf(al).wood, 2000 - OP_COST[1]);
 adv(DAY);
-const ops = Object.values(match.world.outposts); assert.equal(ops.length, 1);
-const op = ops[0]; assert.equal(op.owner, a.id); assert.equal(op.garr.speer, 60);
-adv(OP_BUILD[1]); assert.ok(territory(match, players, match.world.gt).some(r => r.id === op.id && r.ready));
-assert.equal(viewFor(match, players, a, clock).world.outposts[0].garr.speer, 60);
-assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr, undefined, 'Besatzung ist geheim');
+const op = Object.values(w.outposts)[0]; assert.ok(op); assert.equal(op.al, 1); assert.equal(op.garr[a.id].speer, 60);
+adv(OP_BUILD); assert.ok(territory(match, players, gt()).some(r => r.id === op.id && r.ready));
+assert.equal(viewFor(match, players, c, clock).world.outposts[0].garr, undefined, 'Besatzung ist geheim');
+assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].speer, 60);
 
-// Fremdes Revier darf nicht überlappt werden
-assert.match(checkSite(match, players, b, op.x, op.y + 1, 1, match.world.gt), /überlappen|Zu nah|Hier steht/);
+// Fremde dürfen nicht überlappen; weiterbauen nur am eigenen Revier
+assert.match(checkSite(match, players, c, op.x, op.y + 3, gt()), /überlappen|Zu nah|Hier steht/);
+const site2 = findSite(a, [op.x, op.y], [2 * OP_R + 1, 2 * OP_R, 2 * OP_R - 2]); assert.ok(site2, 'zweiter Bauplatz am ersten Außenposten');
 
-// Ausbau
-assert.equal(run(a, { type: 'opUpgrade', id: op.id }), ''); assert.match(run(a, { type: 'opUpgrade', id: op.id }), /schon/);
-adv(OP_BUILD[2] + 10); assert.equal(op.lv, 2);
-assert.ok(territory(match, players, match.world.gt).find(r => r.id === op.id).r === OP_R[2]);
+// Mitglieder bewachen: b schickt Truppen, zieht sie ab; Verschieben zu einem anderen Außenposten
+assert.equal(run(b, { type: 'march', mode: 'garrison', target: op.id, troops: { speer: 80 } }), '');
+give(c, { speer: 5 }); assert.match(run(c, { type: 'march', mode: 'garrison', target: op.id, troops: { speer: 1 } }), /Keine Truppen|Bündnis/);
+adv(DAY); assert.equal(op.garr[b.id].speer, 80);
+storeOf(al).food = storeOf(al).wood = storeOf(al).stone = storeOf(al).ore = 99999;
+assert.equal(run(b, { type: 'march', mode: 'build', x: site2[0], y: site2[1], troops: { speer: 50 } }), '');
+adv(DAY + OP_BUILD);
+assert.equal(Object.keys(w.outposts).length, 2);
+const op2 = Object.values(w.outposts).find(o => o.id !== op.id);
+assert.equal(run(b, { type: 'opMove', from: op.id, to: op2.id }), '');
+assert.equal(op.garr[b.id], undefined, 'Truppen sind unterwegs');
+adv(DAY); assert.equal(op2.garr[b.id].speer, 130);
+assert.equal(run(b, { type: 'opRecall', id: op2.id }), ''); assert.equal(op2.garr[b.id], undefined);
+adv(DAY); assert.ok(b.state.troops.speer >= 200 - 50 - 80 + 80 + 50, 'Truppen sind daheim');
 
-// Thron/Heiligtum: nur mit Revier
-give(a, { schwert: 500 }); rich(a);
-assert.match(run(a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 100 } }), /Revier/);
+// Farmen im Bündnisgebiet: zusätzlich ins Bündnislager, Spieler bekommt volle Beute
+const node = map.objects.find(o => NODE_KINDS.includes(o.k) && inside(territory(match, players, gt()), 'a1', o.x, o.y));
+if (node) {
+  const before = { ...storeOf(al) }, res = node.k === 'farm' ? 'food' : node.k, rb = b.state.res[res];
+  assert.equal(run(b, { type: 'march', target: node.id, troops: { speer: 100 } }), '');
+  adv(3 * DAY);
+  assert.ok(storeOf(al)[res] > before[res], 'Bündnislager bekommt einen Anteil');
+}
 
-// Angriff zerstört den Außenposten, Besatzung geht verloren
-adv(5 * DAY);   // Schutz vorbei
-give(b, { schwert: 600, speer: 300 }); rich(b); b.state.res.gold = 999;
-assert.equal(run(b, { type: 'march', target: op.id, mode: 'raid', troops: { schwert: 600, speer: 300 } }), '');
-adv(DAY);
-assert.equal(Object.keys(match.world.outposts).length, 0, 'zerstört');
-assert.ok(a.state.reports.some(r => r.kind === 'outpost' && !r.win), 'Bericht für den Besitzer');
-assert.ok(b.state.reports.some(r => r.kind === 'outpost' && r.win), 'Bericht für den Angreifer');
-assert.match(run(b, { type: 'march', target: op.id, mode: 'raid', troops: { schwert: 5 } }), /gibt es nicht/);
+// Teleporter und Shop
+assert.match(run(a, { type: 'teleport', x: cx + 2, y: cy }), /Teleporter/);
+assert.equal(run(a, { type: 'buy', item: 'teleport', n: 1 }), ''); assert.equal(a.state.items.teleport, 1);
+assert.match(run(a, { type: 'teleport', x: 5, y: 5 }), /Gebiet|Rand|Wasser/);
+let spot = null;
+for (let x = op.x - OP_R; x <= op.x + OP_R && !spot; x += 2) for (let y = op.y - OP_R; y <= op.y + OP_R && !spot; y += 2) if (!checkTeleport(match, players, a, x, y, gt())) spot = [x, y];
+assert.ok(spot, 'ein Teleportziel im Bündnisgebiet');
+assert.equal(run(a, { type: 'teleport', x: spot[0], y: spot[1] }), '');
+assert.deepEqual(a.state.pos, spot); assert.equal(a.state.items.teleport, 0);
+assert.equal(run(a, { type: 'buy', item: 'teleport', n: 1 }), ''); assert.match(run(a, { type: 'teleport', x: spot[0], y: spot[1] + 1 }), /lädt/);
+
+// Speedups
+a.state.res.food = a.state.res.wood = a.state.res.stone = a.state.res.ore = 9999;
+assert.equal(run(a, { type: 'upgrade', id: 'rathaus' }), '');
+const left0 = a.state.queue[0].left;
+assert.match(run(a, { type: 'useSpeed', item: 'sp5', kind: 'build', ref: 'rathaus' }), /keinen/);
+assert.equal(run(a, { type: 'buy', item: 'sp5', n: 2 }), '');
+assert.equal(run(a, { type: 'useSpeed', item: 'sp5', kind: 'build', ref: 'rathaus' }), ''); assert.ok(a.state.queue.length === 0 || a.state.queue[0].left < left0);
+assert.equal(a.state.items.sp5, 1);
+
+// Angriff auf Außenposten: nur mit angrenzendem eigenen Posten
+const cAl = allianceOfId(c); function allianceOfId(p) { return Object.values(w.alliances).find(x => x.members.includes(p.id)); }
+const target = op;
+give(c, { schwert: 800, speer: 400 }); rich(c); give(d, { schwert: 400 }); rich(d);
+adv(5 * DAY);
+assert.match(run(c, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 100 } }), /angrenzt/);
+const sideX = target.x + 2 * OP_R + 1;
+w.outposts.opC = { id: 'opC', al: cAl.id, by: c.id, x: sideX, y: target.y, done: 0, garr: {} };
+assert.equal(run(d, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 100 } }), 'Nur Bündnisse kämpfen um Außenposten. Gründe eines oder tritt einem bei.');
+assert.equal(run(c, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 800, speer: 400 } }), '');
+adv(2 * DAY);
+assert.ok(!w.outposts[target.id], 'zerstört');
+assert.ok(a.state.reports.some(r => r.kind === 'outpost' && !r.win), 'Bericht für Mitglied');
+assert.ok(c.state.reports.some(r => r.kind === 'outpost' && r.win));
 console.log('Alle Außenposten-Tests bestanden.');

@@ -46,7 +46,7 @@ export function ensureWorld(w) {
 export function ensureState(S) {
   S.away = S.away || {}; S.wounded = S.wounded || {}; S.reports = S.reports || []; S.nextRep = S.nextRep || 1;
   S.explored = S.explored || ''; if (S.slot == null) S.slot = -1; S.pos = S.pos || [0, 0];
-  S.tech = S.tech || {}; S.research = S.research || null; S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;
+  S.tech = S.tech || {}; S.research = S.research || null; S.items = S.items || {}; if (S.tpAt == null) S.tpAt = -1e9; S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;
   S.out = !!S.out; S.exAllies = S.exAllies || {}; S.feed = S.feed || []; S.nextFeed = S.nextFeed || 1; S.bonus = S.bonus || {};
   S.stats = S.stats || {}; for (const k of ['attacks', 'wins', 'conquests', 'kills', 'lost']) S.stats[k] = S.stats[k] || 0;
   return S;

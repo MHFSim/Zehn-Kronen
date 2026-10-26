@@ -75,7 +75,7 @@ export function freshState(now) {
   const lv = {}; for (const k in B) lv[k] = 0;
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
-  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null };
+  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null, items: {}, tpAt: -1e9 };
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);
@@ -116,6 +116,42 @@ export function blocker(S, id) {
   if (S.queue.length >= maxQueues(S)) return 'Alle Bauschleifen belegt';
   if (!afford(S, costOf(id, t))) return 'Nicht genug Ressourcen';
   return '';
+}
+
+
+// Shop: Gegenstände werden mit Gold gekauft und liegen im Beutel (S.items)
+export const ITEMS = {
+  teleport: { name: 'Teleporter', icon: '🌀', price: 800, desc: 'Versetzt deine Burg an einen freien Ort in eurem Bündnisgebiet. Danach 12 Stunden Pause.' },
+  sp5:   { name: 'Beschleuniger 5 Min.', icon: '⚡', price: 15, sec: 300, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 5 Minuten.' },
+  sp60:  { name: 'Beschleuniger 1 Std.', icon: '⚡', price: 150, sec: 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Stunde.' },
+  sp480: { name: 'Beschleuniger 8 Std.', icon: '⚡', price: 1000, sec: 8 * 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 8 Stunden.' }
+};
+export const TELEPORT_COOLDOWN = 12 * 3600;
+// Zeit eines laufenden Auftrags (Bau, Ausbildung, Forschung) um sec Spielsekunden kürzen
+export function speedUp(S, kind, ref, sec) {
+  if (kind === 'build') {
+    const q = B[ref] && inQueue(S, ref); if (!q) return 'Dieses Gebäude wird nicht gebaut.';
+    q.left -= sec; if (q.left <= 0) { S.lv[q.id] = q.target; S.queue = S.queue.filter(x => x !== q); }
+    return '';
+  }
+  if (kind === 'research') {
+    const r = S.research; if (!r) return 'Es wird nichts erforscht.';
+    r.left -= sec; if (r.left <= 0) { S.tech = S.tech || {}; S.tech[r.id] = r.target; S.research = null; }
+    return '';
+  }
+  if (kind === 'train') {
+    const list = S.train[ref]; if (!list || !list.length) return 'Dort wird nichts ausgebildet.';
+    let rem = sec;
+    while (list.length && rem > 0) {
+      const o = list[0];
+      if (o.left > rem) { o.left -= rem; rem = 0; break; }
+      rem -= o.left; S.troops[o.unit]++; o.count--; o.left = o.per;
+      if (o.count <= 0) list.shift();
+    }
+    if (!list.length) delete S.train[ref];
+    return '';
+  }
+  return 'Das kann man nicht beschleunigen.';
 }
 
 // g = vergangene Spielsekunden
@@ -174,6 +210,18 @@ export function applyCommand(S, cmd) {
     costOf(id, q.target).forEach((v, i) => S.res[RES[i]] += v);
     S.queue = S.queue.filter(x => x !== q);
     return '';
+  }
+  if (cmd.type === 'buy') {
+    const it = ITEMS[cmd.item], n = Math.floor(Number(cmd.n) || 1); if (!it) return 'Diesen Gegenstand gibt es nicht';
+    if (!(n >= 1 && n <= 99)) return 'Ungültige Anzahl';
+    if (S.res.gold < it.price * n) return 'Nicht genug Gold';
+    S.res.gold -= it.price * n; S.items = S.items || {}; S.items[cmd.item] = (S.items[cmd.item] || 0) + n; return '';
+  }
+  if (cmd.type === 'useSpeed') {
+    const it = ITEMS[cmd.item]; if (!it || !it.sec) return 'Das ist kein Beschleuniger';
+    if (!((S.items || {})[cmd.item] > 0)) return 'Du hast keinen solchen Beschleuniger';
+    const why = speedUp(S, String(cmd.kind), String(cmd.ref), it.sec); if (why) return why;
+    S.items[cmd.item]--; return '';
   }
   if (cmd.type === 'research') {
     const why = techBlocker(S, cmd.tech); if (why) return why;

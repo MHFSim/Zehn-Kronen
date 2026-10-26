@@ -12,7 +12,7 @@ import {
 } from './core.js';
 import { afterLaunch, applyBonuses, arriveCity, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
-import { arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, noteRaid, opCost, upgradeOutpost, recallGarrison, dismantle, settleTerritory, territory, OP_MIN_TROOPS } from './outpost.js';
+import { arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, storeOf } from './outpost.js';
 import { RES } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
@@ -75,6 +75,7 @@ function onGatherEnd(ctx, m, bt, realT) {
   const n = w.nodes[o.id] || { left: nodeLeft(w, o, bt), t: bt };
   w.nodes[o.id] = { left: Math.max(0, n.left - m.amount), t: bt };
   m.load = { [m.res]: m.amount };
+  clanGather(ctx, m, o, bt);
   m.phase = 'back'; m.t0 = bt; reversed(m);
 }
 function onHome(ctx, m, bt, realT) {
@@ -230,8 +231,7 @@ export function command(match, players, player, cmd, now) {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
       if (mode === 'build') {
         const why = checkBuild(match, players, player, o.x, o.y, troops, w.gt); if (why) return why;
-        const cost = opCost(1); if (RES.some((r, i) => S.res[r] < cost[i])) return 'Nicht genug Rohstoffe für einen Außenposten.';
-      } else if (mode === 'garrison') { if (opx.owner !== player.id) return 'Nur den eigenen Außenposten kannst du verstärken.'; }
+      } else if (mode === 'garrison') { const why = checkGarrison(ctx, player, opx); if (why) return why; }
       else { const why = checkRaid(ctx, player, opx); if (why) return why; }
     } else if (mode === 'normal') {
       if (o.k === 'camp' && !campAlive(w, o.id, w.gt)) return 'Dieses Lager ist gerade zerstört';
@@ -242,10 +242,11 @@ export function command(match, players, player, cmd, now) {
       const c = checkLaunch(ctx, player, o, mode, troops); if (typeof c === 'string') return c;
       target = c.target || null;
     }
+    if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
     const plan = planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
     for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
-    if (mode === 'build') { const cost = opCost(1); RES.forEach((r, i) => { S.res[r] -= cost[i]; }); }
+    if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : { tk: o.k, tid: o.id, mode });
     if (mode === 'raid') noteRaid(ctx, player, opx, m);
     else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison') afterLaunch(ctx, player, m, target, mode);
@@ -266,7 +267,7 @@ export function command(match, players, player, cmd, now) {
       const el = Math.max(0, w.gt - m.t0); let i = 0; while (i < m.path.length - 1 && m.arr[i + 1] <= el) i++;
       const a0 = m.arr[i]; m.path = m.path.slice(0, i + 1).reverse(); m.arr = m.arr.slice(0, i + 1).map((_, j) => a0 - m.arr[i - j]);
       m.phase = 'back'; m.t0 = w.gt; m.load = {};
-      if (m.mode === 'build') { const c = opCost(1); RES.forEach((r, i) => { S.res[r] += c[i]; }); }
+      if (m.mode === 'build') { const al = allianceOf(w, player.id); if (al) refundStore(w, al.id); }
       if (m.path.length < 2) { m.path = [m.path[0], m.path[0]]; m.arr = [0, 1]; }
     }
     return '';
@@ -275,7 +276,9 @@ export function command(match, players, player, cmd, now) {
   if (cmd.type === 'stationRecall') return recallStation(ctx, player, Number(cmd.host));
   if (cmd.type === 'stationDismiss') return dismissStation(ctx, player, Number(cmd.owner));
   if (cmd.type === 'holdRecall') return holdRecall(ctx, player, String(cmd.id));
-  if (cmd.type === 'opUpgrade') return upgradeOutpost(ctx, player, String(cmd.id));
+  if (cmd.type === 'opMove') return moveGarrison(ctx, player, String(cmd.from), String(cmd.to));
+  if (cmd.type === 'donate') return donate(ctx, player, cmd.amounts);
+  if (cmd.type === 'teleport') return teleport(ctx, player, cmd.x, cmd.y);
   if (cmd.type === 'opRecall') return recallGarrison(ctx, player, String(cmd.id));
   if (cmd.type === 'opDismantle') return dismantle(ctx, player, String(cmd.id));
   return applyCommand(S, cmd);
@@ -303,13 +306,16 @@ export function viewFor(match, players, me, now) {
   const nodes = {};
   for (const id in w.nodes) nodes[id] = Math.floor(nodeLeft(w, map.byId[id], gt));
   const camps = {}; for (const id in w.camps) if (w.camps[id].dead > gt) camps[id] = w.camps[id].dead;
-  const outposts = Object.values(w.outposts || {}).map(o => ({ id: o.id, owner: o.owner, x: o.x, y: o.y, lv: o.lv, done: o.done, upg: o.upg, group: groupOf(w, o.owner), mine: o.owner === me.id, garr: o.owner === me.id ? o.garr : undefined, total: sum(o.garr || {}) }));
+  const outposts = Object.values(w.outposts || {}).filter(o => w.alliances[o.al]).map(o => {
+    const al = w.alliances[o.al], mineO = !!myAl && myAl.id === o.al;
+    return { id: o.id, al: o.al, by: o.by, owner: al.leader, x: o.x, y: o.y, done: o.done, group: 'a' + o.al, mine: mineO, garr: mineO ? o.garr : undefined, total: mineO ? Object.values(o.garr).reduce((a, t) => a + sum(t), 0) : undefined };
+  });
   const nameOf = id => (byId(players, id) || {}).name || '';
   const holds = Object.keys(w.holds).map(oid => {
     const h = w.holds[oid], mine = myAl ? h.group === 'a' + myAl.id : h.group === 'p' + me.id;
     return { id: oid, group: h.group, label: groupLabel(w, players, h.group), since: h.since, mine, garr: mine ? h.garr : undefined, total: Object.values(h.garr).reduce((a, t) => a + sum(t), 0) };
   });
-  const ally = myAl ? { id: myAl.id, name: myAl.name, tag: myAl.tag, leader: myAl.leader, members: myAl.members, chat: myAl.chat.slice(-60),
+  const ally = myAl ? { id: myAl.id, name: myAl.name, tag: myAl.tag, leader: myAl.leader, members: myAl.members, store: { ...storeOf(myAl) }, chat: myAl.chat.slice(-60),
     requests: w.pending.filter(x => x.al === myAl.id && x.kind === 'request').map(x => ({ id: x.id, pid: x.pid, name: nameOf(x.pid) })),
     invites: w.pending.filter(x => x.al === myAl.id && x.kind === 'invite').map(x => ({ id: x.id, pid: x.pid, name: nameOf(x.pid) })) } : null;
   const myStations = players.filter(p => p.id !== me.id && p.state.stationed && p.state.stationed[me.id]).map(p => ({ host: p.id, name: p.name, troops: p.state.stationed[me.id] }));
