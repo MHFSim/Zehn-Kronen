@@ -6,6 +6,7 @@
 import { N, G, SUB, SEA, MOUNT, vnoise, fbm, smooth, generateMap, findPath, cellOf, SANCT_R } from '/shared/mapgen.js';
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
 import { buildAtlas, proj } from '/public/art.js';
+import { rectsOf, OP_R } from '/shared/outpost.js';
 
 export const ELEV = 96;                    // Pixel Höhe pro Höheneinheit über dem Meer
 const BW = 4, NB = Math.ceil(2 * N / BW);  // Streifen aus je 4 Diagonalen
@@ -86,8 +87,8 @@ export class WorldMap {
     this.buildTerrain(map);
     this.buildSprites(map);
     this.ui = new PIXI.Container(); this.armies = new PIXI.Container(); this.lines = new PIXI.Graphics(); this.ring = new PIXI.Graphics();
-    this.armies.sortableChildren = true;
-    this.root.addChild(this.lines, this.ring, this.armies, this.ui);
+    this.armies.sortableChildren = true; this.terr = new PIXI.Graphics(); this.opSprites = {}; this.preview = null; this.terrAt = 0;
+    this.root.addChild(this.terr, this.lines, this.ring, this.armies, this.ui);
     this.marchSprites = {}; this.labels = {};
   }
   makeRoads(map) {
@@ -288,6 +289,7 @@ export class WorldMap {
     }
     this.applyFogVisibility();
     this.rebuildLabels(view);
+    this.syncOutposts(view);
     this.syncMarches(view);
     this.dirtyLabels = true;
   }
@@ -396,6 +398,66 @@ export class WorldMap {
     for (const id in this.marchSprites) if (!keep.has(Number(id))) { const s = this.marchSprites[id]; s.lab.destroy({ children: true }); s.destroy({ children: true }); delete this.marchSprites[id]; }
   }
 
+
+  /* ---------- Revier und Außenposten ---------- */
+  rectList() {
+    const v = this.view, gt = this.gtNow();
+    const grp = p => p.ally ? 'a' + p.ally : 'p' + p.id;
+    const cities = v.match.players.filter(p => !p.out && p.slot >= 0).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) }));
+    return rectsOf(cities, v.world.outposts || [], gt);
+  }
+  ownerColor(pid) { const p = this.view.match.players.find(x => x.id === pid); return parseInt(PLAYER_COLORS[((p && p.slot) || 0) % 10].slice(1), 16); }
+  edgePts(x0, y0, x1, y1) {
+    const a = clamp(x0, 0, N), b = clamp(y0, 0, N), c = clamp(x1 + 1, 0, N), d = clamp(y1 + 1, 0, N), pts = [], st = 2;
+    for (let x = a; x < c; x += st) pts.push(this.worldPos(x, b));
+    for (let y = b; y < d; y += st) pts.push(this.worldPos(c, y));
+    for (let x = c; x > a; x -= st) pts.push(this.worldPos(x, d));
+    for (let y = d; y > b; y -= st) pts.push(this.worldPos(a, y));
+    return pts;
+  }
+  drawTerritory() {
+    const g = this.terr; g.clear(); if (!this.view) return;
+    const mine = this.view.match.players.find(p => p.id === this.myId), myG = mine ? (mine.ally ? 'a' + mine.ally : 'p' + mine.id) : '';
+    for (const r of this.rectList()) {
+      const col = this.ownerColor(r.owner), pts = this.edgePts(r.x0, r.y0, r.x1, r.y1).flatMap(p => [p.x, p.y]), me = r.group === myG;
+      g.lineStyle(me ? 4 : 3, col, r.ready ? .95 : .5).beginFill(col, r.ready ? (me ? .24 : .17) : .08).drawPolygon(pts).endFill();
+      g.lineStyle(1, 0x15110c, .35).drawPolygon(pts);
+    }
+    if (this.preview) {
+      const p = this.preview, col = p.ok ? 0x6fe07a : 0xe0594a, pts = this.edgePts(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r).flatMap(q => [q.x, q.y]);
+      g.lineStyle(3, col, .95).beginFill(col, .2).drawPolygon(pts).endFill();
+    }
+  }
+  setPreview(p) { this.preview = p; this.terrDirty = true; }
+  tileAt(wx, wy) {
+    let x = 0, y = 0, z = 0;
+    for (let i = 0; i < 4; i++) { const s = (wy + z) / 16, d = wx / 32; x = (s + d) / 2; y = (s - d) / 2; z = this.zAt(clamp(x, 0, N - .01), clamp(y, 0, N - .01)); }
+    return { x: Math.floor(x), y: Math.floor(y) };
+  }
+  towerSprite(o) {
+    const PIXI = this.PIXI, c = new PIXI.Container(), g = new PIXI.Graphics();
+    g.beginFill(0x000000, .28).drawEllipse(0, 2, 27, 11).endFill();
+    g.beginFill(0x9b9486).drawRect(-13, -38, 26, 38).endFill().beginFill(0x7c766a).drawRect(3, -38, 10, 38).endFill();
+    g.beginFill(0xb3ab9a).drawEllipse(0, -38, 13, 6.5).endFill();
+    for (const bx of [-12, -4, 4]) g.beginFill(0x8c8579).drawRect(bx, -46, 7, 8).endFill();
+    g.beginFill(0x3b2a1c).drawRoundedRect(-4, -14, 8, 14, 3).endFill();
+    g.lineStyle(2, 0x2b1d12).moveTo(0, -46).lineTo(0, -74);
+    const flag = new PIXI.Graphics(); flag.beginFill(0xffffff).drawPolygon([0, -74, 22, -67, 0, -60]).endFill();
+    c.addChild(g, flag); c.flag = flag; c.lab = this.badge('1', 0x5a4a6e); c.lab.position.set(0, 16); c.addChild(c.lab);
+    this.armies.addChild(c); return c;
+  }
+  syncOutposts(view) {
+    const ops = view.world.outposts || [], keep = new Set(), gt = this.gtNow();
+    for (const o of ops) {
+      keep.add(o.id); let s = this.opSprites[o.id]; if (!s) s = this.opSprites[o.id] = this.towerSprite(o);
+      s.o = o; const wp = this.worldPos(o.x + .5, o.y + .5); s.position.set(wp.x, wp.y); s.zIndex = wp.y;
+      const col = this.ownerColor(o.owner); s.flag.tint = col; s.lab.t.text = String(o.lv);
+      s.scale.set(1 + .12 * (o.lv - 1)); s.alpha = gt >= o.done ? 1 : .55;
+    }
+    for (const id in this.opSprites) if (!keep.has(id)) { this.opSprites[id].destroy({ children: true }); delete this.opSprites[id]; }
+    const sig = JSON.stringify([ops, view.match.players.map(p => p.id + ':' + p.rathaus + p.out + p.ally)]); if (sig !== this.terrSig) { this.terrSig = sig; this.terrDirty = true; }
+  }
+
   /* ---------- Bild für Bild ---------- */
   frame(dt, zoom, camRect) {
     this.time += dt; this.zoom = zoom; this.shader.uniforms.uTime = this.time;
@@ -407,6 +469,8 @@ export class WorldMap {
       if (h.fire && h.fire.visible) { const k = Math.floor(t * 8 + h.o.x) % 3; h.fire.texture = this.atlas.tex['fire' + k]; h.fire.alpha = .85 + Math.sin(t * 17 + h.o.y) * .15; }
       if (h.flag && h.flag.visible) { h.flag.skew.y = Math.sin(t * 3.6 + h.o.x) * .22; h.flag2.skew.y = Math.sin(t * 3.9 + h.o.y + 1) * .22; }
     }
+    if (this.terrDirty || this.time - this.terrAt > 1) { this.terrAt = this.time; this.terrDirty = false; this.drawTerritory(); }
+    for (const id in this.opSprites) { const q = this.opSprites[id]; q.flag.skew.y = Math.sin(t * 3.2 + q.o.x) * .2; }
     // Heere bewegen
     const gt = this.gtNow(), w = this.view.world, frame = Math.floor(t * 4) % 2, A = this.atlas;
     this.lines.clear();
@@ -440,6 +504,8 @@ export class WorldMap {
         this.ring.lineStyle(3, 0xf0d98a, .95).drawEllipse(p.x, p.y, r, r / 2).lineStyle(1.5, 0x15110c, .6).drawEllipse(p.x, p.y, r + 3, (r + 3) / 2);
       }
     }
+    if (this.sel && this.sel.type === 'op') { const q = this.opSprites[this.sel.id]; if (q) { const r = 60 + Math.sin(t * 3) * 3; this.ring.lineStyle(3, 0xf0d98a, .95).drawEllipse(q.x, q.y, r, r / 2); } }
+    if (this.sel && this.sel.type === 'site') { const p = this.worldPos(this.sel.x + .5, this.sel.y + .5), r = 22 + Math.sin(t * 4) * 2; this.ring.lineStyle(3, 0xf0d98a, .95).drawEllipse(p.x, p.y, r, r / 2); }
     if (this.dirtyLabels || this.fogChanged) { this.applyFogVisibility(); this.dirtyLabels = false; this.fogChanged = false; }
     this.applyLabelVisibility(zoom);
     void w; void bestSel;
@@ -463,12 +529,19 @@ export class WorldMap {
       const d = Math.hypot(wx - s.x, wy - (s.y - 16)); if (d < 34 && d < bd) { bd = d; best = { type: 'march', id: Number(id) }; }
     }
     if (best) return best;
+    for (const id in this.opSprites) {
+      const q = this.opSprites[id], d = Math.hypot(wx - q.x, wy - (q.y - 30)); if (d < 44 && d < bd) { bd = d; best = { type: 'op', id }; }
+    }
+    if (best) return best;
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o; if (!this.bits || !this.exploredBit(o.x, o.y)) continue;
       const p = this.worldPos(o.x + .5, o.y + .5), rad = o.k === 'throne' ? 90 : o.k === 'start' || o.k === 'sanct' ? 62 : 46;
       const d = Math.hypot(wx - p.x, (wy - (p.y - rad * .35)) * 1.25); if (d < rad && d < bd) { bd = d; best = { type: 'obj', id }; }
     }
-    return best;
+    if (best) return best;
+    const t = this.tileAt(wx, wy);
+    if (t.x >= 3 && t.y >= 3 && t.x < N - 3 && t.y < N - 3 && this.map.pass[t.y * N + t.x]) return { type: 'site', x: t.x, y: t.y };
+    return null;
   }
   select(sel) { this.sel = sel; }
 }

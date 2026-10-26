@@ -77,6 +77,9 @@ Der Server ist maßgeblich: Bauaufträge, Ausbildung und Ressourcen werden dort 
 ## Forschung
 In der Akademie laufen acht Forschungen (Ackerbau, Forstwirtschaft, Steinmetzkunst, Bergbau, Handel, Kriegskunst, Marschordnung, Lasten) mit je fünf Stufen. Es läuft immer nur eine; Stufe n braucht Akademie 2n−1. Sie steigern Erträge, Gold, Kampfkraft, Marschtempo und Beutekapazität. Die Stadtansicht (Holz und Pergament) hat Reiter Wirtschaft, Militär, Verwaltung, Forschung.
 
+## Revier und Außenposten
+Jede Burg beansprucht ein Viereck (Seitenlänge wächst mit dem Rathaus). Mit **Außenposten** vergrößerst du dein Revier: auf der Karte ein freies Feld antippen, mindestens 50 Truppen als Besatzung schicken, Rohstoffe zahlen. Der Posten muss das Revier von dir oder deinem Bündnis berühren und darf kein fremdes überlappen. Stufe 1 bis 3 gibt 9×9, 13×13 und 17×17 Felder. Wie viele Posten du halten darfst, wächst mit dem Rathaus (2 + Rathaus÷2). Gegner können Außenposten angreifen und zerstören; dann verschwindet das Revier. **Heiligtümer und der Thron** lassen sich nur besetzen, solange ein Viereck deiner Gruppe sie berührt; geht das Revier verloren, geht auch der Ort verloren. Die Regeln stehen in `shared/outpost.js`, die Zahlen oben in dieser Datei.
+
 ## Datensicherung
 
 Der Server legt beim Start und danach täglich eine Sicherung in `data/backups/` ab (die letzten 14 bleiben). Im Admin geht es auch per Knopf. Wiederherstellen: Server anhalten, eine Sicherung als `data/zehn-kronen.sqlite` kopieren, Server starten.

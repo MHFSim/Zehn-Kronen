@@ -6,6 +6,7 @@ import {
   T, T_MAX, techLv, techReq, techCost, techTime, techBlocker
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
+import { checkSite, touches, opCost, OP_MIN_TROOPS, OP_BUILD, OP_R, OP_MAX_LV, maxOutposts, opGuard, opReady } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
@@ -242,7 +243,7 @@ function updateSheet() {
   if (o) { const p = $('trProg'), t = $('trTime'); if (p) p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
 }
 function openSheet(id) { msel = null; sel = id; document.body.classList.add('sheet-open'); renderSheet(); }
-function closeSheet() { sel = null; msel = null; if (wm) wm.select(null); document.body.classList.remove('sheet-open'); }
+function closeSheet() { sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
 
 async function command(cmd) {
   if (busy) return false; busy = true;
@@ -520,6 +521,7 @@ function tutorialHTML() {
     ['Ein Heer zu einem Feld schicken', rp.some(r => r.kind === 'gather' || r.kind === 'return'), 'Karte → Feld antippen, Truppen wählen, Sammeln.'],
     ['Ein Banditenlager besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Stufe 1 und 2 sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
+    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Karte → freies Feld antippen → Außenposten bauen. Er vergrößert dein Revier und ist nötig, um Heiligtümer und den Thron zu erreichen.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
     ['Ein Heiligtum besetzen', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Die vier Heiligtümer geben dir und deinem Bündnis +15 % auf einen Rohstoff.']
   ];
@@ -531,7 +533,8 @@ function rulesHTML() {
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
-  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
+  <p class="desc"><b>Revier:</b> Jede Burg und jeder Außenposten beansprucht ein Viereck auf der Karte. Neue Außenposten müssen dein Revier (oder das des Bündnisses) berühren und dürfen kein fremdes überlappen. Gegner können Außenposten zerstören.</p>
+  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Viereck deiner Gruppe den Ort berühren. Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
@@ -555,17 +558,20 @@ function moreHTML() {
       <p class="note">Pro Person ist ein Konto vorgesehen. Mehrfachkonten fallen dem Admin auf und können entfernt werden.</p></div>
     <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
+  const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow();
+  const revier = `<p class="note">Jede Burg und jeder Außenposten beansprucht ein Viereck. Neue Außenposten müssen das Revier von dir oder deinem Bündnis berühren. Heiligtümer und den Thron kannst du nur besetzen, wenn dein Revier sie berührt. Du hältst ${myOps.length} von ${maxOutposts(S)} möglichen Außenposten (wächst mit dem Rathaus).</p>`
+    + (myOps.map(o => `<div class="mrow"><div><b>Außenposten Stufe ${o.lv}</b>${o.upg ? ' <span class="tag">Ausbau</span>' : ''}<div class="note">${gt2 < o.done ? 'im Bau, noch ' + fmtT(real(o.done - gt2)) : 'fertig'} · Besatzung ${fmtN(o.total)} · Revier ${2 * OP_R[o.lv] + 1}×${2 * OP_R[o.lv] + 1}</div></div><button class="btn ghost small" type="button" data-act="opGoto" data-id="${o.id}">Auf der Karte</button></div>`).join('') || '<p class="note">Du hast noch keinen Außenposten. Tippe auf der Karte ein freies Feld an, das dein Revier berührt.</p>');
   const tasks = tutorialHTML(), taskDone = (tasks.match(/class="chk done"/g) || []).length, taskAll = (tasks.match(/class="chk/g) || []).length;
   const SUBS = {
     game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], revier: ['🏰', 'Revier', revier], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('revier', '🏰', 'Revier', myOps.length + ' von ' + maxOutposts(S) + ' Außenposten')}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -603,7 +609,7 @@ let panelName = '', panelSig = '';
 function panelSignature() {
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
-  return JSON.stringify([moreSub, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
+  return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
@@ -636,6 +642,7 @@ function setupPanel() {
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }
+    if (act === 'opGoto') { closePanel(); await setMode('map'); if (mode === 'map') selectMap({ type: 'op', id: d.id }, false); return; }
     if (act === 'allyCreate') return void command({ type: 'allyCreate', name: val('alName'), tag: val('alTag') });
     if (act === 'allyRequest') return void command({ type: 'allyRequest', al: Number(d.al) });
     if (act === 'allyAnswer') return void command({ type: 'allyAnswer', id: Number(d.id), accept: !!d.yes });
@@ -673,12 +680,12 @@ function showEnd(force) {
 
 /* ---------- Karte: Bedienung ---------- */
 const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', ore: 'Erzmine', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', start: 'Burg' };
-const KIND_SHORT = { start: 'Burg', farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron' };
+const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron' };
 const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
 const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
 function marchRemain(m) { const L = m.arr[m.arr.length - 1], g = gtNow(); return m.phase === 'gather' ? m.tEnd - g : m.t0 + L - g; }
 function marchLine(m) {
-  const ph = m.phase === 'out' ? (m.mode === 'attack' ? 'Angriff' : m.mode === 'station' ? 'Verstärkung' : m.mode === 'occupy' ? 'Besetzung' : 'Marsch') : m.phase === 'gather' ? 'Sammelt' : 'Rückweg';
+  const ph = m.phase === 'out' ? (m.mode === 'attack' ? 'Angriff' : m.mode === 'station' ? 'Verstärkung' : m.mode === 'occupy' ? 'Besetzung' : m.mode === 'build' ? 'Bautrupp' : m.mode === 'raid' ? 'Angriff' : m.mode === 'garrison' ? 'Verstärkung' : 'Marsch') : m.phase === 'gather' ? 'Sammelt' : 'Rückweg';
   return `${ph} · ${KIND_SHORT[m.tk] || ''} · ${fmtT(real(Math.max(0, marchRemain(m))))}`;
 }
 const lootHTML = l => Object.keys(l).filter(r => l[r] > 0).map(r => `<span class="cost"><i class="r r-${r}"></i>${RES_DE[r]} ${fmtN(l[r])}</span>`).join('');
@@ -705,12 +712,14 @@ function selectMap(hit, keepSend) {
   if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; }
   document.body.classList.add('sheet-open');
   if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; focusMap(o.x + .5, o.y + .5); }
+  else if (hit.type === 'op') { const o = (view.world.outposts || []).find(x => x.id === hit.id); if (o) focusMap(o.x + .5, o.y + .5); }
+  else if (hit.type === 'site') focusMap(hit.x + .5, hit.y + .5);
   else { const m = view.world.marches.find(x => x.id === hit.id); if (m) { const p = marchPos(m, gtNow()); focusMap(p.x, p.y); } }
   renderSheet();
 }
 function mapSignature() {
   const w = view.world, id = msel.id;
-  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], w.ruins[id], RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
+  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
 }
 function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
 function planFor(o) {
@@ -725,18 +734,73 @@ function pickerHTML() {
   return `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => `<div class="unit"><div><div class="unit-name">${U[u].name}</div><div class="unit-stats">daheim ${fmtN(S.troops[u])} · trägt ${U[u].c}</div></div>
     <div class="stepper"><button type="button" data-act="sminus" data-u="${u}" aria-label="Weniger">−</button><output>${fmtN(send[u] || 0)}</output><button type="button" data-act="splus" data-u="${u}" aria-label="Mehr">+</button></div></div>`).join('')}</div>`;
 }
+
+/* ---------- Revier: Bauplatz und Außenposten ---------- */
+function siteCtx() {
+  const m = view.match;
+  return { mt: { seed: m.seed, world: { alliances: Object.fromEntries((m.alliances || []).map(a => [a.id, a])), outposts: Object.fromEntries((view.world.outposts || []).map(o => [o.id, o])) } },
+    pls: m.players.map(p => ({ id: p.id, name: p.name, state: { out: p.out, slot: p.slot, pos: p.pos, lv: { rathaus: p.rathaus } } })) };
+}
+const opOwnerName = o => pname(o.owner);
+function siteSheet(w) {
+  const { mt, pls } = siteCtx(), mine = (w.outposts || []).filter(o => o.mine).length, free = ownMarches().length < armySlots(S);
+  let why = checkSite(mt, pls, { id: me.id }, msel.x, msel.y, 1, gtNow());
+  if (!why && mine >= maxOutposts(S)) why = 'Du kannst höchstens ' + maxOutposts(S) + ' Außenposten halten (wächst mit dem Rathaus).';
+  if (!why && view.match.phase !== 'running') why = 'Die Partie läuft nicht.';
+  wm.setPreview({ x: msel.x, y: msel.y, r: OP_R[1], ok: !why });
+  const o = { id: 'site', x: msel.x, y: msel.y }, plan = !why ? planFor(o) : null, c = opCost(1);
+  let body = `<p class="desc">Ein Außenposten vergrößert dein Revier um ein Viereck (9×9 Felder, mit Ausbau bis 17×17). Mit Revier kannst du Heiligtümer und den Thron erreichen. Gegner können den Außenposten zerstören.</p>
+    <dl class="stats"><dt>Kosten</dt><dd class="costs">${costHTML(c)}</dd><dt>Bauzeit</dt><dd>${fmtT(real(OP_BUILD[1]))} nach der Ankunft</dd><dt>Deine Außenposten</dt><dd>${mine} von ${maxOutposts(S)}</dd></dl>`;
+  if (why) body += `<p class="why">${esc(why)}</p>`;
+  else {
+    body += pickerHTML();
+    if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
+    const short = RES.some((r, i) => S.res[r] < c[i]) ? 'Nicht genug Rohstoffe.' : '';
+    body += actionRow('Außenposten bauen', plan, short, free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Mindestens ${OP_MIN_TROOPS} Truppen bleiben als Besatzung dort und verteidigen ihn.</p>`;
+  }
+  return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
+}
+function opSheet(w) {
+  const o = (w.outposts || []).find(x => x.id === msel.id); if (!o) return '';
+  const gt = gtNow(), ready = opReady(o, gt), lvNow = o.upg && gt >= o.upg.done ? o.upg.to : o.lv, g = opGuard(lvNow), free = ownMarches().length < armySlots(S);
+  const side = 2 * OP_R[lvNow] + 1, friend = o.mine || (view.match.players.find(p => p.id === o.owner) || {}).ally === (view.match.players.find(p => p.id === me.id) || {}).ally && o.group[0] === 'a';
+  wm.setPreview(null);
+  let body = `<dl class="stats"><dt>Besitzer</dt><dd>${o.mine ? 'du' : esc(opOwnerName(o))}</dd><dt>Revier</dt><dd>${side}×${side} Felder</dd>
+    <dt>Zustand</dt><dd>${ready ? 'fertig' : 'im Bau, noch ' + fmtT(real(o.done - gt))}${o.upg ? ' · Ausbau auf Stufe ' + o.upg.to + ' in ' + fmtT(real(Math.max(0, o.upg.done - gt))) : ''}</dd>
+    <dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>${o.mine ? `<dt>Besatzung</dt><dd>${troopsLine(o.garr || {})}</dd>` : ''}</dl>`;
+  if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
+  else if (o.mine) {
+    const next = lvNow + 1, c = opCost(next), can = !o.upg && ready && lvNow < OP_MAX_LV, short = can && RES.some((r, i) => S.res[r] < c[i]);
+    body += can ? `<div class="block"><h3>Ausbau auf Stufe ${next}</h3><p class="note">Revier ${2 * OP_R[next] + 1}×${2 * OP_R[next] + 1} Felder · ${fmtT(real(OP_BUILD[next]))}</p><div class="costs">${costHTML(c)}</div><div class="row"><button class="btn" type="button" data-act="opUp" ${short ? 'disabled' : ''}>Ausbauen</button>${short ? '<span class="why">Nicht genug Rohstoffe.</span>' : ''}</div></div>`
+      : lvNow >= OP_MAX_LV ? '<p class="note">Höchste Stufe erreicht.</p>' : '';
+    body += pickerHTML() + actionRow('Besatzung verstärken', planFor({ id: o.id, x: o.x, y: o.y }), '', free, '', 'garrison');
+    body += `<div class="row">${sum(o.garr || {}) ? '<button class="btn ghost" type="button" data-act="opRecall">Besatzung abziehen</button>' : ''}<button class="btn ${armedKey === 'opdis' + o.id ? 'danger' : 'ghost'}" type="button" data-act="opDis">${armedKey === 'opdis' + o.id ? 'Wirklich aufgeben' : 'Aufgeben'}</button></div>`;
+  } else if (friend) body += '<p class="note">Der Außenposten gehört einem Verbündeten und erweitert euer gemeinsames Revier.</p>';
+  else {
+    const plan = planFor({ id: o.id, x: o.x, y: o.y }), pl = view.match.players.find(p => p.id === o.owner), prot = pl && pl.protUntil > gt;
+    body += '<p class="note">Wie viele Truppen als Besatzung dort stehen, siehst du erst im Kampf. Gewinnst du, verschwindet der Außenposten samt Revier und du erbeutest einen Teil der Baukosten.</p>' + pickerHTML();
+    if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
+    const why = prot ? 'Der Besitzer steht unter Schutz.' : '';
+    body += (S.protUntil > gt ? '<p class="why">Wenn du angreifst, endet dein Schutz sofort.</p>' : '') + actionRow(armedKey === 'raid' + o.id ? 'Jetzt wirklich angreifen' : 'Außenposten angreifen', plan, why, free, armedKey === 'raid' + o.id ? 'danger' : '', 'raid');
+  }
+  return `<div class="sh-head"><h2>Außenposten</h2><span class="lvl">Stufe ${lvNow}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
+}
 function renderMapSheet() {
   const w = view.world; let h = '';
   if (msel.type === 'march') {
     const m = w.marches.find(x => x.id === msel.id);
     if (!m) { closeSheet(); return; }
-    const tgt = wm.map.byId[m.tid], ph = m.phase === 'out' ? 'auf dem Weg zum Ziel' : m.phase === 'gather' ? 'sammelt' : 'auf dem Rückweg';
+    const tgt = wm.map.byId[m.tid] || null, ph = m.phase === 'out' ? 'auf dem Weg zum Ziel' : m.phase === 'gather' ? 'sammelt' : 'auf dem Rückweg';
     h = `<div class="sh-head"><h2>${m.own ? 'Dein Heer' : 'Heer von ' + esc(m.name)}</h2><span class="lvl">${ph}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-      <dl class="stats"><dt>Ziel</dt><dd>${tgt ? (tgt.k === 'start' ? 'Burg von ' + esc((view.match.players.find(p => p.slot === tgt.slot) || {}).name || '?') : OBJ_NAME[tgt.k] + (tgt.lv ? ' ' + tgt.lv : '')) : '—'}</dd><dt>Noch</dt><dd id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</dd>
+      <dl class="stats"><dt>Ziel</dt><dd>${m.tk === 'site' ? 'Bauplatz' : m.tk === 'outpost' ? 'Außenposten' : tgt ? (tgt.k === 'start' ? 'Burg von ' + esc((view.match.players.find(p => p.slot === tgt.slot) || {}).name || '?') : OBJ_NAME[tgt.k] + (tgt.lv ? ' ' + tgt.lv : '')) : '—'}</dd><dt>Noch</dt><dd id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</dd>
       <dt>Truppen</dt><dd>${m.troops.n != null ? fmtN(m.troops.n) + ' Einheiten' : troopsLine(m.troops)}</dd>${m.own && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
       ${m.phase === 'gather' && m.own ? `<dt>Sammelt</dt><dd class="costs">${lootHTML({ [m.res]: Math.floor(m.amount * Math.max(0, Math.min(1, (gtNow() - m.tStart) / (m.tEnd - m.tStart || 1)))) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
       ${m.own && m.phase !== 'back' ? `<div class="row"><button class="btn ghost" type="button" data-act="recall">${m.phase === 'gather' ? 'Heimrufen (Beute bis jetzt)' : 'Zurückrufen'}</button></div>` : ''}`;
+  } else if (msel.type === 'site' || msel.type === 'op') {
+    h = msel.type === 'site' ? siteSheet(w) : opSheet(w);
+    if (!h) { closeSheet(); return; }
   } else {
+    wm.setPreview(null);
     const o = wm.map.byId[msel.id], k = o.k, id = o.id, free = ownMarches().length < armySlots(S);
     const title = k === 'start' ? ((view.match.players.find(p => p.slot === o.slot) || {}).name ? 'Burg von ' + esc(view.match.players.find(p => p.slot === o.slot).name) : 'Freier Burgplatz') : k === 'sanct' ? SANCT[o.n][0] : OBJ_NAME[k];
     const lv = o.lv ? `<span class="lvl">Stufe ${o.lv}</span>` : '';
@@ -805,7 +869,9 @@ function renderMapSheet() {
           if (!hd) { const sl = sendList(), r = battle(sl, g.troops, g.mult, forceOf(S)); body += `<dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(sum(sl) - sum(r.attLeft))} von ${fmtN(sum(sl))}` : 'Niederlage'}</dd>`; }
           body += '</dl>';
         }
-        body += actionRow(hd && hd.mine ? 'Besatzung verstärken' : hd ? 'Besatzung angreifen' : 'Besetzen', plan, '', free);
+        const myP = view.match.players.find(p => p.id === me.id), touchOK = touches(wm.rectList(), myP && myP.ally ? 'a' + myP.ally : 'p' + me.id, o.x, o.y);
+        if (!touchOK) body += '<p class="why">Dein Revier (oder das deines Bündnisses) berührt diesen Ort nicht. Baue Außenposten in seine Richtung: freies Feld antippen.</p>';
+        body += actionRow(hd && hd.mine ? 'Besatzung verstärken' : hd ? 'Besatzung angreifen' : 'Besetzen', plan, touchOK ? '' : 'Kein Revier an diesem Ort.', free);
         body += '<p class="note">Die Truppen bleiben dort stehen, bis du sie zurückrufst. Verlierst du den Ort, sind sie verloren (zum Teil verwundet).</p>';
       }
     }
@@ -813,9 +879,9 @@ function renderMapSheet() {
   }
   $('sheetInner').innerHTML = h; sheetSig = mapSignature();
 }
-function actionRow(label, plan, why, free, cls = '') {
-  const bad = why || (!sum(sendList()) ? 'Wähle Truppen aus.' : !free ? 'Alle Heere sind unterwegs.' : plan && plan.error ? plan.error : '');
-  return `<div class="row"><button class="btn ${cls}" type="button" data-act="march" ${bad ? 'disabled' : ''}>${label}</button>${bad ? `<span class="why">${bad}</span>` : ''}</div>`;
+function actionRow(label, plan, why, free, cls = '', act = 'march', minT = 0) {
+  const bad = why || (!sum(sendList()) ? 'Wähle Truppen aus.' : sum(sendList()) < minT ? 'Mindestens ' + minT + ' Truppen nötig.' : !free ? 'Alle Heere sind unterwegs.' : plan && plan.error ? plan.error : '');
+  return `<div class="row"><button class="btn ${cls}" type="button" data-act="${act}" ${bad ? 'disabled' : ''}>${label}</button>${bad ? `<span class="why">${bad}</span>` : ''}</div>`;
 }
 function updateMapSheet() {
   if (!msel) return;
@@ -823,7 +889,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'garrison', 'opUp', 'opRecall', 'opDis', 'opGoto'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -839,6 +905,12 @@ function mapAct(act, el) {
   }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
+  else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
+  else if (act === 'raid') { if (!twice('raid' + msel.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'raid', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff auf den Außenposten.', 'info'); closeSheet(); } }); }
+  else if (act === 'garrison') command({ type: 'march', mode: 'garrison', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Verstärkung ist unterwegs.', 'info'); closeSheet(); } });
+  else if (act === 'opUp') command({ type: 'opUpgrade', id: msel.id }).then(ok => ok && toast('Der Ausbau hat begonnen.', 'info'));
+  else if (act === 'opRecall') command({ type: 'opRecall', id: msel.id }).then(ok => ok && toast('Die Besatzung kehrt heim.', 'info'));
+  else if (act === 'opDis') { if (!twice('opdis' + msel.id)) { renderSheet(); return true; } command({ type: 'opDismantle', id: msel.id }).then(ok => { if (ok) closeSheet(); }); }
   else if (act === 'recall') command({ type: 'recall', id: msel.id });
   return true;
 }

@@ -32,13 +32,13 @@ export function newWorld(now, o = {}) {
   const phase = o.phase || 'running', weeks = o.weeks || 10;
   return { ver: 2, n: N, gt: 0, at: now, nodes: {}, camps: {}, ruins: {}, marches: [], nextId: 1,
     phase, weeks, startGt: 0, endGt: phase === 'running' ? weeks * 7 * DAY : 0,
-    alliances: {}, nextAl: 1, pending: [], nextPend: 1, holds: {}, chron: [], result: null };
+    alliances: {}, nextAl: 1, pending: [], nextPend: 1, holds: {}, outposts: {}, nextOp: 1, chron: [], result: null };
 }
 export function ensureWorld(w) {
   if (!w.phase) w.phase = 'running';
   if (!w.alliances) w.alliances = {}; if (!w.nextAl) w.nextAl = 1;
   if (!w.pending) w.pending = []; if (!w.nextPend) w.nextPend = 1;
-  if (!w.holds) w.holds = {}; if (!w.chron) w.chron = [];
+  if (!w.holds) w.holds = {}; if (!w.chron) w.chron = []; if (!w.outposts) w.outposts = {}; if (!w.nextOp) w.nextOp = 1;
   if (w.weeks == null) w.weeks = 10; if (w.startGt == null) w.startGt = 0; if (w.endGt == null) w.endGt = 0;
   if (w.result === undefined) w.result = null;
   return w;

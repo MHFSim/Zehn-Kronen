@@ -7,6 +7,7 @@ import {
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState
 } from './core.js';
+import { territory, touches, removeOutposts } from './outpost.js';
 
 export const SANCT_NAMES = ['Heiligtum der Felder', 'Heiligtum der Wälder', 'Heiligtum der Steine', 'Heiligtum der Erze'];
 export const SANCT_RES = ['food', 'wood', 'stone', 'ore'];
@@ -42,6 +43,7 @@ export function checkLaunch(ctx, me, o, mode, troops) {
   }
   if (mode === 'occupy') {
     if (o.k !== 'throne' && o.k !== 'sanct') return 'Dieses Ziel gibt es nicht';
+    if (!touches(territory(ctx.match, ctx.players, gt), groupOf(w, me.id), o.x, o.y)) return 'Dein Revier berührt diesen Ort nicht. Baue Außenposten in seine Richtung (Karte → freies Feld antippen).';
     return {};
   }
   return 'Unbekannte Marschart';
@@ -157,7 +159,7 @@ export function eliminate(ctx, V, by, bt) {
   for (const oid in w.holds) { const h = w.holds[oid]; if (h.garr[V.id]) { delete h.garr[V.id]; if (!Object.keys(h.garr).length) delete w.holds[oid]; } }
   removeMember(ctx, V.id);
   for (const p of players) if (p.state.vassalOf === V.id) { p.state.vassalOf = 0; p.state.vassalUntil = 0; }
-  S.out = true; S.outAt = bt; S.troops = {}; S.away = {}; S.wounded = {}; S.train = {}; S.queue = []; S.stationed = {}; S.vassalOf = 0; S.vassalUntil = 0; S.protUntil = 0; S.bonus = {};
+  removeOutposts(w, V.id); S.out = true; S.outAt = bt; S.troops = {}; S.away = {}; S.wounded = {}; S.train = {}; S.queue = []; S.stationed = {}; S.vassalOf = 0; S.vassalUntil = 0; S.protUntil = 0; S.bonus = {};
   if (by) by.state.stats.conquests++;
   chron(ctx, V.name + ' ist ausgeschieden' + (by ? ' (erobert von ' + by.name + ')' : '') + '.');
   note(ctx, V.id, 'out', 'Du bist ausgeschieden', 'Du kannst die Partie weiter verfolgen.');
@@ -184,7 +186,7 @@ export function releaseAll(ctx, pid) {
 // Spieler ganz aus der Partie nehmen (Admin): Verbündete bekommen ihre Truppen zurück
 export function purge(ctx, pid) {
   const { players } = ctx, w = ctx.match.world;
-  releaseAll(ctx, pid);
+  releaseAll(ctx, pid); removeOutposts(w, pid);
   w.marches = w.marches.filter(m => m.owner !== pid);
   removeMember(ctx, pid);
   w.pending = w.pending.filter(p => p.pid !== pid);
@@ -207,6 +209,10 @@ const sumGarr = h => { let t = {}; for (const pid in h.garr) t = merge(t, h.garr
 export function arriveHold(ctx, m, o, bt, realT, back) {
   const { players } = ctx, w = ctx.match.world, A = byId(players, m.owner), group = groupOf(w, A.id), hold = w.holds[o.id];
   const info = { kind: o.k, id: o.id, x: o.x, y: o.y, n: o.n };
+  if (!touches(territory(ctx.match, players, bt), group, o.x, o.y)) {
+    pushReport(A.state, { kind: 'hold', title: holdName(o) + ': kein Revier', win: false, target: info, text: 'Dein Revier berührt den Ort nicht mehr. Das Heer kehrt um.' }, realT);
+    return back();
+  }
   if (hold && hold.group === group) {
     hold.garr[A.id] = merge(hold.garr[A.id] || {}, m.troops); m.dead = true;
     pushReport(A.state, { kind: 'hold', title: holdName(o) + ': Truppen angekommen', win: true, target: info, text: 'Deine Truppen verstärken die Besatzung.' }, realT);

@@ -7,11 +7,13 @@ import { U, freshState, advanceTo, applyCommand, armySlots } from './rules.js';
 import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from './combat.js';
 import {
   DAY, GATHER_FULL, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, campAlive,
-  reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel,
+  reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur
 } from './core.js';
 import { afterLaunch, applyBonuses, arriveCity, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
+import { arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, noteRaid, opCost, upgradeOutpost, recallGarrison, dismantle, settleTerritory, territory, OP_MIN_TROOPS } from './outpost.js';
+import { RES } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
 
@@ -23,6 +25,9 @@ function onArrive(ctx, m, bt, realT) {
   const S = p.state;
   advanceTo(S, realT, match.speed);
   const back = () => { m.phase = 'back'; m.t0 = bt; reversed(m); };
+  if (m.mode === 'build') return arriveBuild(ctx, m, bt, realT, back);
+  if (m.mode === 'garrison') return arriveGarrison(ctx, m, bt, realT, back);
+  if (m.mode === 'raid') return arriveRaid(ctx, m, bt, realT, back);
   if (m.mode === 'attack' || m.mode === 'station') return arriveCity(ctx, m, o, bt, realT, back);
   if (m.mode === 'occupy') return arriveHold(ctx, m, o, bt, realT, back);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
@@ -121,6 +126,7 @@ export function syncMatch(match, players, now) {
   ctx.bt = null; ctx.realT = now;
   const dt = Math.max(0, target - w.gt);
   w.gt = target; w.at = now;
+  settleTerritory(ctx);
   applyBonuses(ctx);
   for (const p of players) { advanceTo(p.state, now, speed); }
   vassalStep(ctx, dt, w.gt);
@@ -204,9 +210,12 @@ export function command(match, players, player, cmd, now) {
   if (w.phase === 'paused') return 'Die Partie ist pausiert.';
 
   if (cmd.type === 'march') {
-    const map = mapOf(match), o = map.byId[String(cmd.target)], mode = cmd.mode || 'normal';
+    const map = mapOf(match), mode = cmd.mode || 'normal';
+    if (!['normal', 'attack', 'station', 'occupy', 'build', 'garrison', 'raid'].includes(mode)) return 'Unbekannte Marschart';
+    let o = map.byId[String(cmd.target)], opx = null;
+    if (mode === 'build') { const x = Math.floor(Number(cmd.x)), y = Math.floor(Number(cmd.y)); o = { k: 'site', id: 'site' + x + '_' + y, x, y }; }
+    else if (mode === 'garrison' || mode === 'raid') { opx = (w.outposts || {})[String(cmd.target)]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
     if (!o) return 'Dieses Ziel gibt es nicht';
-    if (!['normal', 'attack', 'station', 'occupy'].includes(mode)) return 'Unbekannte Marschart';
     if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin')) return 'Dieses Ziel gibt es nicht';
     if (w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
     const troops = {};
@@ -217,7 +226,14 @@ export function command(match, players, player, cmd, now) {
       if (n > 0) troops[u] = n;
     }
     let target = null;
-    if (mode === 'normal') {
+    if (mode === 'build' || mode === 'garrison' || mode === 'raid') {
+      if (!sum(troops)) return 'Keine Truppen ausgewählt';
+      if (mode === 'build') {
+        const why = checkBuild(match, players, player, o.x, o.y, troops, w.gt); if (why) return why;
+        const cost = opCost(1); if (RES.some((r, i) => S.res[r] < cost[i])) return 'Nicht genug Rohstoffe für einen Außenposten.';
+      } else if (mode === 'garrison') { if (opx.owner !== player.id) return 'Nur den eigenen Außenposten kannst du verstärken.'; }
+      else { const why = checkRaid(ctx, player, opx); if (why) return why; }
+    } else if (mode === 'normal') {
       if (o.k === 'camp' && !campAlive(w, o.id, w.gt)) return 'Dieses Lager ist gerade zerstört';
       if (o.k === 'ruin' && w.ruins[o.id]) return 'Diese Ruine ist schon geplündert';
       if (NODE_KINDS.includes(o.k) && nodeLeft(w, o, w.gt) < 50) return 'Dieses Feld ist erschöpft';
@@ -229,8 +245,10 @@ export function command(match, players, player, cmd, now) {
     const plan = planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
     for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
-    const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : { tk: o.k, tid: o.id, mode });
-    if (mode !== 'normal') afterLaunch(ctx, player, m, target, mode);
+    if (mode === 'build') { const cost = opCost(1); RES.forEach((r, i) => { S.res[r] -= cost[i]; }); }
+    const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : { tk: o.k, tid: o.id, mode });
+    if (mode === 'raid') noteRaid(ctx, player, opx, m);
+    else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison') afterLaunch(ctx, player, m, target, mode);
     syncMatch(match, players, now);
     return '';
   }
@@ -248,6 +266,7 @@ export function command(match, players, player, cmd, now) {
       const el = Math.max(0, w.gt - m.t0); let i = 0; while (i < m.path.length - 1 && m.arr[i + 1] <= el) i++;
       const a0 = m.arr[i]; m.path = m.path.slice(0, i + 1).reverse(); m.arr = m.arr.slice(0, i + 1).map((_, j) => a0 - m.arr[i - j]);
       m.phase = 'back'; m.t0 = w.gt; m.load = {};
+      if (m.mode === 'build') { const c = opCost(1); RES.forEach((r, i) => { S.res[r] += c[i]; }); }
       if (m.path.length < 2) { m.path = [m.path[0], m.path[0]]; m.arr = [0, 1]; }
     }
     return '';
@@ -256,6 +275,9 @@ export function command(match, players, player, cmd, now) {
   if (cmd.type === 'stationRecall') return recallStation(ctx, player, Number(cmd.host));
   if (cmd.type === 'stationDismiss') return dismissStation(ctx, player, Number(cmd.owner));
   if (cmd.type === 'holdRecall') return holdRecall(ctx, player, String(cmd.id));
+  if (cmd.type === 'opUpgrade') return upgradeOutpost(ctx, player, String(cmd.id));
+  if (cmd.type === 'opRecall') return recallGarrison(ctx, player, String(cmd.id));
+  if (cmd.type === 'opDismantle') return dismantle(ctx, player, String(cmd.id));
   return applyCommand(S, cmd);
 }
 
@@ -281,6 +303,7 @@ export function viewFor(match, players, me, now) {
   const nodes = {};
   for (const id in w.nodes) nodes[id] = Math.floor(nodeLeft(w, map.byId[id], gt));
   const camps = {}; for (const id in w.camps) if (w.camps[id].dead > gt) camps[id] = w.camps[id].dead;
+  const outposts = Object.values(w.outposts || {}).map(o => ({ id: o.id, owner: o.owner, x: o.x, y: o.y, lv: o.lv, done: o.done, upg: o.upg, group: groupOf(w, o.owner), mine: o.owner === me.id, garr: o.owner === me.id ? o.garr : undefined, total: sum(o.garr || {}) }));
   const nameOf = id => (byId(players, id) || {}).name || '';
   const holds = Object.keys(w.holds).map(oid => {
     const h = w.holds[oid], mine = myAl ? h.group === 'a' + myAl.id : h.group === 'p' + me.id;
@@ -303,6 +326,6 @@ export function viewFor(match, players, me, now) {
     },
     ally, invites: mineInv, requests: myReq, incoming, myStations,
     state: S,
-    world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches }
+    world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches, outposts }
   };
 }
