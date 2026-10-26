@@ -291,11 +291,12 @@ export class WorldMap {
     this.dirtyLabels = true;
   }
   gtNow() { const w = this.view.world; return w.gt + (Date.now() + this.offset - w.at) / 1000 * this.speed; }
-  exploredBit(x, y) { return this.bits ? (this.bits[(y * N + x) >> 3] >> ((y * N + x) & 7)) & 1 : 0; }
+  exploredBit() { return 1; }   // kein Nebel: die ganze Karte ist sichtbar
   updateFog(str) {
     const b = new Uint8Array(Math.ceil(N * N / 8));
     try { const raw = atob(str || ''); for (let i = 0; i < raw.length && i < b.length; i++) b[i] = raw.charCodeAt(i); } catch {}
-    this.bits = b;
+    this.bits = b; this.fogData.fill(255);
+    this.fogTex.baseTexture.resource.data = this.fogData; this.fogTex.baseTexture.update(); this.fogChanged = true; return;
     const f = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) f[y * N + x] = this.exploredBit(x, y);
     for (let pass = 0; pass < 2; pass++) {   // weichzeichnen: sanfter Nebelrand
       const g = new Float32Array(N * N);
