@@ -94,52 +94,39 @@ function toast(msg, kind) {
   el.className = 'toast ' + (kind || ''); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
 }
 
-let app, sel = null;
+let sel = null, mapLoop = 0;
 const pick = {};
 
 /* ---------- Kamera der Karte ---------- */
-const cam = () => wm.root;
-function clampCam() {
-  const c = cam(), s = c.scale.x, W = app.screen.width, H = app.screen.height;
-  const hw = N * 32 * s; c.x = Math.min(W / 2 + hw, Math.max(W / 2 - hw, c.x));
-  c.y = Math.min(H * .7, Math.max(H * .3 - N * 34.4 * s, c.y));
-}
-function zoomAt(p, ns) {
-  const c = cam(), s = c.scale.x; ns = Math.min(1.7, Math.max(.06, ns));
-  const wx = (p.x - c.x) / s, wy = (p.y - c.y) / s;
-  c.scale.set(ns); c.x = p.x - wx * ns; c.y = p.y - wy * ns; clampCam();
-}
-function focusMap(tx, ty, zoom) {
-  const c = wm.root, s = zoom || c.scale.x, p = wm.worldPos(tx, ty);
-  c.scale.set(s); c.x = app.screen.width / 2 - p.x * s; c.y = app.screen.height * (document.body.classList.contains('sheet-open') ? .26 : .46) - p.y * s; clampCam();
-}
+function focusMap(tx, ty, dist) { wm.focus(tx, ty, dist, document.body.classList.contains('sheet-open') ? .26 : .46); }
 function setupInput() {
-  const view = app.view, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lastMid = null;
-  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null;
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y), ang = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
+  view.style.touchAction = 'none';
   view.addEventListener('pointerdown', e => {
     view.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (ptrs.size === 1) { moved = false; downAt = { x: e.clientX, y: e.clientY }; }
-    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), s: cam().scale.x }; lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; moved = true; }
+    if (ptrs.size === 1) { moved = false; downAt = { x: e.clientX, y: e.clientY }; wm.dragStart(e.clientX, e.clientY); }
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), a: ang(a, b) }; moved = true; }
   });
   view.addEventListener('pointermove', e => {
     const prev = ptrs.get(e.pointerId); if (!prev) return;
     const cur = { x: e.clientX, y: e.clientY }; ptrs.set(e.pointerId, cur);
-    if (ptrs.size === 1) { cam().x += cur.x - prev.x; cam().y += cur.y - prev.y; clampCam(); if (dist(cur, downAt) > 8) moved = true; }
+    if (ptrs.size === 1) { if (dist(cur, downAt) > 8) moved = true; if (moved) wm.dragMove(cur.x, cur.y); }
     else if (ptrs.size === 2 && pinch) {
-      const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      cam().x += mid.x - lastMid.x; cam().y += mid.y - lastMid.y; lastMid = mid;
-      zoomAt(mid, pinch.s * dist(a, b) / pinch.d);
+      const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = dist(a, b), an = ang(a, b);
+      let da = an - pinch.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+      wm.zoomAt(mid.x, mid.y, d / pinch.d); wm.rotateBy(-da); pinch = { d, a: an };
     }
   });
   const end = e => {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId);
     if (ptrs.size === 0 && !moved && e.type === 'pointerup') tap(e.clientX, e.clientY);
-    if (ptrs.size < 2) { pinch = null; lastMid = null; }
+    if (ptrs.size === 1) { const [r] = [...ptrs.values()]; wm.dragStart(r.x, r.y); downAt = { x: r.x, y: r.y }; }
+    if (ptrs.size < 2) pinch = null;
   };
   view.addEventListener('pointerup', end); view.addEventListener('pointercancel', end);
-  view.addEventListener('wheel', e => { e.preventDefault(); zoomAt({ x: e.clientX, y: e.clientY }, cam().scale.x * (e.deltaY < 0 ? 1.12 : .89)); }, { passive: false });
-  window.addEventListener('resize', () => setTimeout(clampCam, 50));
+  view.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey || e.ctrlKey) wm.rotateBy(e.deltaY * .003); else wm.zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : .89); }, { passive: false });
 }
 function tap(sx, sy) { mapTap(sx, sy); }
 
@@ -686,8 +673,7 @@ function setupPanel() {
 /* ---------- Außenposten platzieren: Karte verschieben, bis das Viereck passt ---------- */
 let placing = false, placeKey = '', placeWhy = '';
 function placeTile() {
-  const c = wm.root, s = c.scale.x;
-  return wm.tileAt((app.screen.width / 2 - c.x) / s, (app.screen.height * .42 - c.y) / s);
+  return wm.tileAtScreen(window.innerWidth / 2, window.innerHeight * .42);
 }
 // Welche Rohstoffpunkte liegen im Viereck (nur Erkundetes)?
 function placeInfo(t) {
@@ -809,7 +795,7 @@ function healHTML() {
 
 function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
-  const c = wm.root, s = c.scale.x, hit = wm.pickAt((sx - c.x) / s, (sy - c.y) / s);
+  const hit = wm.pickAt(sx, sy);
   if (!hit) { closeSheet(); return; }
   selectMap(hit, false);
 }
@@ -1084,15 +1070,13 @@ async function buildMap() {
   try {
     const r = await api('/api/map'); if (!r.ok) throw new Error(r.data.error || 'Karte nicht verfügbar');
     document.body.classList.add('mode-map');   // damit die Zeichenfläche eine Größe hat
-    app = new PIXI.Application({ resizeTo: window, backgroundColor: 0x05182d, antialias: true, resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true });
-    $('stage').appendChild(app.view);
-    wm = new WorldMap(PIXI, app); wm.onFlash = () => { const f = document.createElement('div'); f.className = 'tpflash'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }; wm.load(r.data); app.stage.addChild(wm.root); mapReady = true; wm.sync(view, me.id, offset);
+    wm = new WorldMap(THREE, $('stage')); wm.onFlash = () => { const f = document.createElement('div'); f.className = 'tpflash'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }; wm.load(r.data); mapReady = true; wm.sync(view, me.id, offset);
     const own = wm.map.starts[S.slot] || { x: 48, y: 48 };
-    wm.root.scale.set(Math.min(.8, Math.max(.45, app.screen.width / 640)));
-    focusMap(own.x + .5, own.y + .5);
+    focusMap(own.x + .5, own.y + .5, Math.min(60, Math.max(34, 26000 / Math.max(360, window.innerWidth) * 1.2)));
     setupInput();
-    app.ticker.add(() => { placeStep(); });
-    app.ticker.add(() => { if (mode !== 'map') return; const c = wm.root, s = c.scale.x, H = app.screen.height; wm.frame(app.ticker.deltaMS / 1000, s, { y0: -c.y / s, y1: (H - c.y) / s }); });
+    let last = performance.now();
+    const loop = now => { mapLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode !== 'map') return; placeStep(); wm.frame(dt); };
+    mapLoop = requestAnimationFrame(loop);
     document.body.classList.remove('mode-map');
   } catch (e) { document.body.classList.remove('mode-map'); toast(String(e.message || e)); el.hidden = true; return false; }
   el.hidden = true; return true;
@@ -1105,7 +1089,6 @@ async function setMode(m) {
   if (m === 'map' && !(await buildMap())) return;
   closeSheet(); mode = m;
   document.body.classList.toggle('mode-map', m === 'map'); setNav(m);
-  if (app) { if (m === 'map') app.ticker.start(); else app.ticker.stop(); }
   $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { renderCity(true); }
 }
 function setupNav() {
@@ -1150,5 +1133,5 @@ function startGame() {
     renderTop(); renderHud(); renderBanner(); updateSheet(); updateTrainPanel(); if (mode === 'city') updateCity();
   }, 250);
 }
-window.__zk = { get wm() { return wm; }, get cam() { return wm && wm.root; }, get sel() { return msel; } };   // nur für Tests
+window.__zk = { get wm() { return wm; }, get cam() { return wm && wm.cam; }, get sel() { return msel; } };   // nur für Tests
 boot();

@@ -104,7 +104,7 @@ body.sheet-open:not(.admin-on) .swap{{display:none}}
 </div>
 <button class="swap" id="swap" type="button">Admin</button>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script type="module">
 const __M = {{}};
 {chr(10).join(mods)}

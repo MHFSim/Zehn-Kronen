@@ -65,7 +65,7 @@ shared/core.js     Welt, Märsche, Berichte, Meldungen, Chronik, Bündnis-Hilfen
 shared/war.js      Angriffe auf Burgen, Vasallen, Ausscheiden, Thron, Heiligtümer, Spähen, Punkte, Spielende
 shared/social.js   Bündnisse: gründen, einladen, anfragen, austreten, Chat
 shared/world.js    Ablauf der Partie (Zeit, Ereignisse), Befehle, Sicht je Spieler
-public/            Oberfläche: game.js (Stadt, Karte, Bündnis, Mehr), map.js (PixiJS-Karte), art.js (Bilder), sw.js (Push)
+public/            Oberfläche: game.js (Stadt, Karte, Bündnis, Mehr), map.js (3D-Karte mit Three.js, Modelle im Code), art.js (Stadtansicht), sw.js (Push)
 test/              Regel-, Welt-, Kriegs- und Push-Tests (npm test)
 tools/balance.mjs  Marschzeiten und Beispielkämpfe zum Abstimmen
 ```
