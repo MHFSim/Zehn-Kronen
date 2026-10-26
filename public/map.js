@@ -450,9 +450,13 @@ export class WorldMap {
   rectList() {
     const v = this.view, gt = this.gtNow();
     const grp = p => p.ally ? 'a' + p.ally : 'p' + p.id;
-    const cities = v.match.players.filter(p => !p.out && p.slot >= 0 && p.ally).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) }));
-    return rectsOf(cities, v.world.outposts || [], gt);
+    // Das Burg-Viereck sieht nur der Gründer, und nur bis der erste Außenposten fertig ist
+    const al = (v.match.alliances || []).find(a => a.leader === this.myId), ops = v.world.outposts || [];
+    const show = al && !ops.some(o => o.al === al.id && gt >= o.done);
+    const cities = show ? v.match.players.filter(p => p.id === this.myId && !p.out && p.slot >= 0).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) })) : [];
+    return rectsOf(cities, ops, gt);
   }
+  allyColor(alId, owner) { const a = (this.view.match.alliances || []).find(x => x.id === alId); return a && a.color ? parseInt(a.color.slice(1), 16) : this.ownerColor(owner); }
   ownerColor(pid) { const p = this.view.match.players.find(x => x.id === pid); return parseInt(PLAYER_COLORS[((p && p.slot) || 0) % 10].slice(1), 16); }
   edgePts(x0, y0, x1, y1) {
     const a = clamp(x0, 0, N), b = clamp(y0, 0, N), c = clamp(x1 + 1, 0, N), d = clamp(y1 + 1, 0, N), pts = [], st = 2;
@@ -466,7 +470,7 @@ export class WorldMap {
     const g = this.terr; g.clear(); if (!this.view) return;
     const mine = this.view.match.players.find(p => p.id === this.myId), myG = mine ? (mine.ally ? 'a' + mine.ally : 'p' + mine.id) : '';
     for (const r of this.rectList()) {
-      const col = this.ownerColor(r.owner), pts = this.edgePts(r.x0, r.y0, r.x1, r.y1).flatMap(p => [p.x, p.y]), me = r.group === myG;
+      const col = r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), pts = this.edgePts(r.x0, r.y0, r.x1, r.y1).flatMap(p => [p.x, p.y]), me = r.group === myG;
       g.lineStyle(me ? 4 : 3, col, r.ready ? .95 : .5).beginFill(col, r.ready ? (me ? .24 : .17) : .08).drawPolygon(pts).endFill();
       g.lineStyle(1, 0x15110c, .35).drawPolygon(pts);
     }
@@ -498,7 +502,7 @@ export class WorldMap {
     for (const o of ops) {
       keep.add(o.id); let s = this.opSprites[o.id]; if (!s) s = this.opSprites[o.id] = this.towerSprite(o);
       s.o = o; const wp = this.worldPos(o.x + .5, o.y + .5); s.position.set(wp.x, wp.y); s.zIndex = wp.y;
-      const col = this.ownerColor(o.owner); s.flag.tint = col; s.lab.visible = false;
+      const col = this.allyColor(o.al, o.owner); s.flag.tint = col; s.lab.visible = false;
       s.alpha = gt >= o.done ? 1 : .55;
     }
     for (const id in this.opSprites) if (!keep.has(id)) { this.opSprites[id].destroy({ children: true }); delete this.opSprites[id]; }
@@ -586,8 +590,6 @@ export class WorldMap {
       const d = Math.hypot(wx - p.x, (wy - (p.y - rad * .35)) * 1.25); if (d < rad && d < bd) { bd = d; best = { type: 'obj', id }; }
     }
     if (best) return best;
-    const t = this.tileAt(wx, wy);
-    if (t.x >= 3 && t.y >= 3 && t.x < N - 3 && t.y < N - 3 && this.map.pass[t.y * N + t.x]) return { type: 'site', x: t.x, y: t.y };
     return null;
   }
   select(sel) { this.sel = sel; }

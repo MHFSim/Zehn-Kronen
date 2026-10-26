@@ -45,7 +45,9 @@ export const opView = (w, o) => ({ ...o, group: 'a' + o.al, owner: leaderOf(w.al
 // Städte und Außenposten einer laufenden Partie
 export function territory(match, players, gt) {
   const w = match.world, cities = [], ops = [];
-  for (const p of players) if (!p.state.out && p.state.slot >= 0 && allianceOf(w, p.id)) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
+  // Vor dem ersten fertigen Außenposten zählt nur die Burg des Gründers als Revier; danach entfällt dieses Viereck
+  const firstDone = al => Object.values(w.outposts || {}).some(o => o.al === al.id && gt >= o.done);
+  for (const p of players) if (!p.state.out && p.state.slot >= 0 && (al => al && al.leader === p.id && !firstDone(al))(allianceOf(w, p.id))) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
   for (const id in (w.outposts || {})) { const o = w.outposts[id]; if (w.alliances[o.al]) ops.push(opView(w, o)); }
   return rectsOf(cities, ops, gt);
 }
@@ -57,6 +59,7 @@ export function checkSite(match, players, me, x, y, gt) {
   const map = mapOf(match), w = match.world, al = allianceOf(w, me.id);
   if (!al) return 'Außenposten gehören dem Bündnis. Gründe eines oder tritt einem bei.';
   if (!BASE_OK(map, x, y)) return 'Auf Wasser, Fels oder außerhalb der Karte kann man nicht bauen.';
+  if (!Object.values(w.outposts || {}).some(o => o.al === al.id) && al.leader !== me.id) return 'Den ersten Außenposten baut der Gründer des Bündnisses.';
   if (map.objects.some(o => Math.abs(o.x - x) <= 1 && Math.abs(o.y - y) <= 1)) return 'Zu nah an einem anderen Ort. Such dir ein freies Feld.';
   const group = 'a' + al.id, nr = { x0: x - OP_R, y0: y - OP_R, x1: x + OP_R, y1: y + OP_R }, rects = territory(match, players, gt);
   for (const r of rects) {

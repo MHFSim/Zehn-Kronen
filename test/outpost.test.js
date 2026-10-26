@@ -32,6 +32,10 @@ assert.ok(touches(territory(match, players, 0), 'a1', cx + R + 1, cy), 'Burg-Vie
 const site = findSite(a, [cx, cy], [R + OP_R, R + OP_R - 2, R + 2]); assert.ok(site, 'Bauplatz nahe der Burg');
 assert.match(checkSite(match, players, a, ...toward(cx, cy, 45), gt()), /berühren|Wasser|Zu nah/);
 
+assert.match(checkSite(match, players, b, site[0], site[1], gt()), /Gründer/, 'den ersten baut der Gründer');
+assert.equal(territory(match, players, 0).filter(r => r.k === 'city' && r.group === 'a1').length, 1, 'nur die Burg des Gründers');
+assert.equal(run(b, { type: 'allyColor', color: '#112233' }), 'Nur der Anführer kann die Farbe wählen.');
+assert.equal(run(a, { type: 'allyColor', color: '#112233' }), ''); assert.equal(al.color, '#112233');
 // Bündnislager: ohne Rohstoffe geht nichts, Einzahlen füllt es
 give(a, { speer: 200 }); give(b, { speer: 200, schwert: 100 }); rich(a); rich(b);
 assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), /Bündnislager/);
@@ -44,12 +48,14 @@ assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troo
 // Bauen aus dem Lager
 assert.equal(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), '');
 assert.equal(storeOf(al).wood, 2000 - OP_COST[1]);
+assert.equal(territory(match, players, gt()).filter(r => r.k === 'city' && r.group === 'a1').length, 1, 'Burg-Viereck bleibt, bis der Posten fertig ist');
 adv(DAY);
 const op = Object.values(w.outposts)[0]; assert.ok(op); assert.equal(op.al, 1); assert.equal(op.garr[a.id].speer, 60);
 adv(OP_BUILD); assert.ok(territory(match, players, gt()).some(r => r.id === op.id && r.ready));
 assert.equal(viewFor(match, players, c, clock).world.outposts[0].garr, undefined, 'Besatzung ist geheim');
 assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].speer, 60);
 
+assert.equal(territory(match, players, gt()).filter(r => r.k === 'city' && r.group === 'a1').length, 0, 'danach entfällt das Burg-Viereck');
 // Fremde dürfen nicht überlappen; weiterbauen nur am eigenen Revier
 assert.match(checkSite(match, players, c, op.x, op.y + 3, gt()), /überlappen|Zu nah|Hier steht/);
 const site2 = findSite(a, [op.x, op.y], [2 * OP_R + 1, 2 * OP_R, 2 * OP_R - 2]); assert.ok(site2, 'zweiter Bauplatz am ersten Außenposten');

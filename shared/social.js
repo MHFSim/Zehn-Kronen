@@ -91,6 +91,11 @@ export function socialCommand(ctx, me, cmd) {
       const id = Number(cmd.pid); if (id === me.id || !mine.members.includes(id)) return 'Dieses Mitglied gibt es nicht.';
       leave(ctx, id, 'kick'); return '';
     }
+    case 'allyColor': {
+      if (!mine || mine.leader !== me.id) return 'Nur der Anführer kann die Farbe wählen.';
+      const c = String(cmd.color || '').toLowerCase(); if (!/^#[0-9a-f]{6}$/.test(c)) return 'Ungültige Farbe.';
+      mine.color = c; return '';
+    }
     case 'allyLead': {
       if (!mine || mine.leader !== me.id) return 'Nur der Anführer kann die Führung abgeben.';
       const id = Number(cmd.pid); if (id === me.id || !mine.members.includes(id)) return 'Dieses Mitglied gibt es nicht.';
