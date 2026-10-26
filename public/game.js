@@ -568,9 +568,40 @@ function moreHTML() {
     + `<div class="hub">${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
+/* ---------- Ausbilden (eigenes Menü) ---------- */
+let trainTab = '';
+const TRAIN_B = ['kaserne', 'schiess', 'stall'];
+const trainBuilding = () => TRAIN_B.includes(trainTab) ? trainTab : TRAIN_B.find(b => S.lv[b]) || 'kaserne';
+function trainHTML() {
+  const tab = trainBuilding(), b = B[tab], L = S.lv[tab], q = S.train[tab] || [];
+  const strip = `<div class="strip"><div><b>${fmtN(troopCount(S))}</b><span>Truppen gesamt</span></div><div><b>${fmtN(queuedTroops(S))}</b><span>in Ausbildung</span></div><div><b>${fmtN(Object.values(S.troops).reduce((a, n) => a + n, 0))}</b><span>daheim</span></div></div>`;
+  let body;
+  if (!L) {
+    const blk = blocker(S, tab);
+    body = `<div class="block"><h3>${b.name} fehlt</h3><p class="note">${esc(b.desc)}</p><p class="note">${blk ? esc(blk) : 'Du kannst sie jetzt bauen.'}</p><div class="row"><button class="btn" type="button" data-act="toCityB" data-b="${tab}">Zum Gebäude</button></div></div>`;
+  } else {
+    const rows = b.units.map(u => {
+      const d = U[u], ok = L >= d.req, n = pick[u] || 10, total = d.cost.map(c => c * n), home = S.troops[u] || 0;
+      return `<div class="ucard ${ok ? '' : 'locked'}"><div class="uhead"><div><b>${d.name}</b><small>${fmtN(home)} daheim</small></div><span class="utime">${fmtT(real(unitTime(S, u, tab)))} je Einheit</span></div>
+        <div class="ustats"><span>⚔ ${d.a}</span><span>🛡 ${d.v}</span><span>❤ ${d.l}</span><span>👣 ${d.s}</span><span>🎒 ${d.c}</span></div>
+        ${ok ? `<div class="uact"><div class="stepper"><button type="button" data-act="minus" data-u="${u}" aria-label="Weniger">−</button><output>${n}</output><button type="button" data-act="plus" data-u="${u}" aria-label="Mehr">+</button></div>
+          <button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && q.length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div><div class="costs">${costHTML(total)}</div>` : `<p class="note">Ab ${b.name} Stufe ${d.req}</p>`}</div>`;
+    }).join('');
+    const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span>` : '<span class="time">wartet</span>'}</div>`).join('');
+    body = rows + `<div class="block"><h3>Ausbildungsschleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
+  }
+  return phead('⚔️', 'Ausbilden', `${b.name}${L ? ' · Stufe ' + L : ''}`) + strip + ptabs(TRAIN_B.map(x => [x, B[x].name, (S.train[x] || []).length]), tab, 'ttab') + body;
+}
+function updateTrainPanel() {
+  if (panelName !== 'train') return;
+  const o = (S.train[trainBuilding()] || [])[0], p = document.querySelector('[data-tp]'), t = document.querySelector('[data-tt]');
+  if (o && p) { p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
+}
+
 /* ---------- Panels (Bündnis, Mehr) ---------- */
 let panelName = '', panelSig = '';
 function panelSignature() {
+  if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
   return JSON.stringify([moreSub, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
@@ -580,7 +611,7 @@ function renderPanel(force) {
   const el = $('sidePanelInner'), keep = {};
   el.querySelectorAll('input,select').forEach(i => { if (i.id) keep[i.id] = [i.value, document.activeElement === i]; });
   const top = $('sidePanel').scrollTop, box = $('chatBox'), atEnd = !box || box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
-  el.innerHTML = panelName === 'ally' ? allyHTML() : moreHTML();
+  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : moreHTML();
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
@@ -598,6 +629,10 @@ function setupPanel() {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, d = el.dataset, val = id => (document.getElementById(id) || {}).value || '';
     const go = () => { $('sidePanel').scrollTop = 0; renderPanel(true); };
+    if (act === 'ttab') { trainTab = d.t; return go(); }
+    if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
+    if (act === 'train') return void command({ type: 'train', id: trainBuilding(), unit: d.u, count: pick[d.u] || 10 });
+    if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(5, Math.min(1000, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }
@@ -887,7 +922,7 @@ function setupNav() {
   $('nav').addEventListener('click', e => {
     const b = e.target.closest('button[data-nav]'); if (!b) return;
     if (b.dataset.nav === 'reports') { if (panelName) closePanel(); return openReports(); }
-    if (b.dataset.nav === 'ally' || b.dataset.nav === 'more') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
+    if (b.dataset.nav === 'ally' || b.dataset.nav === 'more' || b.dataset.nav === 'train') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
     setMode(b.dataset.nav);
   });
   $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); const t = e.target.closest('[data-act=rtab]'); if (t) { repTab = t.dataset.t; renderReports(); } });
@@ -922,7 +957,7 @@ function startGame() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resync(); });
   setInterval(() => {
     advanceTo(S, serverNow(), speed); // dieselben Regeln wie auf dem Server, nur zur Anzeige
-    renderTop(); renderHud(); renderBanner(); updateSheet(); if (mode === 'city') updateCity();
+    renderTop(); renderHud(); renderBanner(); updateSheet(); updateTrainPanel(); if (mode === 'city') updateCity();
   }, 250);
 }
 window.__zk = { get wm() { return wm; }, get cam() { return wm && wm.root; }, get sel() { return msel; } };   // nur für Tests
