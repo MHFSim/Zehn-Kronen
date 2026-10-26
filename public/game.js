@@ -98,6 +98,11 @@ let sel = null, mapLoop = 0;
 const pick = {};
 
 /* ---------- Kamera der Karte ---------- */
+// Beim Antippen bleibt die Karte stehen; nur wenn das Ziel unter dem Popup oder am Rand läge, gleitet sie sanft hoch
+function revealMap(tx, ty) {
+  const p = wm.screenOf(tx, wm.baseY(tx, ty, 1) + 1, ty), W = window.innerWidth, H = window.innerHeight;
+  if (p.y > H * .5 || p.y < H * .16 || p.x < 36 || p.x > W - 36) wm.panTo(tx, ty, .3);
+}
 function focusMap(tx, ty, dist) { wm.focus(tx, ty, dist, document.body.classList.contains('sheet-open') ? .26 : .46); }
 function setupInput() {
   const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null;
@@ -804,10 +809,10 @@ function selectMap(hit, keepSend) {
   sel = null; msel = hit; wm.select(hit);
   if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; }
   document.body.classList.add('sheet-open');
-  if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; focusMap(o.x + .5, o.y + .5); }
-  else if (hit.type === 'op') { const o = (view.world.outposts || []).find(x => x.id === hit.id); if (o) focusMap(o.x + .5, o.y + .5); }
-  else if (hit.type === 'site') focusMap(hit.x + .5, hit.y + .5);
-  else { const m = view.world.marches.find(x => x.id === hit.id); if (m) { const p = marchPos(m, gtNow()); focusMap(p.x, p.y); } }
+  if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; revealMap(o.x + .5, o.y + .5); }
+  else if (hit.type === 'op') { const o = (view.world.outposts || []).find(x => x.id === hit.id); if (o) revealMap(o.x + .5, o.y + .5); }
+  else if (hit.type === 'site') revealMap(hit.x + .5, hit.y + .5);
+  else { const m = view.world.marches.find(x => x.id === hit.id); if (m) { const p = marchPos(m, gtNow()); revealMap(p.x, p.y); } }
   renderSheet();
 }
 function mapSignature() {

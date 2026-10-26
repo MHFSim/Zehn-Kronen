@@ -899,12 +899,15 @@ export class WorldMap {
     return { x: o.x + d.x * t, z: o.z + d.z * t };
   }
   tileAtScreen(sx, sy) { const g = this.groundAt(sx, sy); if (!g) return { x: Math.floor(this.cam.x), y: Math.floor(this.cam.z) }; return { x: clamp(Math.floor(g.x), 0, N - 1), y: clamp(Math.floor(g.z), 0, N - 1) }; }
-  dragStart(sx, sy) { this.anchor = this.groundAt(sx, sy); }
+  // Kamera weich zu einem Feld gleiten lassen (fy = gewünschte Bildschirmhöhe)
+  panTo(tx, ty, fy = .3) { const c = this.cam, sx = c.x, sz = c.z; this.focus(tx, ty, null, fy); const ex = c.x, ez = c.z; c.x = sx; c.z = sz; this.updateCamera(); this.anim = { sx, sz, ex, ez, t: 0 }; }
+  dragStart(sx, sy) { this.anim = null; this.anchor = this.groundAt(sx, sy); }
   dragMove(sx, sy) {
     if (!this.anchor) return;
     for (let i = 0; i < 2; i++) { const g = this.groundAt(sx, sy); if (!g) return; this.cam.x += this.anchor.x - g.x; this.cam.z += this.anchor.z - g.z; this.updateCamera(); }
   }
   zoomAt(sx, sy, factor) {
+    this.anim = null;
     const a = this.groundAt(sx, sy); this.cam.dist /= factor; this.updateCamera();
     const b = a && this.groundAt(sx, sy); if (a && b) { this.cam.x += a.x - b.x; this.cam.z += a.z - b.z; this.updateCamera(); }
   }
@@ -921,6 +924,7 @@ export class WorldMap {
     if (this.time > 3 && !this.perf1 && this.ema > .045) { this.perf1 = 1; this.sun.castShadow = false; this.renderer.shadowMap.enabled = false; this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
     if (this.time > 6 && this.perf1 === 1 && this.ema > .055) { this.perf1 = 2; this.renderer.setPixelRatio(1); this.renderer.setSize(this.W, this.H); }
     dt = Math.min(dt, .1); this.time += dt; const t = this.time; this.waterMat.uniforms.uTime.value = t;
+    if (this.anim) { const a = this.anim; a.t = Math.min(1, a.t + dt / .38); const u = 1 - Math.pow(1 - a.t, 3); this.cam.x = a.sx + (a.ex - a.sx) * u; this.cam.z = a.sz + (a.ez - a.sz) * u; if (a.t >= 1) this.anim = null; }
     this.stepFx(dt); this.updateCamera();
     const frustum = this.frustum || (this.frustum = new T.Frustum()), pm = new T.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse); frustum.setFromProjectionMatrix(pm);
     const sph = new T.Sphere();
