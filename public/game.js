@@ -251,11 +251,22 @@ function setupSheet() {
 
 /* ---------- Stadt als Menü (wie bei Lords & Knights) ---------- */
 const BGROUPS = [['Wirtschaft', ['farm', 'saege', 'stein', 'mine', 'lager']], ['Militär', ['kaserne', 'schiess', 'stall', 'lazarett']], ['Verwaltung', ['akademie', 'mauer']]];
-const imgCache = {};
-const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
+const imgCache = {}, imgReal = {};
+// Eigene Bilder (Ordner public/img/city/, z. B. farm1.jpg, rathaus2.jpg) ersetzen die gemalten, sobald sie existieren.
+function imgKey(id) { return id + (id === 'rathaus' ? tierOf(S.lv.rathaus) : 1); }
 function imgOf(id) {
-  const t = id === 'rathaus' ? tierOf(S.lv.rathaus) : 1, key = id + t;
-  if (!imgCache[key]) imgCache[key] = buildingImage(id, t).toDataURL('image/jpeg', .86);
+  const key = imgKey(id);
+  if (imgReal[key]) return imgReal[key];
+  if (!imgCache[key]) {
+    imgCache[key] = buildingImage(id, key.slice(id.length) | 0 || 1).toDataURL('image/jpeg', .86);
+    if (imgReal[key] === undefined) {
+      imgReal[key] = null;
+      const im = new Image();
+      im.onload = () => { imgReal[key] = im.src; citySigV = ''; renderCity(true); if (sel) renderSheet(); };
+      im.onerror = () => {};
+      im.src = '/public/img/city/' + key + '.jpg';
+    }
+  }
   return imgCache[key];
 }
 function cityMeta(id) {
