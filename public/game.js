@@ -69,7 +69,7 @@ function fmtT(s) {
   return m + ':' + p(x);
 }
 const real = g => g / speed;
-const costHTML = c => c.map((v, i) => v ? `<span class="cost ${S.res[RES[i]] >= v ? '' : 'short'}"><i class="r r-${RES[i]}"></i>${fmtN(v)}</span>` : '').join('');
+const costHTML = c => c.map((v, i) => v ? `<span class="cost ${S.res[RES[i]] >= v ? '' : 'short'}"><i class="r r-${RES[i]}"></i>${RES_DE[RES[i]]} ${fmtN(v)}</span>` : '').join('');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let toastTimer;
 function toast(msg) {
@@ -134,7 +134,7 @@ function renderTop() {
   const c = cap(S);
   $('res').innerHTML = [...RES, 'gold'].map(r => {
     const v = S.res[r], rt = rate(S, r), pct = r === 'gold' ? 0 : Math.min(100, v / c * 100);
-    return `<div class="res-cell" title="${RES_DE[r]}"><div class="res-top"><i class="r r-${r}"></i>${fmtN(v)}</div>
+    return `<div class="res-cell" title="${RES_DE[r]}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtN(v)}</div>
       <div class="res-rate ${rt < 0 ? 'neg' : ''}">${rt >= 0 ? '+' : ''}${fmtN(rt)}/h</div>
       <div class="res-bar">${r === 'gold' ? '' : `<i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i>`}</div></div>`;
   }).join('');
@@ -292,7 +292,7 @@ function buildingCard(id) {
   else foot = `<div class="bfoot"><span class="costs sm">${costHTML(costOf(id, L + 1))}</span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button></div>${why ? `<div class="why one">${why}</div>` : ''}`;
   const extra = t ? `<div class="bmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
   return `<article class="bcard ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="bimg"><img alt="" src="${imgOf(id)}"><span class="blv">${L || '–'}</span>${q ? '<span class="btag">Im Bau</span>' : ''}</div>
-    <div class="bname">${b.name}</div><div class="bmeta">${cityMeta(id)}</div>${extra}${foot}</article>`;
+    <div class="bbody"><div class="bname">${b.name}</div><div class="bmeta">${cityMeta(id)}</div>${extra}${foot}</div></article>`;
 }
 function citySig() {
   return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
@@ -360,7 +360,7 @@ function marchLine(m) {
   const ph = m.phase === 'out' ? 'Marsch' : m.phase === 'gather' ? 'Sammelt' : 'Rückweg';
   return `${ph} · ${KIND_SHORT[m.tk] || ''} · ${fmtT(real(Math.max(0, marchRemain(m))))}`;
 }
-const lootHTML = l => Object.keys(l).filter(r => l[r] > 0).map(r => `<span class="cost"><i class="r r-${r}"></i>${fmtN(l[r])}</span>`).join('');
+const lootHTML = l => Object.keys(l).filter(r => l[r] > 0).map(r => `<span class="cost"><i class="r r-${r}"></i>${RES_DE[r]} ${fmtN(l[r])}</span>`).join('');
 const troopsLine = t => Object.keys(t).filter(u => t[u] > 0 && U[u]).map(u => `${fmtN(t[u])} ${U[u].name}`).join(', ') || '—';
 function healHTML() {
   const ws = Object.keys(S.wounded || {}).filter(u => S.wounded[u] > 0);
