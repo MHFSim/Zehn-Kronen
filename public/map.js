@@ -43,7 +43,7 @@ void main(){
     col+=vec3(.55,.62,.62)*sp*(1.0-d);
     float foam=smoothstep(.055,.0,vWater)*(.55+.45*sin(t*1.5+n*8.0+vTile.x*4.0));
     col=mix(col,vec3(.93,.96,.94),foam*.75);
-    float edge=min(min(vTile.x,vTile.y),min(96.0-vTile.x,96.0-vTile.y));
+    float edge=min(min(vTile.x,vTile.y),min(${N}.0-vTile.x,${N}.0-vTile.y));
     col=mix(vec3(.02,.10,.19),col,smoothstep(-2.0,5.0,edge));
   } else {
     float shore=smoothstep(.0,.05,-vWater);
@@ -52,7 +52,7 @@ void main(){
   }
   float cl=vn(vTile*.075+vec2(t*.012,t*.005));
   col*=1.0-smoothstep(.5,.78,cl)*.2;
-  float f=texture2D(uFog,vTile/96.0).r;
+  float f=texture2D(uFog,vTile/${N}.0).r;
   float lum=dot(vCol,vec3(.3,.55,.15));
   float mist=vn(vTile*.9+vec2(t*.05,-t*.03));
   vec3 fogc=vec3(.075,.095,.125)+vec3(lum-.35)*.22+vec3(.02,.03,.04)*mist;
@@ -160,7 +160,7 @@ export class WorldMap {
       col[i * 3] = clamp(c[0] * shade / 255, 0, 1.2); col[i * 3 + 1] = clamp(c[1] * shade / 255, 0, 1.2); col[i * 3 + 2] = clamp(c[2] * shade / 255, 0, 1.2);
     }
     // Indizes nach Diagonalen (hinten zuerst) – Streifen sind zusammenhängende Bereiche
-    const idx = new Uint16Array((G - 1) * (G - 1) * 6), starts = new Array(NB + 1).fill(0); let k = 0;
+    const idx = new Uint32Array((G - 1) * (G - 1) * 6), starts = new Array(NB + 1).fill(0); let k = 0;
     for (let b = 0; b < NB; b++) {
       starts[b] = k;
       for (let d = b * BW * SUB; d < Math.min((b + 1) * BW * SUB, 2 * (G - 1) - 1); d++) {

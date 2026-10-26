@@ -5,7 +5,7 @@ import {
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos, battle, campTroops, campMult, campLoot, capacityOf, sum } from '/shared/world.js';
-import { NODE_MAX } from '/shared/mapgen.js';
+import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
 import { buildingImage } from '/public/art.js';
 
@@ -85,11 +85,11 @@ const pick = {};
 const cam = () => wm.root;
 function clampCam() {
   const c = cam(), s = c.scale.x, W = app.screen.width, H = app.screen.height;
-  c.x = Math.min(W / 2 + 3072 * s, Math.max(W / 2 - 3072 * s, c.x));
-  c.y = Math.min(H * .7, Math.max(H * .3 - 3300 * s, c.y));
+  const hw = N * 32 * s; c.x = Math.min(W / 2 + hw, Math.max(W / 2 - hw, c.x));
+  c.y = Math.min(H * .7, Math.max(H * .3 - N * 34.4 * s, c.y));
 }
 function zoomAt(p, ns) {
-  const c = cam(), s = c.scale.x; ns = Math.min(1.7, Math.max(.14, ns));
+  const c = cam(), s = c.scale.x; ns = Math.min(1.7, Math.max(.08, ns));
   const wx = (p.x - c.x) / s, wy = (p.y - c.y) / s;
   c.scale.set(ns); c.x = p.x - wx * ns; c.y = p.y - wy * ns; clampCam();
 }
