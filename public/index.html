@@ -237,8 +237,33 @@ table.rank tr.me td{color:#e2b86a;font-weight:700}
 <style>
 /* ===== Neue Stadt: Holz und Pergament ===== */
 .parch{--bg:#e9dcb8;--panel:#f6edd2;--panel-2:#ecdfbb;--line:#c9b27f;--ink:#2e2012;--muted:#6d5a3b;--brass:#8a5412;--brass-ink:#fff6dd;--good:#3d6b2b;--bad:#a5321e;--food:#b8921e;--wood:#7d4f24;--stone:#7c7a73;--ore:#57728c;--gold:#b88a14;color-scheme:light;color:var(--ink)}
-body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-user-select:none;user-select:none;padding:calc(env(safe-area-inset-top,0px) + 112px) max(12px,env(safe-area-inset-left,0px)) calc(var(--nav) + 28px);
-  background:repeating-linear-gradient(90deg,rgba(0,0,0,.22) 0 2px,transparent 2px 92px),repeating-linear-gradient(0deg,rgba(255,235,190,.035) 0 1px,transparent 1px 6px),linear-gradient(#3b2415,#26160b)}
+body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow:hidden;-webkit-user-select:none;user-select:none;background:#a9cde6}
+body:not(.city3d) .city .cbtns{display:none}
+body:not(.city3d) .city .cdrawer{transform:none;position:fixed;inset:calc(env(safe-area-inset-top,0px) + 104px) 0 var(--nav) 0;max-height:none;width:auto;left:0;right:0;border-radius:0}
+body:not(.city3d) .city .cdhead{display:none}
+#cityStage{position:absolute;inset:0}#cityStage canvas{display:block;width:100%;height:100%;touch-action:none}
+.clabels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.cb{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:2px;will-change:transform}
+.cb .bub{pointer-events:auto;cursor:pointer;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:17px;line-height:1;color:#2a1a08;background:radial-gradient(circle at 35% 30%,#fff7d6,#e9c76a 55%,#b88a2c);border:2px solid #fff2bf;box-shadow:0 3px 8px rgba(0,0,0,.5);animation:cbob 1.8s ease-in-out infinite}
+.cb.up .bub{background:radial-gradient(circle at 35% 30%,#eaffd0,#86d45e 55%,#3f8f2c);border-color:#f4ffd8}
+.cb.build .bub{background:radial-gradient(circle at 35% 30%,#ffe9c0,#eda14a 55%,#a45a12)}
+.cb.train .bub{background:radial-gradient(circle at 35% 30%,#dceaff,#6aa0e8 55%,#2c5a9f)}
+.cb.research .bub{background:radial-gradient(circle at 35% 30%,#f0e0ff,#b184e6 55%,#6a3fa8)}
+.cb.lock .bub{background:radial-gradient(circle at 35% 30%,#eee,#a8a8a8 55%,#666);animation:none;border-color:#ddd}
+.cb .tim{font-size:11px;font-weight:700;color:#fff;background:rgba(20,14,8,.8);border-radius:9px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.cb .plate{pointer-events:auto;cursor:pointer;font-size:10px;color:#f6e7bd;background:rgba(24,16,8,.74);border:1px solid rgba(232,195,106,.55);border-radius:10px;padding:1px 8px;white-space:nowrap}
+.cb .plate b{color:#ffd86a;margin-left:3px}
+.cb.lock .plate{opacity:.6}
+@keyframes cbob{50%{transform:translateY(-4px)}}
+.cbtns{position:fixed;z-index:4;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--nav) + 16px);display:flex;flex-direction:column;gap:10px}
+body.sheet-open .cbtns{display:none}
+.rbtn{width:56px;height:56px;border-radius:50%;border:3px solid #e8c36a;background:radial-gradient(circle at 35% 28%,#6a4a2c,#2a1a0c);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;box-shadow:0 4px 12px rgba(0,0,0,.55),inset 0 0 0 2px rgba(0,0,0,.35);cursor:pointer;padding:0}
+.rbtn span{font-size:21px;line-height:1}.rbtn small{font-size:9px;color:#f1dca0;letter-spacing:.3px}
+.cdrawer{position:fixed;z-index:5;left:50%;bottom:calc(var(--nav) + 10px);width:min(96vw,720px);max-height:min(72%,calc(100% - var(--nav) - 120px));display:flex;flex-direction:column;background:var(--panel);border:1px solid #e0b86699;border-radius:20px;box-shadow:0 18px 44px rgba(0,0,0,.6);transform:translate(-50%,115%);transition:transform .28s cubic-bezier(.2,.8,.2,1);pointer-events:none;visibility:hidden}
+.cdrawer.open{transform:translate(-50%,0);pointer-events:auto;visibility:visible}
+.cdhead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(232,195,106,.3);color:#f6e7bd;font-family:var(--f-display);font-size:19px}
+.cdhead .close{width:32px;height:32px;border-radius:50%;border:2px solid #e8c36a;background:#2a1a0c;color:#f6e7bd;cursor:pointer;font-size:14px}
+.cdbody{overflow-y:auto;overscroll-behavior:contain;padding:12px;-webkit-overflow-scrolling:touch}
 .city-in{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 .scene{position:relative;border-radius:14px;overflow:hidden;border:3px solid #7a5230;box-shadow:0 0 0 2px #1d1108,0 12px 26px rgba(0,0,0,.55);aspect-ratio:2.1/1;cursor:pointer}
 .scene img{width:100%;height:100%;object-fit:cover;display:block}
@@ -392,7 +417,11 @@ body.sheet-open .sheet.popup{transform:translate(-50%,0) scale(1);opacity:1;poin
 
 <div id="game" hidden>
   <div id="stage" aria-label="Weltkarte"></div>
-  <main class="city" id="city" aria-label="Stadt"></main>
+  <main class="city" id="city" aria-label="Stadt">
+    <div id="cityStage"></div>
+    <div class="cbtns"><button type="button" class="rbtn" data-act="cdrawer" aria-label="Bauen und Verwalten"><span>🔨</span><small>Bauen</small></button><button type="button" class="rbtn" data-act="chome" aria-label="Zur Mitte"><span>🎯</span><small>Mitte</small></button></div>
+    <section class="cdrawer" id="cityDrawer" aria-label="Stadt verwalten"><div class="cdhead"><b>Stadt verwalten</b><button type="button" class="close" data-act="cdrawer" aria-label="Schließen">✕</button></div><div class="cdbody" id="cityList"></div></section>
+  </main>
   <header class="topbar">
     <div class="brand">
       <div><h1>Zehn Kronen</h1><small id="matchName"></small></div>

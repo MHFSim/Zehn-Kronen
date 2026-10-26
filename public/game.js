@@ -10,6 +10,7 @@ import { cityR, checkSite, checkRaid, checkTeleport, touches, OP_COST, OP_MIN_TR
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
+import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
 
 /* ---------- Verbindung zum Server ---------- */
@@ -251,7 +252,7 @@ function setupSheet() {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
     if (act === 'close') return closeSheet();
-    if (act === 'toTech') { closeSheet(); cityCat = 'tech'; renderCity(true); $('city').scrollTop = 0; return; }
+    if (act === 'toTech') { closeSheet(); cityCat = 'tech'; renderCity(true); $('cityDrawer').classList.add('open'); $('cityList').scrollTop = 0; return; }
     if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
     if (act === 'upgrade') return command({ type: 'upgrade', id });
@@ -331,7 +332,7 @@ let citySigV = '';
 function renderCity(force) {
   if (!S || !$('city')) return;
   const sig = citySig(); if (!force && sig === citySigV) return; citySigV = sig;
-  const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('city').scrollTop;
+  const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('cityList').scrollTop;
   const tr = []; for (const k in S.train) for (const [i, o] of S.train[k].entries()) tr.push({ k, o, first: i === 0 });
   const row = (img, main, prog, time, sp) => `<div class="ord"><img alt="" src="${img}"><div class="qmain">${main}${prog}</div>${time}${sp ? `<button class="spd" type="button" data-speed="${sp}" aria-label="Beschleunigen">⚡</button>` : ''}</div>`;
   const orders = q.map(x => row(imgOf(x.id), `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`, 'build:' + x.id))
@@ -349,16 +350,15 @@ function renderCity(force) {
     body = (A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`)
       + `<div class="note-box">Akademie Stufe <b>${A}</b> · Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1.${A ? '' : ''}</div>` + Object.keys(T).map(techPlateHTML).join('');
   } else body = BGROUPS.find(g => g[0] === cityCat)[3].map(plateHTML).join('');
-  $('city').innerHTML = `<div class="city-in">
-    <article class="scene" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="scene-t"><div><div class="scene-name">Burg von ${esc(me.name)}</div><div class="scene-sub">Rathaus Stufe ${L} · „${esc(match.name)}“</div></div><span class="shield">${L}</span></div></article>
+  $('cityList').innerHTML = `<div class="city-in">
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
     <div class="tabs">${tabs}</div><div class="tabbody parch">${body}</div>
   </div>`;
-  $('city').scrollTop = keepTop;
+  $('cityList').scrollTop = keepTop;
 }
 function updateCity() {
-  renderCity(false);
+  renderCity(false); city3d();
   for (const x of S.queue) {
     document.querySelectorAll(`[data-qprog="${x.id}"]`).forEach(e => { e.style.width = Math.max(0, 1 - x.left / x.total) * 100 + '%'; });
     document.querySelectorAll(`[data-qtime="${x.id}"]`).forEach(e => { e.textContent = fmtT(real(x.left)); });
@@ -373,8 +373,42 @@ function updateCity() {
     document.querySelectorAll(`[data-tinfo="${k}"]`).forEach(e => { e.textContent = `${o.count}× ${U[o.unit].name}${o.heal ? ' (Heilung)' : ''} · ${fmtT(real(o.left + (o.count - 1) * o.per))}`; }); }
   for (const m of ownMarches()) document.querySelectorAll(`[data-mtime="${m.id}"]`).forEach(e => { e.textContent = marchLine(m); });
 }
+
+/* ---------- 3D-Stadt ---------- */
+let cv = null, cvLoop = 0, cvFail = false;
+const colNum = c => typeof c === 'number' ? c : parseInt(String(c || '#3a6fd0').replace('#', ''), 16) || 0x3a6fd0;
+function ensureCity() {
+  if (cv || cvFail || !S || !window.THREE) return !!cv;
+  try {
+    cv = new CityView(THREE, $('cityStage'), { onPick: id => { if (id) openSheet(id); else if (sel && !msel) closeSheet(); } });
+    cv.configure({ color: colNum(PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length]), slot: S.slot || 0, layout: Object.fromEntries(Object.keys(B).map(k => [k, [B[k].x, B[k].y, B[k].w]])) });
+    let last = performance.now();
+    const loop = now => { cvLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode === 'city' && !document.hidden) cv.frame(dt); };
+    cvLoop = requestAnimationFrame(loop);
+    document.body.classList.add('city3d');
+  } catch (e) { cvFail = true; cv = null; document.body.classList.remove('city3d'); console.error(e); }
+  return !!cv;
+}
+function city3d() {
+  if (!ensureCity()) return;
+  const infos = {};
+  for (const id of Object.keys(B)) {
+    const lv = S.lv[id], q = S.queue.find(x => x.id === id), tr = S.train[id] && S.train[id][0];
+    let st = 'none', txt = '';
+    if (q) { st = 'build'; txt = fmtT(real(q.left)); }
+    else if (id === 'akademie' && S.research) { st = 'research'; txt = fmtT(real(S.research.left)); }
+    else if (tr) { st = 'train'; txt = fmtT(real(tr.left + (tr.count - 1) * tr.per)); }
+    else if (locked_(id)) st = 'lock';
+    else if (!blocker(S, id)) st = lv ? 'up' : 'new';
+    infos[id] = { lv, st, txt, name: B[id].name, locked: locked_(id), build: !!q };
+  }
+  cv.update(infos);
+}
 function setupCity() {
   $('city').addEventListener('click', async e => {
+    const act = e.target.closest('[data-act]');
+    if (act && act.dataset.act === 'cdrawer') { $('cityDrawer').classList.toggle('open'); return; }
+    if (act && act.dataset.act === 'chome') { if (cv) cv.home(); return; }
     const up = e.target.closest('[data-up]');
     if (up) { e.stopPropagation(); return void command({ type: 'upgrade', id: up.dataset.up }); }
     const rs = e.target.closest('[data-tech]');
@@ -1098,7 +1132,7 @@ async function setMode(m) {
   if (m === 'map' && !(await buildMap())) return;
   closeSheet(); mode = m;
   document.body.classList.toggle('mode-map', m === 'map'); setNav(m);
-  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { renderCity(true); }
+  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { renderCity(true); city3d(); if (cv) cv.resize(); }
 }
 function setupNav() {
   $('nav').addEventListener('click', e => {

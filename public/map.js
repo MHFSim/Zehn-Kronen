@@ -1018,3 +1018,6 @@ export class WorldMap {
   }
   select(sel) { this.sel = sel; }
 }
+
+/* ---------- Baukasten für die 3D-Stadtansicht (city3d.js) ---------- */
+export const KIT = { use: t => { T = t; }, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };
