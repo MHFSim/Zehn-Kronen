@@ -3,7 +3,7 @@
 // das gemeinsame Revier. Ein neuer Außenposten muss das Revier des Bündnisses berühren und wird aus dem Bündnislager
 // bezahlt. Bündnismitglieder bewachen ihn mit eigenen Truppen. Heiligtümer und Thron kann nur besetzen, wessen
 // Gruppe sie mit einem Viereck berührt. Feindliche Außenposten kann nur angreifen, wer selbst einen berührenden hat.
-import { N } from './mapgen.js';
+import { N, isWater } from './mapgen.js';
 import { battle, sum, forceOf } from './combat.js';
 import {
   mapOf, byId, groupOf, groupLabel, allianceOf, pushReport, note, chron, settleAway, sendHome, fmtDur, planFrom, launch,
@@ -55,10 +55,11 @@ const BASE_OK = (map, x, y) => Number.isInteger(x) && Number.isInteger(y) && x >
 
 /* ---------- Bauplatz prüfen ---------- */
 // Gibt '' zurück, wenn dort (x, y) ein Außenposten des Bündnisses von me stehen darf, sonst den Grund.
+export const SITE_OK = (map, x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 3 && y >= 3 && x <= N - 4 && y <= N - 4 && !isWater(map, x, y);
 export function checkSite(match, players, me, x, y, gt) {
   const map = mapOf(match), w = match.world, al = allianceOf(w, me.id);
   if (!al) return 'Außenposten gehören dem Bündnis. Gründe eines oder tritt einem bei.';
-  if (!BASE_OK(map, x, y)) return 'Auf Wasser, Fels oder außerhalb der Karte kann man nicht bauen.';
+  if (!SITE_OK(map, x, y)) return 'Auf Wasser oder außerhalb der Karte kann man nicht bauen.';
   if (!Object.values(w.outposts || {}).some(o => o.al === al.id) && al.leader !== me.id) return 'Den ersten Außenposten baut der Gründer des Bündnisses.';
   if (map.objects.some(o => Math.abs(o.x - x) <= 1 && Math.abs(o.y - y) <= 1)) return 'Zu nah an einem anderen Ort. Such dir ein freies Feld.';
   const group = 'a' + al.id, nr = { x0: x - OP_R, y0: y - OP_R, x1: x + OP_R, y1: y + OP_R }, rects = territory(match, players, gt);

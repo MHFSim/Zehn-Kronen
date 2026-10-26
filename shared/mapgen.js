@@ -200,9 +200,11 @@ export function generateMap(seed) {
 
 /* ---------- Wegfindung (A*) ---------- */
 const SQ2 = 1.4142135623730951;
+// Nur Wasser ist als Ziel ausgeschlossen: Auf Berge kann man zwar nicht laufen, aber (z. B. für Außenposten) hinmarschieren
+export const isWater = (map, x, y) => map.H[(y * SUB + 1) * G + x * SUB + 1] < SEA + 0.005;
 export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
   const pass = map.pass;
-  if (!pass[cellOf(sx, sy)] || !pass[cellOf(gx, gy)]) return null;
+  if (!pass[cellOf(sx, sy)] || (!pass[cellOf(gx, gy)] && isWater(map, gx, gy))) return null;
   const g = new Float64Array(N * N).fill(Infinity), came = new Int32Array(N * N).fill(-1), closed = new Uint8Array(N * N);
   const heap = []; // Einträge [f, g, cell]
   const less = (a, b) => a[0] < b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] < b[2])));
@@ -220,8 +222,8 @@ export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
       const nx = cx + dx, ny = cy + dy;
       if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
       const n = cellOf(nx, ny), pn = pass[n];
-      if (!pn || closed[n]) continue;
-      if (dx && dy && (!pass[cellOf(cx + dx, cy)] || !pass[cellOf(cx, cy + dy)])) continue;
+      if ((!pn && n !== goal) || closed[n]) continue;
+      if (n !== goal && dx && dy && (!pass[cellOf(cx + dx, cy)] || !pass[cellOf(cx, cy + dy)])) continue;
       const ng = gc + (dx && dy ? SQ2 : 1) * (pn === 2 ? forestCost : 1);
       if (ng < g[n]) { g[n] = ng; came[n] = c; push([ng + hf(nx, ny), ng, n]); }
     }
