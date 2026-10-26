@@ -163,6 +163,11 @@ function castle(c, tier, withFlag, v = 0) {
   const R = (tier === 1 ? 1.45 : tier === 2 ? 1.85 : 2.25) * (L === 3 ? 1.12 : 1);      // halbe Seitenlänge des Hofs
   shadow(c, 110 * R / 1.5, 40 * R / 1.5, .4, 4, 2);
   grass(c, 90 * R / 1.4, 38 * R / 1.4, 60, r);
+  // Steinsockel: die Burg steht erhöht auf einem Fundament, nicht im Boden
+  const PL = tier === 1 ? 8 : tier === 2 ? 10 : 12;
+  wallBox(c, -R - .5, -R - .5, 2 * R + 1, 2 * R + 1, PL, mul(ST, .72));
+  fillPoly(c, [P(-R - .5, -R - .5, PL), P(R + .5, -R - .5, PL), P(R + .5, R + .5, PL), P(-R - .5, R + .5, PL)], [150, 146, 120]);
+  c.save(); c.translate(0, -PL);
   const wallH = (tier === 1 ? 13 : tier === 2 ? 20 : 26) + (L === 4 ? 3 : 0), wd = .26;
   // Hintere Mauern (Nord und West) zuerst
   wallBox(c, -R, -R, 2 * R, wd, wallH, STD);
@@ -208,7 +213,8 @@ function castle(c, tier, withFlag, v = 0) {
   if (tier >= 2 || L >= 3) { wallBox(c, -R + .4, -.1, .55, .7, 9, [180, 150, 112]); hipRoof(c, -R + .35, -.15, .65, .8, 9, 8, mul(ROOFC, .85)); }
   if (tier >= 3 || (L === 3 && tier >= 2)) { wallBox(c, R - .95, .1, .6, .55, 8, [186, 156, 118]); hipRoof(c, R - 1.0, .05, .7, .65, 8, 8, mul(ROOFC, .75)); }
   if (L === 0 && tier === 1) { wallBox(c, -R + .35, -.2, .5, .5, 7, [180, 150, 112]); hipRoof(c, -R + .3, -.25, .6, .6, 7, 7, ROOFC); }
-  return { flag: [apx[0], apx[1] - poleH], flag2: [fr[0], fr[1] - 14] };
+  c.restore();
+  return { flag: [apx[0], apx[1] - poleH - PL], flag2: [fr[0], fr[1] - 14 - PL] };
 }
 function flagCloth(c, col) { // Fahne: weiß, wird mit der Spielerfarbe eingefärbt
   c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(5, -2, 9, 3, 15, 0); c.lineTo(15, 9); c.bezierCurveTo(9, 12, 5, 7, 0, 9); c.closePath();

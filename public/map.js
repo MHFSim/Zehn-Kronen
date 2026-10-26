@@ -210,7 +210,7 @@ export class WorldMap {
     const PIXI = this.PIXI, A = this.atlas, seed = map.seed;
     const items = [], blocked = new Uint8Array(N * N);
     for (const o of map.objects) {
-      const r = o.k === 'throne' ? 3 : o.k === 'start' ? 3.2 : o.k === 'sanct' ? 2.2 : 1.7;
+      const r = o.k === 'throne' ? 3 : o.k === 'start' ? 5 : o.k === 'sanct' ? 2.2 : 1.7;
       for (let y = Math.floor(o.y - r); y <= o.y + r; y++) for (let x = Math.floor(o.x - r); x <= o.x + r; x++) {
         if (x < 0 || y < 0 || x >= N || y >= N) continue;
         if (Math.hypot(x - o.x, y - o.y) <= r) blocked[y * N + x] = 1;
