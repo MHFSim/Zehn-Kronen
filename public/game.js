@@ -711,7 +711,7 @@ function placeStep() {
   $('placeGo').hidden = placing !== 'build'; $('placeTp').hidden = placing !== 'tp';
   if (placing === 'tp') {
     const why = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, t.x, t.y, gtNow()), cd = TELEPORT_COOLDOWN - (gtNow() - S.tpAt), has = itemN('teleport') > 0;
-    const r = cityR(S.lv.rathaus); wm.setPreview({ x: t.x, y: t.y, r, ok: !why });
+    const r = cityR(S.lv.rathaus); wm.setPreview({ x: t.x, y: t.y, r, ok: !why, ghost: true });
     const msg = !has ? 'Du hast keinen Teleporter (Mehr → Shop).' : cd > 0 ? 'Der Teleporter lädt noch ' + fmtT(real(cd)) + '.' : why;
     el.className = 'pl-txt ' + (msg ? 'bad' : 'ok'); el.textContent = msg || 'Deine Burg zieht hierher um (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
     $('placeTp').disabled = !!msg; return;

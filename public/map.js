@@ -494,12 +494,21 @@ export class WorldMap {
       g.lineStyle(me ? 4 : 3, col, r.ready ? .95 : .5).beginFill(col, r.ready ? (me ? .24 : .17) : .08).drawPolygon(pts).endFill();
       g.lineStyle(1, 0x15110c, .35).drawPolygon(pts);
     }
-    if (this.preview) {
+    if (this.preview && !this.preview.ghost) {
       const p = this.preview, col = p.ok ? 0x6fe07a : 0xe0594a, pts = this.edgePts(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r).flatMap(q => [q.x, q.y]);
       g.lineStyle(3, col, .95).beginFill(col, .2).drawPolygon(pts).endFill();
     }
   }
-  setPreview(p) { this.preview = p; this.terrDirty = true; }
+  setPreview(p) {
+    this.preview = p; this.terrDirty = true;
+    if (this.ghost) this.ghost.visible = false;
+    if (!p || !p.ghost) return;
+    const h = Object.values(this.obj).find(q => q.o.k === 'start' && q.player && q.player.id === this.myId); if (!h) return;
+    if (!this.ghost) { this.ghost = new PIXI.Sprite(); this.ghost.zIndex = 1e6; this.armies.addChild(this.ghost); }
+    const g = this.ghost, m = h.main, pos = this.worldPos(p.x + .5, p.y + .5);
+    g.texture = m.texture; g.anchor.set(m.anchor.x, m.anchor.y); g.scale.set(m.scale.x, m.scale.y);
+    g.position.set(pos.x, pos.y); g.alpha = .85; g.tint = p.ok ? 0xbfffc4 : 0xff9a8f; g.visible = true;
+  }
   tileAt(wx, wy) {
     let x = 0, y = 0, z = 0;
     for (let i = 0; i < 4; i++) { const s = (wy + z) / 16, d = wx / 32; x = (s + d) / 2; y = (s - d) / 2; z = this.zAt(clamp(x, 0, N - .01), clamp(y, 0, N - .01)); }
