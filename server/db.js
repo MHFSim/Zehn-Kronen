@@ -27,6 +27,13 @@ export function openDb(file) {
       created INTEGER NOT NULL,
       last_seen INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS push_subs (
+      endpoint TEXT PRIMARY KEY,
+      player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       token TEXT PRIMARY KEY,
       player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
@@ -38,5 +45,7 @@ export function openDb(file) {
   const cols = db.prepare("PRAGMA table_info(matches)").all().map(c => c.name);
   if (!cols.includes('seed')) db.exec('ALTER TABLE matches ADD COLUMN seed INTEGER');
   if (!cols.includes('world')) db.exec('ALTER TABLE matches ADD COLUMN world TEXT');
+  const pcols = db.prepare("PRAGMA table_info(players)").all().map(c => c.name);
+  if (!pcols.includes('ip_hash')) db.exec('ALTER TABLE players ADD COLUMN ip_hash TEXT');
   return db;
 }
