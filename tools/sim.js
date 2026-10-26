@@ -1,7 +1,8 @@
 // Nur für die Testversion im Chat: bildet den Node.js-Server im Browser nach.
 // Gleiche Routen und Antworten wie server/index.js, gespeichert in localStorage dieses Browsers.
 // Benutzt dieselbe Spiel-Engine (shared/world.js) wie der echte Server.
-import { newWorld, syncMatch, addPlayer, command, viewFor, setSpeed, mapOf } from '/shared/world.js';
+import { syncMatch, addPlayer, command, viewFor, setSpeed } from '/shared/world.js';
+import { newWorld, mapOf } from '/shared/core.js';
 const KEY = 'zk-sim-v4';
 const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[b % 57]).join('');
 let mem = null;

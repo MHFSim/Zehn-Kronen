@@ -1,7 +1,9 @@
 // Prüfung von Karte, Märschen, Sammeln und Kämpfen: `npm test`
 import assert from 'node:assert/strict';
 import { generateMap, findPath, N } from '../shared/mapgen.js';
-import { newWorld, syncMatch, addPlayer, command, viewFor, mapOf, battle, campTroops, campMult, nodeLeft, marchPos, setSpeed } from '../shared/world.js';
+import { syncMatch, addPlayer, command, viewFor, setSpeed } from '../shared/world.js';
+import { newWorld, mapOf, nodeLeft, marchPos } from '../shared/core.js';
+import { battle, campTroops, campMult } from '../shared/combat.js';
 
 // Karte ist bei gleichem Seed identisch und jeder Startplatz erreichbar
 const a = generateMap(4242), b = generateMap(4242);

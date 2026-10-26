@@ -4,7 +4,7 @@
 // Atlas (art.js). Netz und Sprites werden in waagerechten Streifen abwechselnd gezeichnet, damit Berge Dinge dahinter
 // richtig verdecken.
 import { N, G, SUB, SEA, MOUNT, vnoise, fbm, smooth, generateMap, findPath, cellOf, SANCT_R } from '/shared/mapgen.js';
-import { PLAYER_COLORS, marchPos, cellXY } from '/shared/world.js';
+import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
 import { buildAtlas, proj } from '/public/art.js';
 
 export const ELEV = 96;                    // Pixel Höhe pro Höheneinheit über dem Meer

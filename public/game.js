@@ -4,7 +4,8 @@ import {
   RES, RES_DE, B, U, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots
 } from '/shared/rules.js';
-import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos, battle, campTroops, campMult, campLoot, capacityOf, sum } from '/shared/world.js';
+import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
+import { battle, campTroops, campMult, campLoot, capacityOf, sum } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
 import { buildingImage } from '/public/art.js';

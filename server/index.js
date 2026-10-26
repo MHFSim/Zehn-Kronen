@@ -6,7 +6,8 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypt
 import { join, normalize, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
-import { syncMatch, addPlayer, command, viewFor, setSpeed, mapOf, newWorld } from '../shared/world.js';
+import { syncMatch, addPlayer, command, viewFor, setSpeed } from '../shared/world.js';
+import { mapOf, newWorld } from '../shared/core.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 3000);

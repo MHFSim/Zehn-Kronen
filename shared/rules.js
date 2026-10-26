@@ -27,9 +27,9 @@ export const B = {
   lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80, 0], time: 20,
               desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind.' },
   akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 150, 80], time: 40,
-              desc: 'Forschung für Wirtschaft und Militär. Folgt in Schritt 4 des Entwicklungsplans.' },
+              desc: 'Forschung für Wirtschaft und Militär. Kommt in einem späteren Ausbau.' },
   mauer:    { name: 'Mauer & Tor', x: 6, y: 11, w: 2, unlock: 3, base: [0, 100, 200, 0], time: 20,
-              desc: 'Die Mauer-Haltbarkeit entscheidet später, wann eine Belagerung beginnen kann.' }
+              desc: 'Stärkt die Verteidigung deiner Burg und vergrößert die Stadtwache, die sie auch ohne Truppen beschützt.' }
 };
 
 export const U = {
@@ -47,7 +47,7 @@ export function freshState(now) {
   const lv = {}; for (const k in B) lv[k] = 0;
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
-  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now };
+  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {} };
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);
@@ -69,10 +69,12 @@ export const inQueue = (S, id) => S.queue.find(q => q.id === id);
 export const afford = (S, c) => c.every((v, i) => S.res[RES[i]] >= v);
 export const unitTime = (S, u, bid) => U[u].t * Math.pow(0.95, Math.max(0, S.lv[bid] - 1));
 
+// Boni (S.bonus) kommen von gehaltenen Heiligtümern und vom Thron und werden von der Welt gesetzt
+export const bonusOf = (S, r) => 1 + ((S.bonus && S.bonus[r]) || 0);
 export function rate(S, r) {
-  if (r === 'gold') return 5 + 10 * S.lv.rathaus;
+  if (r === 'gold') return (5 + 10 * S.lv.rathaus) * bonusOf(S, 'gold');
   const id = Object.keys(B).find(k => B[k].prod === r);
-  let v = 15 + prodAt(id, S.lv[id]);
+  let v = (15 + prodAt(id, S.lv[id])) * bonusOf(S, r);
   if (r === 'food') v -= troopCount(S);
   return v;
 }
