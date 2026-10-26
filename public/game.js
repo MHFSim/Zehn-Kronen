@@ -89,7 +89,7 @@ function clampCam() {
   c.y = Math.min(H * .7, Math.max(H * .3 - N * 34.4 * s, c.y));
 }
 function zoomAt(p, ns) {
-  const c = cam(), s = c.scale.x; ns = Math.min(1.7, Math.max(.08, ns));
+  const c = cam(), s = c.scale.x; ns = Math.min(1.7, Math.max(.06, ns));
   const wx = (p.x - c.x) / s, wy = (p.y - c.y) / s;
   c.scale.set(ns); c.x = p.x - wx * ns; c.y = p.y - wy * ns; clampCam();
 }
