@@ -31,21 +31,30 @@ const serverNow = () => Date.now() + offset;
 const params = new URLSearchParams(location.search);
 const invite = params.get('einladung') || '';
 const $auth = document.getElementById('auth'), $form = document.getElementById('authForm'), $err = document.getElementById('authErr');
+let joinInfo = null, joinMode = false;
+function setAuthMode(join) {
+  joinMode = join && !!joinInfo;
+  const lead = document.getElementById('authLead'), btn = document.getElementById('authBtn'), note = document.getElementById('authNote'), pw = document.getElementById('fPass');
+  $err.textContent = '';
+  if (joinMode) {
+    lead.textContent = `Du bist eingeladen zur Partie „${joinInfo.match}“ (${joinInfo.players} von ${joinInfo.max} Plätzen belegt). Wähle einen Namen und ein Passwort.`;
+    btn.textContent = 'Registrieren und beitreten'; pw.autocomplete = 'new-password';
+    note.innerHTML = 'Schon dabei? <button type="button" class="linkish" id="authSwitch">Stattdessen anmelden</button>';
+  } else {
+    lead.textContent = 'Melde dich an, um deine Stadt zu regieren.';
+    btn.textContent = 'Anmelden'; pw.autocomplete = 'current-password';
+    note.innerHTML = joinInfo ? 'Neu hier? <button type="button" class="linkish" id="authSwitch">Registrieren und beitreten</button>' : 'Neu hier? Du brauchst einen Einladungslink vom Admin deiner Partie.';
+  }
+  const sw = document.getElementById('authSwitch'); if (sw) sw.onclick = () => setAuthMode(!joinMode);
+}
 async function boot() {
   const r = await api('/api/me');
   if (r.ok) { accept(r.data); return startGame(); }
   $auth.hidden = false;
   if (invite) {
     const inv = await api('/api/invite?code=' + encodeURIComponent(invite));
-    if (inv.ok) {
-      document.getElementById('authLead').textContent = `Du bist eingeladen zur Partie „${inv.data.match}“ (${inv.data.players} von ${inv.data.max} Plätzen belegt). Wähle einen Namen und ein Passwort.`;
-      document.getElementById('authBtn').textContent = 'Partie beitreten';
-      document.getElementById('fPass').autocomplete = 'new-password';
-      document.getElementById('authNote').innerHTML = 'Schon dabei? <button type="button" class="linkish" id="toLogin">Stattdessen anmelden</button>';
-      document.getElementById('toLogin').onclick = () => { location.href = '/'; };
-    } else {
-      $err.textContent = inv.data.error || 'Einladung ungültig.';
-    }
+    if (inv.ok) { joinInfo = inv.data; setAuthMode(true); }
+    else $err.textContent = inv.data.error || 'Einladung ungültig.';
   }
   document.getElementById('fName').focus();
 }
@@ -53,9 +62,9 @@ $form.addEventListener('submit', async e => {
   e.preventDefault();
   const name = document.getElementById('fName').value.trim(), password = document.getElementById('fPass').value;
   $err.textContent = '';
-  const r = invite ? await api('/api/join', { invite, name, password }) : await api('/api/login', { name, password });
+  const r = joinMode ? await api('/api/join', { invite, name, password }) : await api('/api/login', { name, password });
   if (!r.ok) { $err.textContent = r.data.error || 'Das hat nicht geklappt.'; return; }
-  if (invite) history.replaceState(null, '', '/');
+  if (joinMode) history.replaceState(null, '', '/');
   accept(r.data); startGame();
 });
 

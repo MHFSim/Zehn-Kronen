@@ -46,9 +46,7 @@ sim = wrap('sim', rd('tools/sim.js'))
 # --- Spiel: Anpassungen für die Testversion ---
 game = rd('public/game.js')
 game = must_rep("const invite = params.get('einladung') || '';", "let invite = window.zkSimInvite();", game)
-game = must_rep("document.getElementById('toLogin').onclick = () => { location.href = '/'; };",
-  "document.getElementById('toLogin').onclick = () => { invite = ''; document.getElementById('authLead').textContent = 'Melde dich an, um deine Stadt zu regieren.'; document.getElementById('authBtn').textContent = 'Anmelden'; document.getElementById('authNote').textContent = ''; $err.textContent = ''; };", game)
-game = must_rep("  if (invite) history.replaceState(null, '', '/');\n", '', game)
+game = must_rep("  if (joinMode) history.replaceState(null, '', '/');\n", '', game)
 game = game.replace("location.href = '/'", 'location.reload()')
 game = wrap('game', game)
 
