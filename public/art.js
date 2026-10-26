@@ -279,6 +279,47 @@ function ore(c) {
   c.strokeStyle = '#3a2a1c'; c.lineWidth = 1.6; c.beginPath(); const a = P(.6, 1.5), b = P(2.1, 1.3); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
 }
 
+/* ---------- Kompakte Ressourcenstellen für die Karte ---------- */
+function boulder(c, x, y, rad, col, r) {
+  const p = P(x, y), n = 8, pts = [];
+  for (let i = 0; i < n; i++) { const a = i / n * 6.283; const k = rad * (.82 + r() * .3); pts.push([p[0] + Math.cos(a) * k, p[1] - rad * .55 + Math.sin(a) * k * .62]); }
+  fillPoly(c, pts, mul(col, .78));
+  const top = pts.map(q => [p[0] + (q[0] - p[0]) * .72, p[1] - rad * .8 + (q[1] - (p[1] - rad * .55)) * .72]);
+  fillPoly(c, top, mul(col, 1.12));
+  c.strokeStyle = 'rgba(25,22,18,.55)'; c.lineWidth = .9; path(c, pts); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.22)'; c.beginPath(); c.ellipse(p[0] - rad * .3, p[1] - rad * 1.0, rad * .3, rad * .14, -.3, 0, 7); c.fill();
+}
+function nodeStone(c) {
+  const r = lcg(73); shadow(c, 52, 22, .34, 2, 2); grass(c, 46, 18, 14, r, [90, 110, 60]);
+  for (const [x, y, rad] of [[-.6, -.3, 13], [.5, -.5, 11], [-.1, .35, 15], [.9, .3, 9], [-1.0, .5, 8]]) boulder(c, x, y, rad, [176, 170, 158], r);
+  wallBox(c, .25, 1.0, .55, .4, 6, [196, 190, 176], { jit: .06 });
+}
+function nodeOre(c) {
+  const r = lcg(97); shadow(c, 52, 22, .34, 2, 2); grass(c, 46, 18, 12, r, [80, 96, 58]);
+  for (const [x, y, rad] of [[-.6, -.3, 13], [.5, -.4, 12], [0, .4, 14], [-1.0, .5, 8]]) boulder(c, x, y, rad, [86, 84, 90], r);
+  for (const [x, y, col] of [[-.5, -.6, '#7ec4ea'], [.6, -.7, '#d8a64a'], [.1, .0, '#9ad4f2'], [.9, .1, '#e9c47c'], [-.3, .5, '#7ec4ea']]) {
+    const p = P(x, y); c.fillStyle = col; c.beginPath(); c.moveTo(p[0], p[1] - 14); c.lineTo(p[0] + 3.2, p[1] - 8); c.lineTo(p[0], p[1] - 4); c.lineTo(p[0] - 3.2, p[1] - 8); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(20,24,30,.55)'; c.lineWidth = .7; c.stroke();
+  }
+}
+function nodeWood(c) {
+  const r = lcg(57); shadow(c, 54, 22, .34, 2, 2); grass(c, 46, 18, 14, r);
+  for (const [x, y] of [[-1.1, -.3], [-.8, .6]]) { const p = P(x, y); c.fillStyle = '#6a4a2c'; c.fillRect(p[0] - 4, p[1] - 6, 8, 6); c.fillStyle = '#d8b484'; c.beginPath(); c.ellipse(p[0], p[1] - 6, 4, 2, 0, 0, 7); c.fill(); }
+  for (let row = 0; row < 3; row++) for (let i = 0; i < 4 - row; i++) {
+    const p = P(-.2 + i * .2 + row * .1, .1 - i * .02, row * 5); c.fillStyle = css(mul([150, 100, 56], .85 + r() * .3)); c.beginPath(); c.ellipse(p[0], p[1] - 3, 4, 3.4, 0, 0, 7); c.fill();
+    c.fillStyle = '#d9b27c'; c.beginPath(); c.ellipse(p[0] + 1, p[1] - 3, 2.2, 2, 0, 0, 7); c.fill();
+  }
+  const a = P(.9, -.5); c.strokeStyle = '#4a3624'; c.lineWidth = 2; c.beginPath(); c.moveTo(a[0] - 6, a[1]); c.lineTo(a[0] + 8, a[1] - 14); c.stroke(); c.fillStyle = '#9aa0a6'; c.fillRect(a[0] + 5, a[1] - 17, 7, 3.4);
+}
+function nodeFarm(c) {
+  const r = lcg(41); shadow(c, 54, 22, .3, 2, 2); grass(c, 46, 18, 12, r);
+  const x = -1.1, y = -.7, w = 2.1, d = 1.5, col = [206, 170, 62];
+  fillPoly(c, [P(x, y), P(x + w, y), P(x + w, y + d), P(x, y + d)], mul(col, .7));
+  for (let i = 0; i < 10; i++) { const u = i / 10; const a = P(x + w * u + .1, y + .05), b = P(x + w * u + .1, y + d - .05); c.strokeStyle = css(mul(col, .95 + (i % 2) * .25), .95); c.lineWidth = 2.4; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+  for (let i = 0; i < 26; i++) { const p = P(x + w * r(), y + d * r()); c.fillStyle = css(mul(col, 1.35), .8); c.fillRect(p[0], p[1] - 3, 1, 3); }
+  for (const [hx, hy] of [[.8, 1.1], [1.2, 1.0]]) { const p = P(hx, hy); c.fillStyle = '#c9a647'; c.beginPath(); c.ellipse(p[0], p[1] - 4, 5, 4, 0, 0, 7); c.fill(); c.strokeStyle = '#8a6a22'; c.lineWidth = .8; c.stroke(); }
+}
+
 /* ---------- Lager, Ruinen, Heiligtümer, Thron ---------- */
 function camp(c) {
   const r = lcg(131);
@@ -414,7 +455,7 @@ export function buildAtlas(PIXI) {
     add('castle' + t, W, Hh, W / 2, AY, c => castle(c, t));
   }
   add('flag', 18, 14, 1, 2, c => flagCloth(c));
-  add('farm', 220, 190, 110, 122, farm); add('wood', 220, 180, 110, 114, wood); add('stone', 220, 190, 110, 120, stone); add('ore', 230, 190, 115, 118, ore);
+  add('farm', 130, 110, 65, 70, nodeFarm); add('wood', 130, 110, 65, 70, nodeWood); add('stone', 130, 110, 65, 70, nodeStone); add('ore', 130, 110, 65, 70, nodeOre);
   add('camp', 220, 180, 110, 112, camp); add('campDead', 200, 100, 100, 70, campDead);
   add('ruin', 220, 190, 110, 118, ruin); add('sanct', 250, 240, 125, 150, sanct); add('throne', 330, 290, 165, 190, throne); add('slot', 130, 80, 65, 50, slot);
   for (let k = 0; k < 3; k++) add('fire' + k, 48, 48, 24, 40, c => fireFrame(c, k));

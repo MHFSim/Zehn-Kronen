@@ -236,7 +236,7 @@ export class WorldMap {
       const holder = { o, spr: [], vis: true }; ob[o.id] = holder;
       const tx = o.x + .5, ty = o.y + .5;
       const nameFor = { throne: 'throne', sanct: 'sanct', farm: 'farm', wood: 'wood', stone: 'stone', ore: 'ore', camp: 'camp', ruin: 'ruin', start: 'slot' }[o.k];
-      const s = mk(nameFor, tx, ty, o.k === 'farm' || o.k === 'wood' || o.k === 'stone' || o.k === 'ore' ? .78 + .045 * o.lv : 1);
+      const s = mk(nameFor, tx, ty, o.k === 'farm' || o.k === 'wood' || o.k === 'stone' || o.k === 'ore' ? .95 + .05 * o.lv : 1);
       s.depth = tx + ty; s.own = holder; holder.main = s; items.push(s); holder.spr.push(s);
       if (o.k === 'camp') {
         const dead = mk('campDead', tx, ty, 1); dead.depth = tx + ty; dead.own = holder; dead.visible = false; holder.dead = dead; items.push(dead); holder.spr.push(dead);
@@ -334,11 +334,11 @@ export class WorldMap {
   }
   setBadge(c, text, color) { if (c.t.text !== text) { c.t.text = text; } if (color !== c.col) { c.col = color; c.g.tint = 0xffffff; } }
   rebuildLabels(view) {
-    const RES_COL = { farm: 0xb58a22, wood: 0x7b5630, stone: 0x6b6f75, ore: 0x3f6b94 }, T = { farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine' };
+    const RES_COL = { farm: 0xb58a22, wood: 0x7b5630, stone: 0x6b6f75, ore: 0x3f6b94 }, T = { farm: 'Nahrung', wood: 'Holz', stone: 'Stein', ore: 'Erz' };
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, y = -46;
       if (o.k === 'start' && h.player) { txt = h.player.name; col = parseInt(PLAYER_COLORS[h.player.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1]; if (h.player.id === this.myId) txt = '★ ' + txt; }
-      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = T[o.k] + ' ' + o.lv; col = RES_COL[o.k]; y = -54; }
+      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = T[o.k] + ' ' + o.lv; col = RES_COL[o.k]; y = -34; }
       else if (o.k === 'camp') { txt = h.isDead ? 'Lager zerstört' : 'Banditen ' + o.lv; col = h.isDead ? 0x4a4036 : 0x8a2b24; y = h.isDead ? -26 : -58; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; y = -58; }
       else if (o.k === 'sanct') { txt = 'Heiligtum'; col = 0x2f6f8f; y = -86; }
