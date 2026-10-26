@@ -83,7 +83,7 @@ export class WorldMap {
   /* ---------- Aufbau ---------- */
   load(data) {
     const PIXI = this.PIXI, map = generateMap(data.seed); this.map = map; this.seed = data.seed;
-    this.roads = this.makeRoads(map);
+    this.roads = new Float32Array(G * G); this.roadCells = new Uint8Array(N * N); this.roadSig = '';
     this.buildTerrain(map);
     this.buildSprites(map);
     this.ui = new PIXI.Container(); this.armies = new PIXI.Container(); this.lines = new PIXI.Graphics(); this.ring = new PIXI.Graphics();
@@ -91,8 +91,22 @@ export class WorldMap {
     this.root.addChild(this.terr, this.lines, this.ring, this.armies, this.ui);
     this.marchSprites = {}; this.labels = {};
   }
-  makeRoads(map) {
-    const mask = new Float32Array(G * G), C = Math.floor(N / 2);
+  // Wege entstehen mit den Außenposten: je Bündnis von der Burg des Gründers zum ersten Posten, dann jeder Posten zum nächsten bestehenden
+  roadEdges(view) {
+    const gt = this.gtNow(), edges = [];
+    for (const al of view.match.alliances || []) {
+      const ld = view.match.players.find(p => p.id === al.leader); if (!ld) continue;
+      const ops = (view.world.outposts || []).filter(o => o.al === al.id && gt >= o.done).sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)));
+      const nodes = [[ld.pos[0], ld.pos[1]]];
+      for (const o of ops) {
+        let best = nodes[0], bd = 1e9; for (const q of nodes) { const d = Math.hypot(q[0] - o.x, q[1] - o.y); if (d < bd) { bd = d; best = q; } }
+        edges.push([best[0], best[1], o.x, o.y]); nodes.push([o.x, o.y]);
+      }
+    }
+    return edges;
+  }
+  setRoads(edges) {
+    const map = this.map, mask = new Float32Array(G * G);
     const splat = (x, y) => {
       const gx = x * SUB, gy = y * SUB, r = 1.5;
       for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
@@ -101,21 +115,34 @@ export class WorldMap {
         if (w > mask[iy * G + ix]) mask[iy * G + ix] = w;
       }
     };
-    const road = (ax, ay, bx, by) => {
-      const p = findPath(map, ax, ay, bx, by, 1.2); if (!p) return;
-      let px = null, py = null;
-      for (const c of p) {
-        const [x, y] = cellXY(c), cx = x + .5, cy = y + .5;
+    for (const [ax, ay, bx, by] of edges) {
+      const p = findPath(map, ax, ay, bx, by, 1.2); let px = null, py = null;
+      const pts = p ? p.map(c => { const [x, y] = cellXY(c); return [x + .5, y + .5]; }) : [[ax + .5, ay + .5], [bx + .5, by + .5]];
+      for (const [cx, cy] of pts) {
         if (px !== null) for (let k = 0; k < 4; k++) splat(px + (cx - px) * k / 4, py + (cy - py) * k / 4);
         splat(cx, cy); px = cx; py = cy;
       }
-    };
-    for (const s of map.starts) road(s.x, s.y, C, C);
-    for (const o of map.objects) if (o.k === 'sanct') road(o.x, o.y, C, C);
+    }
+    const old = this.roads; this.roads = mask;
+    for (let i = 0; i < mask.length; i++) if (mask[i] !== old[i]) this.paintVertex(i, mask[i]);
     const cells = new Uint8Array(N * N);
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (mask[(y * SUB + 1) * G + x * SUB + 1] > .5) cells[y * N + x] = 1;
     this.roadCells = cells;
-    return mask;
+    const buf = this.geo.getBuffer('aCol'); buf.update(this.tv.col);
+    this.applyFogVisibility();
+  }
+  // Farbe eines Gitterpunkts: Boden, darüber Weg (rw 0..1) und Plätze
+  paintVertex(i, rw) {
+    const { pre, nz3, shd, col, C, pads, map } = this.tv, x = (i % G) / SUB, y = Math.floor(i / G) / SUB, n3 = nz3[i];
+    let c = [pre[i * 3], pre[i * 3 + 1], pre[i * 3 + 2]];
+    if (rw > 0) c = mixc(c, mixc(C.dirt, [132, 104, 70], n3), rw * .78);
+    for (const o of map.objects) {
+      const pd = pads[o.k]; if (!pd) continue;
+      const d = Math.hypot(x - o.x - .5, y - o.y - .5); if (d > pd[1]) continue;
+      c = mixc(c, mixc(pd[0], [pd[0][0] * .9, pd[0][1] * .9, pd[0][2] * .9], n3), (1 - smooth(pd[1] * .5, pd[1], d)) * pd[2]);
+    }
+    const shade = shd[i];
+    col[i * 3] = clamp(c[0] * shade / 255, 0, 1.2); col[i * 3 + 1] = clamp(c[1] * shade / 255, 0, 1.2); col[i * 3 + 2] = clamp(c[2] * shade / 255, 0, 1.2);
   }
   buildTerrain(map) {
     const PIXI = this.PIXI, H = map.H, F = map.F, seed = map.seed, n = G * G;
@@ -128,6 +155,8 @@ export class WorldMap {
     const pads = { start: [[118, 104, 78], 2.3, .6], camp: [[112, 94, 68], 2.2, .7], ruin: [[112, 106, 90], 1.9, .55], sanct: [[205, 200, 184], 2.4, .8], throne: [[190, 180, 150], 3.4, .8],
       farm: [[150, 126, 70], 1.9, .5], wood: [[98, 82, 52], 1.7, .55], stone: [[150, 144, 130], 1.9, .6], ore: [[100, 92, 82], 2.1, .6] };
     const L = [-.55, -.25, .8], ll = Math.hypot(...L); L[0] /= ll; L[1] /= ll; L[2] /= ll;
+    const pre = new Float32Array(n * 3), nz3 = new Float32Array(n), shd = new Float32Array(n);
+    this.tv = { pre, nz3, shd, col, C, pads, map };
     for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++) {
       const i = gy * G + gx, x = gx / SUB, y = gy / SUB, h = H[i];
       const z = h > SEA ? (h - SEA) * ELEV : 0, p = proj(x, y, z);
@@ -151,15 +180,8 @@ export class WorldMap {
       c = mixc(c, C.snow, snowW);
       const fw = smooth(.5, .6, F[i]) * (h < .62 ? 1 : 0) * (1 - smooth(.4, .9, slope) * .4);
       c = mixc(c, mixc(C.forest, [58, 100, 48], n2), fw * .86);
-      // Wege und Plätze
-      const rw = this.roads[i];
-      if (rw > 0) c = mixc(c, mixc(C.dirt, [132, 104, 70], n3), rw * .78);
-      for (const o of map.objects) {
-        const pd = pads[o.k]; if (!pd) continue;
-        const d = Math.hypot(x - o.x - .5, y - o.y - .5); if (d > pd[1]) continue;
-        c = mixc(c, mixc(pd[0], [pd[0][0] * .9, pd[0][1] * .9, pd[0][2] * .9], n3), (1 - smooth(pd[1] * .5, pd[1], d)) * pd[2]);
-      }
-      col[i * 3] = clamp(c[0] * shade / 255, 0, 1.2); col[i * 3 + 1] = clamp(c[1] * shade / 255, 0, 1.2); col[i * 3 + 2] = clamp(c[2] * shade / 255, 0, 1.2);
+      pre[i * 3] = c[0]; pre[i * 3 + 1] = c[1]; pre[i * 3 + 2] = c[2]; nz3[i] = n3; shd[i] = shade;
+      this.paintVertex(i, 0);
     }
     // Indizes nach Diagonalen (hinten zuerst) – Streifen sind zusammenhängende Bereiche
     const idx = new Uint32Array((G - 1) * (G - 1) * 6), starts = new Array(NB + 1).fill(0); let k = 0;
@@ -176,6 +198,7 @@ export class WorldMap {
     }
     starts[NB] = k;
     const geo = new PIXI.Geometry();
+    this.geo = geo;
     geo.addAttribute('aVertexPosition', pos, 2).addAttribute('aTile', tile, 2).addAttribute('aCol', col, 3).addAttribute('aWater', wat, 1).addIndex(idx);
     // Nebeltextur 96 x 96 (R-Kanal)
     this.fogData = new Uint8Array(N * N * 4); for (let q = 3; q < this.fogData.length; q += 4) this.fogData[q] = 255;
@@ -291,6 +314,7 @@ export class WorldMap {
     this.applyFogVisibility();
     this.rebuildLabels(view);
     this.syncOutposts(view);
+    const eg = this.roadEdges(view), sg = JSON.stringify(eg); if (sg !== this.roadSig) { this.roadSig = sg; this.setRoads(eg); }
     this.syncMarches(view);
     this.dirtyLabels = true;
   }
@@ -370,6 +394,7 @@ export class WorldMap {
         else if (s === own.fire || (own.o.k === 'camp' && s === own.main)) v = !own.isDead;
         else if (s === own.flag || s === own.flag2) v = !!own.player;
       }
+      if (!own && this.roadCells[s.cell]) v = false;   // Bäume und Felsen weichen den Wegen
       s.visible = v;
     }
   }
