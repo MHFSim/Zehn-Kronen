@@ -63,6 +63,7 @@ void main(){
   gl_FragColor=vec4(outc,1.0);
 }`;
 
+const CASTLE_SCALE = 1.75;   // Burgen sind deutlich größer und höher als alle anderen Orte
 const SHOW_NAMES = false;
 export class WorldMap {
   constructor(PIXI, app) {
@@ -209,7 +210,7 @@ export class WorldMap {
     const PIXI = this.PIXI, A = this.atlas, seed = map.seed;
     const items = [], blocked = new Uint8Array(N * N);
     for (const o of map.objects) {
-      const r = o.k === 'throne' ? 3 : o.k === 'start' || o.k === 'sanct' ? 2.2 : 1.7;
+      const r = o.k === 'throne' ? 3 : o.k === 'start' ? 3.2 : o.k === 'sanct' ? 2.2 : 1.7;
       for (let y = Math.floor(o.y - r); y <= o.y + r; y++) for (let x = Math.floor(o.x - r); x <= o.x + r; x++) {
         if (x < 0 || y < 0 || x >= N || y >= N) continue;
         if (Math.hypot(x - o.x, y - o.y) <= r) blocked[y * N + x] = 1;
@@ -285,11 +286,14 @@ export class WorldMap {
       const p = bySlot[o.slot], tier = p ? (p.rathaus >= 14 ? 3 : p.rathaus >= 7 ? 2 : 1) : 0;
       if (p && p.pos && (p.pos[0] !== o.x || p.pos[1] !== o.y)) this.moveStart(h, p.pos[0], p.pos[1]);
       h.player = p || null; h.tier = tier;
-      const nm = p ? 'castle' + tier : 'slot', s = h.main;
+      const nm = p ? 'castle' + tier + ':' + (p.slot % 10) : 'slot', s = h.main;
       if (h.nm !== nm) {
-        h.nm = nm; s.texture = this.atlas.tex[nm]; const an = this.atlas.anchor[nm]; s.anchor.set(an[0], an[1]);
-        const meta = this.atlas.meta[nm];
-        if (meta) { for (const [k, f] of [['flag', meta.flag], ['flag2', meta.flag2]]) { const sp = h[k]; const q = f; sp.position.set(s.x + q[0], s.y + q[1]); sp.visible = true; } }
+        h.nm = nm;
+        const cf = p ? this.atlas.castleFor(tier, p.slot % 10) : null;
+        s.texture = cf ? cf.tex : this.atlas.tex.slot; const an = cf ? cf.anchor : this.atlas.anchor.slot; s.anchor.set(an[0], an[1]);
+        const k = p ? CASTLE_SCALE : 1; s.scale.set(k / this.atlas.SC);
+        const meta = cf ? cf.meta : null; h.k = k;
+        if (meta) { for (const [kk, f] of [['flag', meta.flag], ['flag2', meta.flag2]]) { const sp = h[kk]; sp.position.set(s.x + f[0] * k, s.y + f[1] * k); sp.scale.set((kk === 'flag' ? 1 : .8) * k / this.atlas.SC); sp.visible = true; } }
         else { h.flag.visible = false; h.flag2.visible = false; }
       }
       if (p) { const col = PLAYER_COLORS[p.slot % 10]; h.flag.tint = parseInt(col.slice(1), 16); h.flag2.tint = h.flag.tint; }
@@ -405,7 +409,7 @@ export class WorldMap {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, y = -46;
       if (o.k === 'start' && h.player) {
         const pl = h.player, al = pl.ally && (view.match.alliances || []).find(a => a.id === pl.ally), gt = this.gtNow();
-        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1];
+        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1] * CASTLE_SCALE - 14;
         if (pl.id === this.myId) txt = '★ ' + txt;
         if (pl.out) { txt = '✖ ' + txt; col = 0x4a4036; }
         else if (pl.vassalOf) txt += ' (Vasall)';
@@ -420,7 +424,7 @@ export class WorldMap {
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
         col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; y = o.k === 'sanct' ? -86 : -130;
       }
-      if (txt !== null && !SHOW_NAMES && !/^\d+$/.test(txt)) txt = null;   // Textbeschriftungen aus; nur Stufenzahlen bleiben
+      if (txt !== null && !SHOW_NAMES && !/^\d+$/.test(txt) && o.k !== 'start') txt = null;   // nur Burgen tragen den Namen   // Textbeschriftungen aus; nur Stufenzahlen bleiben
       if (txt === null) { if (h.lab) h.lab.visible = false; continue; }
       let lab = h.lab;
       if (!lab || h.labTxt !== txt || h.labCol !== col) {
@@ -602,7 +606,7 @@ export class WorldMap {
     if (best) return best;
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o; if (!this.bits || !this.exploredBit(o.x, o.y)) continue;
-      const p = this.worldPos(o.x + .5, o.y + .5), rad = o.k === 'throne' ? 90 : o.k === 'start' || o.k === 'sanct' ? 62 : 46;
+      const p = this.worldPos(o.x + .5, o.y + .5), rad = o.k === 'throne' ? 90 : o.k === 'start' ? 100 : o.k === 'sanct' ? 62 : 46;
       const d = Math.hypot(wx - p.x, (wy - (p.y - rad * .35)) * 1.25); if (d < rad && d < bd) { bd = d; best = { type: 'obj', id }; }
     }
     if (best) return best;

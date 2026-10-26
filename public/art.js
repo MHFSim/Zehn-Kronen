@@ -147,57 +147,63 @@ function rock(c, k) {
 
 /* ---------- Burgen nach Stufe ---------- */
 const STONE = [172, 164, 148], STONE_D = [138, 130, 118], ROOF = [128, 52, 40], WOOD = [118, 84, 52];
-function towerAt(c, x, y, s, h, roofH, roofCol) {
-  wallBox(c, x - s / 2, y - s / 2, s, s, h, STONE, { rnd: lcg(Math.floor(x * 31 + y * 17 + 4)) });
+function towerAt(c, x, y, s, h, roofH, roofCol, st = STONE) {
+  wallBox(c, x - s / 2, y - s / 2, s, s, h, st, { rnd: lcg(Math.floor(x * 31 + y * 17 + 4)) });
   const p = P(x, y, h);
   // Fenster
   fillPoly(c, [[p[0] - 7.6, p[1] + 7], [p[0] - 5.2, p[1] + 8.2], [p[0] - 5.2, p[1] + 3.4], [p[0] - 7.6, p[1] + 2.4]], [26, 24, 30]);
   cone(c, p[0], p[1] + 2, s * 36, roofH, roofCol, lcg(5));
   return P(x, y, h + roofH * .9 + 2);
 }
-function castle(c, tier, withFlag) {
-  const r = lcg(tier * 17 + 2);
-  const R = tier === 1 ? 1.15 : tier === 2 ? 1.5 : 1.85;      // halbe Seitenlänge des Hofs
+// Zehn Burgen: Dachfarbe, Steinton und Bauform (v % 5) unterscheiden sich je Spieler
+const CASTLE_ROOFS = [[128, 52, 40], [48, 86, 150], [52, 122, 70], [122, 66, 140], [196, 112, 40], [40, 130, 128], [74, 74, 84], [190, 154, 52], [176, 76, 118], [104, 72, 46]];
+const CASTLE_STONES = [[172, 164, 148], [178, 170, 150], [160, 160, 156], [184, 168, 142], [166, 166, 168], [176, 160, 140], [150, 150, 146], [182, 174, 158], [170, 158, 150], [164, 158, 136]];
+function castle(c, tier, withFlag, v = 0) {
+  const r = lcg(tier * 17 + 2 + v * 5), ROOFC = CASTLE_ROOFS[v % 10], ST = CASTLE_STONES[v % 10], STD = mul(ST, .8), L = v % 5;
+  const R = (tier === 1 ? 1.15 : tier === 2 ? 1.5 : 1.85) * (L === 3 ? 1.12 : 1);      // halbe Seitenlänge des Hofs
   shadow(c, 110 * R / 1.5, 40 * R / 1.5, .4, 4, 2);
   grass(c, 90 * R / 1.4, 38 * R / 1.4, 60, r);
-  const wallH = tier === 1 ? 9 : tier === 2 ? 15 : 20, wd = .26;
-  const cols = css(mul(STONE_D, 1));
-  void cols;
+  const wallH = (tier === 1 ? 9 : tier === 2 ? 15 : 20) + (L === 4 ? 3 : 0), wd = .26;
   // Hintere Mauern (Nord und West) zuerst
-  wallBox(c, -R, -R, 2 * R, wd, wallH, STONE_D);
-  wallBox(c, -R, -R, wd, 2 * R, wallH, STONE_D);
+  wallBox(c, -R, -R, 2 * R, wd, wallH, STD);
+  wallBox(c, -R, -R, wd, 2 * R, wallH, STD);
   // Hinterer Turm
-  if (tier >= 2) towerAt(c, -R, -R, .62, wallH + 8, 15, ROOF);
+  if (tier >= 2 || L === 4) towerAt(c, -R, -R, L === 4 ? .8 : .62, wallH + (L === 4 ? 16 : 8), 15, ROOFC, ST);
   // Burgfried im Zentrum
-  const kh = tier === 1 ? 22 : tier === 2 ? 34 : 48, ks = tier === 1 ? 1.0 : tier === 2 ? 1.25 : 1.5;
-  const k = wallBox(c, -ks / 2, -ks / 2, ks, ks, kh, [198, 188, 164]);
-  void k;
+  const kh = (tier === 1 ? 22 : tier === 2 ? 34 : 48) + (L === 2 ? 8 : 0), ks = (tier === 1 ? 1.0 : tier === 2 ? 1.25 : 1.5) * (L === 1 ? 1.15 : 1);
+  wallBox(c, -ks / 2, -ks / 2, ks, ks, kh, [198, 188, 164]);
   // Fenster und Tür am Burgfried
   for (let i = 0; i < (tier === 1 ? 1 : 2); i++) { window2(c, -ks / 2 + ks * (.28 + i * .4), ks / 2, kh * .62, 'L'); window2(c, ks / 2, -ks / 2 + ks * (.3 + i * .38), kh * .62, 'R'); }
   if (tier >= 2) { for (let i = 0; i < 2; i++) window2(c, -ks / 2 + ks * (.3 + i * .38), ks / 2, kh * .3, 'L'); }
-  if (tier >= 3) { crenels(c, -ks / 2, -ks / 2, ks, ks, kh, STONE); }
-  const apx = hipRoof(c, -ks / 2 - .08, -ks / 2 - .08, ks + .16, ks + .16, kh, tier === 1 ? 18 : tier === 2 ? 24 : 30, ROOF);
+  if (tier >= 3 || L === 1) { crenels(c, -ks / 2, -ks / 2, ks, ks, kh, ST); }
+  let apx, poleH = 24 + tier * 4;
+  if (L === 2) { const tp = P(0, 0, kh); cone(c, tp[0], tp[1] + 5, ks * 32, 30 + tier * 8, ROOFC, r); apx = P(0, 0, kh + (30 + tier * 8) * .9 + 2); poleH = 14 + tier * 3; }
+  else apx = hipRoof(c, -ks / 2 - .08, -ks / 2 - .08, ks + .16, ks + .16, kh, (tier === 1 ? 18 : tier === 2 ? 24 : 30) * (L === 1 ? .7 : 1), ROOFC);
   // Flaggenmast des Burgfrieds
-  flagPole(c, apx, 24 + tier * 4);
+  flagPole(c, apx, poleH);
   // Vordere Mauern (Süd und Ost) und Tor
-  wallBox(c, -R, R - wd, 2 * R, wd, wallH, STONE);
-  wallBox(c, R - wd, -R, wd, 2 * R, wallH, STONE);
+  wallBox(c, -R, R - wd, 2 * R, wd, wallH, ST);
+  wallBox(c, R - wd, -R, wd, 2 * R, wallH, ST);
   // Torhaus an der vorderen linken Mauer
-  wallBox(c, -.36, R - wd - .08, .72, wd + .16, wallH + 6, [182, 172, 154]);
+  const gw = L === 3 ? .95 : .72;
+  wallBox(c, -gw / 2, R - wd - .08, gw, wd + .16, wallH + 6, [182, 172, 154]);
   door(c, -.22, R - wd - .08, .44, wd + .16, wallH * .85, 'L');
-  const gh = P(0, R + .08, wallH + 6); cone(c, gh[0], gh[1] + 1, 12, 13, ROOF, r, 5);
-  // Eckturm vorn links, rechts, hinten rechts
-  const tH = wallH + (tier === 1 ? 6 : 12), tS = tier === 1 ? .5 : .62;
-  if (tier >= 2) { towerAt(c, -R, R, tS, tH, 15, ROOF); towerAt(c, R, -R, tS, tH, 15, ROOF); }
-  const fr = towerAt(c, R, R, tier === 1 ? .56 : .7, tH + 4, tier === 1 ? 14 : 18, ROOF);
+  const gh = P(0, R + .08, wallH + 6); cone(c, gh[0], gh[1] + 1, L === 3 ? 16 : 12, L === 3 ? 17 : 13, ROOFC, r, 5);
+  // Ecktürme
+  const tH = wallH + (tier === 1 ? 6 : 12) + (L === 4 ? 8 : 0), tS = tier === 1 ? .5 : .62;
+  if (tier >= 2) { towerAt(c, -R, R, tS, tH, 15, ROOFC, ST); if (L !== 1) towerAt(c, R, -R, tS, tH + (L === 4 ? 6 : 0), 15, ROOFC, ST); }
+  const fs = (tier === 1 ? .56 : .7) * (L === 1 ? 1.2 : 1);
+  const fr = towerAt(c, R, R, fs, tH + 4 + (L === 1 ? 8 : 0), (tier === 1 ? 14 : 18) + (L === 1 ? 6 : 0), ROOFC, ST);
   flagPole(c, fr, 14);
-  if (tier === 1) { towerAt(c, -R, R, .46, wallH + 4, 11, ROOF); }
+  if (tier === 1) { towerAt(c, -R, R, .46, wallH + 4, 11, ROOFC, ST); }
+  if (L === 1 && tier >= 2) towerAt(c, R, -R, .5, wallH + 22, 20, ROOFC, ST);
   // Zinnen auf den vorderen Mauern
-  crenels(c, -R, R - wd, 2 * R, wd, wallH, STONE);
-  // Zusatzgebäude im Hof (ab Stufe 2)
-  if (tier >= 2) { wallBox(c, -R + .4, -.1, .55, .7, 9, [180, 150, 112]); hipRoof(c, -R + .35, -.15, .65, .8, 9, 8, [110, 70, 44]); }
-  if (tier >= 3) { wallBox(c, R - .95, .1, .6, .55, 8, [186, 156, 118]); hipRoof(c, R - 1.0, .05, .7, .65, 8, 8, [118, 66, 44]); }
-  return { flag: [apx[0], apx[1] - (24 + tier * 4)], flag2: [fr[0], fr[1] - 14] };
+  crenels(c, -R, R - wd, 2 * R, wd, wallH, ST);
+  // Zusatzgebäude im Hof (ab Stufe 2; bei Bauform 3 und 4 immer)
+  if (tier >= 2 || L >= 3) { wallBox(c, -R + .4, -.1, .55, .7, 9, [180, 150, 112]); hipRoof(c, -R + .35, -.15, .65, .8, 9, 8, mul(ROOFC, .85)); }
+  if (tier >= 3 || (L === 3 && tier >= 2)) { wallBox(c, R - .95, .1, .6, .55, 8, [186, 156, 118]); hipRoof(c, R - 1.0, .05, .7, .65, 8, 8, mul(ROOFC, .75)); }
+  if (L === 0 && tier === 1) { wallBox(c, -R + .35, -.2, .5, .5, 7, [180, 150, 112]); hipRoof(c, -R + .3, -.25, .6, .6, 7, 7, ROOFC); }
+  return { flag: [apx[0], apx[1] - poleH], flag2: [fr[0], fr[1] - 14] };
 }
 function flagCloth(c, col) { // Fahne: weiß, wird mit der Spielerfarbe eingefärbt
   c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(5, -2, 9, 3, 15, 0); c.lineTo(15, 9); c.bezierCurveTo(9, 12, 5, 7, 0, 9); c.closePath();
@@ -498,7 +504,18 @@ export function buildAtlas(PIXI) {
     tex[d.name] = new PIXI.Texture(base, new PIXI.Rectangle(d.px + pad, d.py + pad, d.w * SC, d.h * SC));
     anchor[d.name] = [d.ax / d.w, d.ay / d.h]; if (d.meta) meta[d.name] = d.meta;
   }
-  return { tex, anchor, meta, SC, canvas: cv };
+  // Burgen je Spieler (Bauform und Farben nach Platz), erst bei Bedarf gezeichnet
+  const cache = {};
+  const castleFor = (tier, v) => {
+    const key = tier + ':' + v; if (cache[key]) return cache[key];
+    const W = [190, 250, 310][tier - 1], Hh = W, AY = [130, 175, 215][tier - 1];
+    const cvs = document.createElement('canvas'); cvs.width = W * SC; cvs.height = Hh * SC;
+    const cx = cvs.getContext('2d'); cx.translate(W / 2 * SC, AY * SC); cx.scale(SC, SC);
+    const m = castle(cx, tier, false, v);
+    const t = new PIXI.Texture(PIXI.BaseTexture.from(cvs, { scaleMode: PIXI.SCALE_MODES.LINEAR, mipmap: PIXI.MIPMAP_MODES.OFF }));
+    return (cache[key] = { tex: t, anchor: [.5, AY / Hh], meta: m });
+  };
+  return { tex, anchor, meta, SC, canvas: cv, castleFor };
 }
 
 

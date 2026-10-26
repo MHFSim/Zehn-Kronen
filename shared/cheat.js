@@ -17,6 +17,8 @@ export function cheat(match, players, c, now) {
   const w = match.world; if (!w) return 'Keine Welt';
   syncMatch(match, players, now);
   const targets = c.player === 'all' || c.player == null || c.player === '' ? players.filter(p => p.state.slot >= 0 && !p.state.out) : players.filter(p => p.id === Number(c.player));
+  // Nur das Bündnis des gewählten Spielers, wenn ein einzelner Spieler gewählt ist
+  const alsOf = () => { const all = Object.values(w.alliances || {}); return targets.length === 1 && c.player != null && c.player !== 'all' ? all.filter(a => a.members.includes(targets[0].id)) : all; };
   const needPlayers = ['resources', 'fill', 'troops', 'finish', 'levels', 'items', 'protection', 'reveal'];
   if (needPlayers.includes(c.kind) && !targets.length) return 'Spieler nicht gefunden';
   for (const p of targets) ensureState(p.state);
@@ -47,7 +49,7 @@ export function cheat(match, players, c, now) {
     }
     case 'store': {
       const n = num(c.amount, 5000);
-      for (const al of Object.values(w.alliances || {})) { al.store = al.store || { food: 0, wood: 0, stone: 0, ore: 0 }; for (const r of RES) al.store[r] += n; }
+      for (const al of alsOf()) { al.store = al.store || { food: 0, wood: 0, stone: 0, ore: 0 }; for (const r of RES) al.store[r] += n; }
       return '';
     }
     case 'items':
@@ -64,7 +66,7 @@ export function cheat(match, players, c, now) {
       for (const p of targets) { reveal(p.state, N / 2, N / 2, N); flushBits(p.state); }
       return '';
     case 'outposts':
-      for (const o of Object.values(w.outposts || {})) o.done = Math.min(o.done, w.gt);
+      for (const o of Object.values(w.outposts || {})) if (alsOf().some(a => a.id === o.al)) o.done = Math.min(o.done, w.gt);
       return '';
     case 'respawn':
       w.camps = {}; w.nodes = {}; w.ruins = {};

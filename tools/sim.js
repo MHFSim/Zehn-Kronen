@@ -3,6 +3,7 @@
 // Benutzt dieselbe Spiel-Engine (shared/world.js) wie der echte Server.
 import { syncMatch, addPlayer, command, viewFor, setSpeed, setWeeks, startMatch, pauseMatch, resumeMatch, endMatch, removePlayer } from '/shared/world.js';
 import { newWorld, mapOf, takeNotes } from '/shared/core.js';
+import { cheat } from '/shared/cheat.js';
 const KEY = 'zk-sim-v6';
 const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[b % 57]).join('');
 let mem = null;
@@ -111,6 +112,10 @@ const routes = {
     else if (b.action === 'pause') err = pauseMatch(m, pl, t);
     else if (b.action === 'resume') err = resumeMatch(m, pl, t);
     else if (b.action === 'end') err = endMatch(m, pl, t);
+    else if (b.action === 'cheat') {   // in der Testversion wirken Cheats nur auf den angemeldeten Spieler (und dessen Bündnis)
+      const me = pl.find(p => p.id === db.session.playerId); if (!me) return R(400, { error: 'Melde dich zuerst im Spiel an (in diesem Browser), dann wirken die Cheats auf dich.' });
+      err = cheat(m, pl, { ...(b.cheat || {}), player: me.id }, t);
+    }
     else if (b.action === 'invite') m.invite = rnd(10);
     else if (b.action === 'delete') { db.matches = db.matches.filter(x => x.id !== id); db.players = db.players.filter(p => p.match_id !== id); }
     else if (b.action === 'kick') { const pid = Number(b.playerId); if (pl.some(p => p.id === pid)) { removePlayer(m, pl, pid, t); db.players = db.players.filter(p => p.id !== pid); } }

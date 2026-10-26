@@ -37,7 +37,7 @@ def wrap(name, src):
 
 import os
 mods = []
-for name, path in [('mapgen', 'shared/mapgen.js'), ('rules', 'shared/rules.js'), ('combat', 'shared/combat.js'), ('core', 'shared/core.js'), ('outpost', 'shared/outpost.js'), ('war', 'shared/war.js'), ('social', 'shared/social.js'), ('world', 'shared/world.js'),
+for name, path in [('mapgen', 'shared/mapgen.js'), ('rules', 'shared/rules.js'), ('combat', 'shared/combat.js'), ('core', 'shared/core.js'), ('outpost', 'shared/outpost.js'), ('war', 'shared/war.js'), ('social', 'shared/social.js'), ('world', 'shared/world.js'), ('cheat', 'shared/cheat.js'),
                    ('art', 'public/art.js'), ('map', 'public/map.js')]:
     if (root / path).exists():
         mods.append(wrap(name, rd(path)))
