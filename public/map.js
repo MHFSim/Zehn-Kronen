@@ -63,7 +63,7 @@ void main(){
   gl_FragColor=vec4(outc,1.0);
 }`;
 
-const CASTLE_SCALE = 1.75;   // Burgen sind deutlich größer und höher als alle anderen Orte
+const CASTLE_SCALE = 2.0;   // Burgen sind deutlich größer und höher als alle anderen Orte
 const SHOW_NAMES = false;
 export class WorldMap {
   constructor(PIXI, app) {
@@ -409,7 +409,7 @@ export class WorldMap {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, y = -46;
       if (o.k === 'start' && h.player) {
         const pl = h.player, al = pl.ally && (view.match.alliances || []).find(a => a.id === pl.ally), gt = this.gtNow();
-        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1] * CASTLE_SCALE - 14;
+        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[135, 180, 235][(h.tier || 1) - 1] * CASTLE_SCALE - 14;
         if (pl.id === this.myId) txt = '★ ' + txt;
         if (pl.out) { txt = '✖ ' + txt; col = 0x4a4036; }
         else if (pl.vassalOf) txt += ' (Vasall)';

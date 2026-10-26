@@ -160,17 +160,19 @@ const CASTLE_ROOFS = [[128, 52, 40], [48, 86, 150], [52, 122, 70], [122, 66, 140
 const CASTLE_STONES = [[172, 164, 148], [178, 170, 150], [160, 160, 156], [184, 168, 142], [166, 166, 168], [176, 160, 140], [150, 150, 146], [182, 174, 158], [170, 158, 150], [164, 158, 136]];
 function castle(c, tier, withFlag, v = 0) {
   const r = lcg(tier * 17 + 2 + v * 5), ROOFC = CASTLE_ROOFS[v % 10], ST = CASTLE_STONES[v % 10], STD = mul(ST, .8), L = v % 5;
-  const R = (tier === 1 ? 1.15 : tier === 2 ? 1.5 : 1.85) * (L === 3 ? 1.12 : 1);      // halbe Seitenlänge des Hofs
+  const R = (tier === 1 ? 1.45 : tier === 2 ? 1.85 : 2.25) * (L === 3 ? 1.12 : 1);      // halbe Seitenlänge des Hofs
   shadow(c, 110 * R / 1.5, 40 * R / 1.5, .4, 4, 2);
   grass(c, 90 * R / 1.4, 38 * R / 1.4, 60, r);
-  const wallH = (tier === 1 ? 9 : tier === 2 ? 15 : 20) + (L === 4 ? 3 : 0), wd = .26;
+  const wallH = (tier === 1 ? 13 : tier === 2 ? 20 : 26) + (L === 4 ? 3 : 0), wd = .26;
   // Hintere Mauern (Nord und West) zuerst
   wallBox(c, -R, -R, 2 * R, wd, wallH, STD);
   wallBox(c, -R, -R, wd, 2 * R, wallH, STD);
   // Hinterer Turm
   if (tier >= 2 || L === 4) towerAt(c, -R, -R, L === 4 ? .8 : .62, wallH + (L === 4 ? 16 : 8), 15, ROOFC, ST);
+  towerAt(c, 0, -R, tier === 1 ? .5 : .66, wallH + 10 + tier * 3, 14 + tier * 2, ROOFC, ST);
+  towerAt(c, -R, 0, tier === 1 ? .5 : .66, wallH + 10 + tier * 3, 14 + tier * 2, ROOFC, ST);
   // Burgfried im Zentrum
-  const kh = (tier === 1 ? 22 : tier === 2 ? 34 : 48) + (L === 2 ? 8 : 0), ks = (tier === 1 ? 1.0 : tier === 2 ? 1.25 : 1.5) * (L === 1 ? 1.15 : 1);
+  const kh = (tier === 1 ? 32 : tier === 2 ? 48 : 66) + (L === 2 ? 8 : 0), ks = (tier === 1 ? 1.25 : tier === 2 ? 1.6 : 1.95) * (L === 1 ? 1.15 : 1);
   wallBox(c, -ks / 2, -ks / 2, ks, ks, kh, [198, 188, 164]);
   // Fenster und Tür am Burgfried
   for (let i = 0; i < (tier === 1 ? 1 : 2); i++) { window2(c, -ks / 2 + ks * (.28 + i * .4), ks / 2, kh * .62, 'L'); window2(c, ks / 2, -ks / 2 + ks * (.3 + i * .38), kh * .62, 'R'); }
@@ -192,10 +194,13 @@ function castle(c, tier, withFlag, v = 0) {
   // Ecktürme
   const tH = wallH + (tier === 1 ? 6 : 12) + (L === 4 ? 8 : 0), tS = tier === 1 ? .5 : .62;
   if (tier >= 2) { towerAt(c, -R, R, tS, tH, 15, ROOFC, ST); if (L !== 1) towerAt(c, R, -R, tS, tH + (L === 4 ? 6 : 0), 15, ROOFC, ST); }
-  const fs = (tier === 1 ? .56 : .7) * (L === 1 ? 1.2 : 1);
+  const fs = (tier === 1 ? .7 : .86) * (L === 1 ? 1.2 : 1);
   const fr = towerAt(c, R, R, fs, tH + 4 + (L === 1 ? 8 : 0), (tier === 1 ? 14 : 18) + (L === 1 ? 6 : 0), ROOFC, ST);
   flagPole(c, fr, 14);
-  if (tier === 1) { towerAt(c, -R, R, .46, wallH + 4, 11, ROOFC, ST); }
+  if (tier === 1) { towerAt(c, -R, R, .6, wallH + 10, 14, ROOFC, ST); towerAt(c, R, -R, .6, wallH + 10, 14, ROOFC, ST); }
+  const ft = towerAt(c, R, 0, tier === 1 ? .5 : .66, wallH + 10 + tier * 3, 14 + tier * 2, ROOFC, ST); flagPole(c, ft, 11);
+  if (tier >= 2) { const f2 = towerAt(c, -R, R, tS, tH + 6, 18, ROOFC, ST); flagPole(c, f2, 12); }
+  if (tier >= 3) { towerAt(c, -R * .5, R, .6, wallH + 12, 15, ROOFC, ST); towerAt(c, R, R * .5, .6, wallH + 12, 15, ROOFC, ST); }
   if (L === 1 && tier >= 2) towerAt(c, R, -R, .5, wallH + 22, 20, ROOFC, ST);
   // Zinnen auf den vorderen Mauern
   crenels(c, -R, R - wd, 2 * R, wd, wallH, ST);
@@ -473,7 +478,7 @@ export function buildAtlas(PIXI) {
   for (let k = 0; k < 3; k++) { add('oak' + k, 52, 66, 26, 60, c => oak(c, k)); add('pine' + k, 48, 80, 24, 74, c => pine(c, k, false)); add('pineS' + k, 48, 80, 24, 74, c => pine(c, k, true)); add('rock' + k, 48, 36, 24, 30, c => rock(c, k)); }
   for (let k = 0; k < 2; k++) add('bush' + k, 36, 28, 18, 24, c => bush(c, k));
   for (let t = 1; t <= 3; t++) {
-    const W = [190, 250, 310][t - 1], Hh = [190, 250, 310][t - 1], AY = [130, 175, 215][t - 1];
+    const W = [250, 320, 400][t - 1], Hh = W, AY = [165, 220, 280][t - 1];
     add('castle' + t, W, Hh, W / 2, AY, c => castle(c, t));
   }
   add('flag', 18, 14, 1, 2, c => flagCloth(c));
@@ -508,7 +513,7 @@ export function buildAtlas(PIXI) {
   const cache = {};
   const castleFor = (tier, v) => {
     const key = tier + ':' + v; if (cache[key]) return cache[key];
-    const W = [190, 250, 310][tier - 1], Hh = W, AY = [130, 175, 215][tier - 1];
+    const W = [250, 320, 400][tier - 1], Hh = W, AY = [165, 220, 280][tier - 1];
     const cvs = document.createElement('canvas'); cvs.width = W * SC; cvs.height = Hh * SC;
     const cx = cvs.getContext('2d'); cx.translate(W / 2 * SC, AY * SC); cx.scale(SC, SC);
     const m = castle(cx, tier, false, v);
