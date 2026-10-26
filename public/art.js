@@ -302,14 +302,30 @@ function nodeOre(c) {
     c.strokeStyle = 'rgba(20,24,30,.55)'; c.lineWidth = .7; c.stroke();
   }
 }
+function log(c, x, y, z, len, rad, r) {
+  const a = P(x, y, z), b = P(x + len, y, z); c.lineCap = 'round';
+  c.strokeStyle = '#33220f'; c.lineWidth = rad * 2 + 1.6; c.beginPath(); c.moveTo(a[0], a[1] - rad); c.lineTo(b[0], b[1] - rad); c.stroke();
+  c.strokeStyle = css(mul([122, 82, 46], .88 + r() * .3)); c.lineWidth = rad * 2; c.beginPath(); c.moveTo(a[0], a[1] - rad); c.lineTo(b[0], b[1] - rad); c.stroke();
+  c.strokeStyle = 'rgba(255,225,170,.28)'; c.lineWidth = rad * .6; c.beginPath(); c.moveTo(a[0], a[1] - rad * 1.45); c.lineTo(b[0], b[1] - rad * 1.45); c.stroke();
+  c.strokeStyle = 'rgba(40,24,10,.45)'; c.lineWidth = .8; for (let i = 1; i < 4; i++) { const t = i / 4 + r() * .1; c.beginPath(); c.moveTo(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - rad * 1.7); c.lineTo(a[0] + (b[0] - a[0]) * t + 2, a[1] + (b[1] - a[1]) * t - rad * .5); c.stroke(); }
+  c.lineCap = 'butt';
+  const e = [b[0], b[1] - rad];
+  c.fillStyle = '#e2c08c'; c.strokeStyle = '#4a3018'; c.lineWidth = 1; c.beginPath(); c.ellipse(e[0], e[1], rad * .78, rad, 0, 0, 7); c.fill(); c.stroke();
+  c.strokeStyle = '#a77a45'; c.lineWidth = .8; for (const k of [.62, .32]) { c.beginPath(); c.ellipse(e[0], e[1], rad * .78 * k, rad * k, 0, 0, 7); c.stroke(); }
+}
 function nodeWood(c) {
-  const r = lcg(57); shadow(c, 54, 22, .34, 2, 2); grass(c, 46, 18, 14, r);
-  for (const [x, y] of [[-1.1, -.3], [-.8, .6]]) { const p = P(x, y); c.fillStyle = '#6a4a2c'; c.fillRect(p[0] - 4, p[1] - 6, 8, 6); c.fillStyle = '#d8b484'; c.beginPath(); c.ellipse(p[0], p[1] - 6, 4, 2, 0, 0, 7); c.fill(); }
-  for (let row = 0; row < 3; row++) for (let i = 0; i < 4 - row; i++) {
-    const p = P(-.2 + i * .2 + row * .1, .1 - i * .02, row * 5); c.fillStyle = css(mul([150, 100, 56], .85 + r() * .3)); c.beginPath(); c.ellipse(p[0], p[1] - 3, 4, 3.4, 0, 0, 7); c.fill();
-    c.fillStyle = '#d9b27c'; c.beginPath(); c.ellipse(p[0] + 1, p[1] - 3, 2.2, 2, 0, 0, 7); c.fill();
-  }
-  const a = P(.9, -.5); c.strokeStyle = '#4a3624'; c.lineWidth = 2; c.beginPath(); c.moveTo(a[0] - 6, a[1]); c.lineTo(a[0] + 8, a[1] - 14); c.stroke(); c.fillStyle = '#9aa0a6'; c.fillRect(a[0] + 5, a[1] - 17, 7, 3.4);
+  const r = lcg(57); shadow(c, 56, 22, .36, 2, 2); grass(c, 48, 18, 14, r);
+  // Stapel: unten 4, Mitte 3, oben 2 Stämme
+  const L = 1.25, R = 4.4;
+  for (const [row, n] of [[0, 4], [1, 3], [2, 2]]) for (let i = 0; i < n; i++) log(c, -.8, -.85 + (i + (4 - n) * .5) * .44, row * 7.6, L, R, r);
+  // Stumpf mit Axt
+  const sp = P(.95, .55); c.fillStyle = '#5a3d22'; c.fillRect(sp[0] - 7, sp[1] - 9, 14, 9); c.fillStyle = '#d8b484'; c.strokeStyle = '#4a3018'; c.lineWidth = 1; c.beginPath(); c.ellipse(sp[0], sp[1] - 9, 7, 3.4, 0, 0, 7); c.fill(); c.stroke();
+  c.strokeStyle = '#a77a45'; c.lineWidth = .7; c.beginPath(); c.ellipse(sp[0], sp[1] - 9, 4, 1.9, 0, 0, 7); c.stroke();
+  c.strokeStyle = '#6a4a2c'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(sp[0] + 1, sp[1] - 9); c.lineTo(sp[0] + 8, sp[1] - 21); c.stroke();
+  c.fillStyle = '#aab0b6'; c.beginPath(); c.moveTo(sp[0] + 5, sp[1] - 19); c.lineTo(sp[0] + 12, sp[1] - 22); c.lineTo(sp[0] + 11, sp[1] - 14); c.closePath(); c.fill();
+  // Einzelner Stamm und Späne vorn
+  log(c, -.3, 1.0, 0, 1.2, 3.8, r);
+  for (let i = 0; i < 9; i++) { const p = P(-.6 + r() * 2, .4 + r() * 1.2); c.fillStyle = '#d9b27c'; c.fillRect(p[0], p[1] - 1, 2.4, 1); }
 }
 function nodeFarm(c) {
   const r = lcg(41); shadow(c, 54, 22, .3, 2, 2); grass(c, 46, 18, 12, r);

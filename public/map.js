@@ -338,7 +338,7 @@ export class WorldMap {
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, y = -46;
       if (o.k === 'start' && h.player) { txt = h.player.name; col = parseInt(PLAYER_COLORS[h.player.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1]; if (h.player.id === this.myId) txt = '★ ' + txt; }
-      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = T[o.k] + ' ' + o.lv; col = RES_COL[o.k]; y = -34; }
+      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = String(o.lv); col = RES_COL[o.k]; y = -30; }
       else if (o.k === 'camp') { txt = h.isDead ? 'Lager zerstört' : 'Banditen ' + o.lv; col = h.isDead ? 0x4a4036 : 0x8a2b24; y = h.isDead ? -26 : -58; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; y = -58; }
       else if (o.k === 'sanct') { txt = 'Heiligtum'; col = 0x2f6f8f; y = -86; }
