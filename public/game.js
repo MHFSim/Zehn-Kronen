@@ -6,7 +6,7 @@ import {
   T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
-import { checkSite, checkRaid, checkTeleport, touches, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
+import { cityR, checkSite, checkRaid, checkTeleport, touches, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
@@ -702,25 +702,32 @@ function placeInfo(t) {
 }
 function placeStep() {
   const show = mode === 'map' && view && view.ally && !msel && view.match.phase === 'running';
-  $('placeBtn').hidden = !show || placing; $('placeBar').hidden = !(show && placing); $('placeInfo').hidden = !(show && placing);
+  $('placeBtn').hidden = !show || !!placing; $('tpBtn').hidden = !show || !!placing;
+  $('placeBar').hidden = !(show && placing); $('placeInfo').hidden = !(show && placing === 'build');
   if (!placing || !show) { if (placing && !show) placing = false; return; }
-  const t = placeTile(), key = t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60);
+  const t = placeTile(), key = placing + t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60) + itemN('teleport');
   if (key === placeKey) return; placeKey = key;
+  const { mt, pls } = siteCtx(), el = $('placeTxt');
+  $('placeGo').hidden = placing !== 'build'; $('placeTp').hidden = placing !== 'tp';
+  if (placing === 'tp') {
+    const why = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, t.x, t.y, gtNow()), cd = TELEPORT_COOLDOWN - (gtNow() - S.tpAt), has = itemN('teleport') > 0;
+    const r = cityR(S.lv.rathaus); wm.setPreview({ x: t.x, y: t.y, r, ok: !why });
+    const msg = !has ? 'Du hast keinen Teleporter (Mehr → Shop).' : cd > 0 ? 'Der Teleporter lädt noch ' + fmtT(real(cd)) + '.' : why;
+    el.className = 'pl-txt ' + (msg ? 'bad' : 'ok'); el.textContent = msg || 'Deine Burg zieht hierher um (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
+    $('placeTp').disabled = !!msg; return;
+  }
   placeInfo(t);
-  const { mt, pls } = siteCtx(); placeWhy = checkSite(mt, pls, { id: me.id }, t.x, t.y, gtNow());
+  placeWhy = checkSite(mt, pls, { id: me.id }, t.x, t.y, gtNow());
   wm.setPreview({ x: t.x, y: t.y, r: OP_R, ok: !placeWhy });
-  const el = $('placeTxt'); el.className = 'pl-txt ' + (placeWhy ? 'bad' : 'ok');
+  el.className = 'pl-txt ' + (placeWhy ? 'bad' : 'ok');
   el.textContent = placeWhy || 'Hier passt der Außenposten (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
   const poor = OP_COST.some((c, i) => view.ally.store[RES[i]] < c);
   $('placeGo').disabled = !!placeWhy || poor;
   if (!placeWhy && poor) { el.className = 'pl-txt bad'; el.textContent = 'Der Platz passt, aber im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).'; }
-  const tpw = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, t.x, t.y, gtNow());
-  $('placeTp').disabled = !!tpw || itemN('teleport') < 1 || gtNow() - S.tpAt < TELEPORT_COOLDOWN; $('placeTp').title = tpw || (itemN('teleport') < 1 ? 'Kein Teleporter im Beutel (Mehr → Shop)' : '');
 }
 function setupPlace() {
-  $('placeBtn').onclick = () => {
-    placing = true; placeKey = ''; placeStep();
-  };
+  $('placeBtn').onclick = () => { placing = 'build'; placeKey = ''; placeStep(); };
+  $('tpBtn').onclick = () => { placing = 'tp'; placeKey = ''; placeStep(); };
   $('placeCancel').onclick = () => { placing = false; wm.setPreview(null); placeStep(); };
   $('placeTp').onclick = () => { const t = placeTile(), from = [...S.pos]; command({ type: 'teleport', x: t.x, y: t.y }).then(ok => { if (ok) { placing = false; wm.setPreview(null); wm.teleportFx(from, [t.x, t.y]); placeStep(); } }); };
   $('placeGo').onclick = () => { const t = placeTile(); selectMap({ type: 'site', x: t.x, y: t.y }, false); placeStep(); };
@@ -761,7 +768,7 @@ function shopHTML() {
   const card = (id) => { const it = ITEMS[id]; return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div><div class="note">Im Beutel: <b>${itemN(id)}</b></div></div>
     <button class="btn small" type="button" data-act="shopBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>${it.price} 🪙</button></div>`; };
   return `<p class="note">Du hast <b>${fmtN(Math.floor(S.res.gold))} 🪙 Gold</b>. Gold bekommst du aus Heiligtümern, Lagern und Beute.</p>
-    <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte ein freies Feld in eurem Bündnisgebiet antippen.'}</p>` : ''}</div>
+    <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte den Button „Teleportieren“ nutzen.'}</p>` : ''}</div>
     <div class="block"><h3>Beschleuniger</h3>${SPEED_IDS.map(card).join('')}<p class="note">Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
 }
 
@@ -851,12 +858,6 @@ function siteSheet(w) {
   wm.setPreview({ x: msel.x, y: msel.y, r: OP_R, ok: !why });
   const o = { id: 'site', x: msel.x, y: msel.y }, plan = !why ? planFor(o) : null;
   let body = '';
-  const tpWhy = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, msel.x, msel.y, gt);
-  if (al && (!tpWhy || itemN('teleport') > 0)) {
-    const cd = TELEPORT_COOLDOWN - (gt - S.tpAt), has = itemN('teleport') > 0;
-    body += `<div class="block tpbox"><h3>🌀 Teleportieren</h3><p class="note">Versetze deine Burg hierher, mitten in euer Bündnisgebiet.</p><div class="row"><button class="btn" type="button" data-act="teleport" ${has && cd <= 0 && !tpWhy ? '' : 'disabled'}>Hierher teleportieren</button>
-      <span class="${has && cd <= 0 && !tpWhy ? 'note' : 'why'}">${tpWhy ? esc(tpWhy) : !has ? 'Du hast keinen Teleporter (Mehr → Shop).' : cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) : 'Teleporter im Beutel: ' + itemN('teleport')}</span></div></div>`;
-  }
   body += `<p class="desc">Ein Außenposten gehört eurem Bündnis und erweitert das gemeinsame Revier um ein Viereck (13×13 Felder). Es gibt nur eine Stufe. Mitglieder können ihn mit Truppen bewachen. Feinde können ihn zerstören, wenn ihr Außenposten an seinen grenzt.</p>
     <dl class="stats"><dt>Kosten (Bündnislager)</dt><dd class="costs">${costHTML(OP_COST, st || {})}</dd><dt>Bauzeit</dt><dd>${fmtT(real(OP_BUILD))} nach der Ankunft</dd><dt>Außenposten des Bündnisses</dt><dd>${mineN} von ${maxOutposts(al)}</dd></dl>`;
   if (why) body += `<p class="why">${esc(why)}</p>`;
