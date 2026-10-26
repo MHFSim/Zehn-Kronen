@@ -252,7 +252,7 @@ function setupSheet() {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
     if (act === 'close') return closeSheet();
-    if (act === 'toTech') { closeSheet(); cityCat = 'tech'; renderCity(true); $('cityDrawer').classList.add('open'); $('cityList').scrollTop = 0; return; }
+    if (act === 'toTech') { closeSheet(); cityCat = 'tech'; renderCity(true); $('cityDrawer').classList.add('open'); $('city').scrollTop = 0; return; }
     if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
     if (act === 'upgrade') return command({ type: 'upgrade', id });
@@ -332,7 +332,7 @@ let citySigV = '';
 function renderCity(force) {
   if (!S || !$('city')) return;
   const sig = citySig(); if (!force && sig === citySigV) return; citySigV = sig;
-  const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('cityList').scrollTop;
+  const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('city').scrollTop;
   const tr = []; for (const k in S.train) for (const [i, o] of S.train[k].entries()) tr.push({ k, o, first: i === 0 });
   const row = (img, main, prog, time, sp) => `<div class="ord"><img alt="" src="${img}"><div class="qmain">${main}${prog}</div>${time}${sp ? `<button class="spd" type="button" data-speed="${sp}" aria-label="Beschleunigen">⚡</button>` : ''}</div>`;
   const orders = q.map(x => row(imgOf(x.id), `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`, 'build:' + x.id))
@@ -351,11 +351,12 @@ function renderCity(force) {
       + `<div class="note-box">Akademie Stufe <b>${A}</b> · Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1.${A ? '' : ''}</div>` + Object.keys(T).map(techPlateHTML).join('');
   } else body = BGROUPS.find(g => g[0] === cityCat)[3].map(plateHTML).join('');
   $('cityList').innerHTML = `<div class="city-in">
+    <article class="scene" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="scene-t"><div><div class="scene-name">Burg von ${esc(me.name)}</div><div class="scene-sub">Rathaus Stufe ${L} · „${esc(match.name)}“</div></div><span class="shield">${L}</span></div></article>
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
     <div class="tabs">${tabs}</div><div class="tabbody parch">${body}</div>
   </div>`;
-  $('cityList').scrollTop = keepTop;
+  $('city').scrollTop = keepTop;
 }
 function updateCity() {
   renderCity(false); city3d();
@@ -375,7 +376,8 @@ function updateCity() {
 }
 
 /* ---------- 3D-Stadt ---------- */
-let cv = null, cvLoop = 0, cvFail = false;
+const CITY_3D = false;   // 3D-Stadt ist abgeschaltet (Text-Stadt); Code bleibt für später
+let cv = null, cvLoop = 0, cvFail = !CITY_3D;
 const colNum = c => typeof c === 'number' ? c : parseInt(String(c || '#3a6fd0').replace('#', ''), 16) || 0x3a6fd0;
 function ensureCity() {
   if (cv || cvFail || !S || !window.THREE) return !!cv;

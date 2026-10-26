@@ -237,9 +237,13 @@ table.rank tr.me td{color:#e2b86a;font-weight:700}
 <style>
 /* ===== Neue Stadt: Holz und Pergament ===== */
 .parch{--bg:#e9dcb8;--panel:#f6edd2;--panel-2:#ecdfbb;--line:#c9b27f;--ink:#2e2012;--muted:#6d5a3b;--brass:#8a5412;--brass-ink:#fff6dd;--good:#3d6b2b;--bad:#a5321e;--food:#b8921e;--wood:#7d4f24;--stone:#7c7a73;--ore:#57728c;--gold:#b88a14;color-scheme:light;color:var(--ink)}
-body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow:hidden;-webkit-user-select:none;user-select:none;background:#a9cde6}
+body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-user-select:none;user-select:none;padding:calc(env(safe-area-inset-top,0px) + 112px) max(12px,env(safe-area-inset-left,0px)) calc(var(--nav) + 28px);
+  background:repeating-linear-gradient(90deg,rgba(0,0,0,.22) 0 2px,transparent 2px 92px),repeating-linear-gradient(0deg,rgba(255,235,190,.035) 0 1px,transparent 1px 6px),linear-gradient(#3b2415,#26160b)}
+body.city3d:not(.mode-map) .city{overflow:hidden;padding:0;background:#a9cde6}
+body:not(.city3d) .city #cityStage{display:none}
+body:not(.city3d) .city .cdrawer{position:static;transform:none;visibility:visible;pointer-events:auto;width:auto;max-height:none;display:block;background:none;border:0;box-shadow:none;border-radius:0}
+body:not(.city3d) .city .cdbody{overflow:visible;padding:0}
 body:not(.city3d) .city .cbtns{display:none}
-body:not(.city3d) .city .cdrawer{transform:none;position:fixed;inset:calc(env(safe-area-inset-top,0px) + 104px) 0 var(--nav) 0;max-height:none;width:auto;left:0;right:0;border-radius:0}
 body:not(.city3d) .city .cdhead{display:none}
 #cityStage{position:absolute;inset:0}#cityStage canvas{display:block;width:100%;height:100%;touch-action:none}
 .clabels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
