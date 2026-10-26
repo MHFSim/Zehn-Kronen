@@ -449,6 +449,17 @@ const ptabs = (items, cur, act) => `<div class="ptabs" role="tablist">${items.ma
 let allyTab = '', moreSub = '', repTab = 'all';
 
 /* ---------- Bündnis ---------- */
+function revierHTML() {
+  const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow(), al0 = view.ally, st = al0 ? al0.store : null;
+  const revier = !al0 ? '<p class="note">Außenposten, Bündnislager und gemeinsames Revier gibt es nur im Bündnis. Gründe eines oder tritt einem bei (Tab Bündnis).</p>' : `
+    <p class="note">Das Revier gehört dem Bündnis: Jede Burg und jeder Außenposten beansprucht ein Viereck. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} von ${maxOutposts(al0)} möglichen.</p>
+    <div class="block"><h3>🏛 Bündnislager</h3><div class="costs">${costHTML(RES.map(r => st[r]), { food: 1e12, wood: 1e12, stone: 1e12, ore: 1e12 })}</div>
+      <p class="note">Ein neuer Außenposten kostet:</p><div class="costs">${costHTML(OP_COST, st)}</div><p class="note">Wer im Bündnisgebiet Felder, Wälder, Brüche oder Minen abbaut, füllt das Lager zusätzlich um ${Math.round(CLAN_SHARE * 100)} % der Beute; dir wird nichts abgezogen.</p>
+      <div class="donate">${RES.map(r => `<label>${RES_DE[r]}<input id="dn_${r}" type="number" inputmode="numeric" min="0" placeholder="0"></label>`).join('')}</div>
+      <div class="row"><button class="btn" type="button" data-act="donate">In das Lager einzahlen</button></div></div>`
+    + (myOps.map(o => `<div class="mrow"><div><b>Außenposten</b><div class="note">${gt2 < o.done ? 'im Bau, noch ' + fmtT(real(o.done - gt2)) : 'fertig'} · Besatzung ${fmtN(o.total || 0)}</div></div><button class="btn ghost small" type="button" data-act="opGoto" data-id="${o.id}">Auf der Karte</button></div>`).join('') || (al0 ? '<p class="note">Noch kein Außenposten. Den ersten baut der Gründer: auf der Karte den Button „Außenposten“ benutzen (nur mit gefülltem Lager).</p>' : ''));
+  return revier;
+}
 function allyHTML() {
   const cap = match.cap, a = view.ally;
   const intro = `<p class="note">Ein Bündnis darf höchstens <b>${cap}</b> Mitglieder haben (Hälfte der Spieler plus eins). Verbündete können sich nicht angreifen, gewinnen gemeinsam und dürfen Truppen in die Burg des anderen legen. Jeder darf jederzeit austreten. Nach dem Austritt sind Angriffe auf die früheren Verbündeten 24 Stunden gesperrt.</p>`;
@@ -464,7 +475,7 @@ function allyHTML() {
     return phead('🛡️', 'Bündnis', 'Du bist in keinem Bündnis') + ptabs([['inv', 'Einladungen', invs.length], ['list', 'Bündnisse'], ['found', 'Gründen']], tab, 'atab') + body;
   }
   const lead = a.leader === me.id, reqN = (a.requests || []).length;
-  const tab = ['ov', 'chat', 'adm'].includes(allyTab) ? allyTab : 'ov';
+  const tab = ['ov', 'lager', 'chat', 'adm'].includes(allyTab) ? allyTab : 'ov';
   const members = a.members.map(id => {
     const p = match.players.find(x => x.id === id) || {};
     const st = p.out ? 'ausgeschieden' : p.vassalOf ? 'Vasall' : p.protUntil > gtNow() ? 'geschützt' : '';
@@ -481,13 +492,14 @@ function allyHTML() {
   const body = tab === 'ov' ? `<div class="block"><h3>Mitglieder</h3>${members}</div>
       <div class="block"><h3>Verstärkung</h3><p class="note">In deiner Burg: ${fmtN(stationTotal())} von ${fmtN(60 * S.lv.rathaus)} fremden Truppen (Platz wächst mit dem Rathaus). Sie helfen bei der Verteidigung. Neue schickst du über die Karte: Burg des Verbündeten antippen, Stationieren.</p>${stat || '<p class="note">Im Moment liegen keine fremden Truppen bei dir.</p>'}
       <h3 style="margin-top:12px">Deine Truppen bei Verbündeten</h3>${mine || '<p class="note">Keine.</p>'}</div>`
+    : tab === 'lager' ? revierHTML()
     : tab === 'chat' ? `<div class="block"><div class="msgs" id="chatBox">${chat}</div><div class="chatform"><input id="alMsg" maxlength="300" placeholder="Nachricht an das Bündnis" autocomplete="off"><button class="btn small" data-act="allyChat" type="button">Senden</button></div></div>`
     : `${reqs ? `<div class="block"><h3>Beitrittsanfragen</h3>${reqs}</div>` : ''}
       ${lead ? `<div class="block"><h3>Farbe des Reviers</h3><div class="swatches">${['#c8372d', '#2f6fd1', '#e2b02e', '#3f9d4c', '#8a4bc4', '#e0782b', '#27a7a1', '#d9609c', '#9aa5b1', '#b9d03a', '#ffffff', '#1c1c1c'].map(c => `<button type="button" class="sw ${(a.color || '').toLowerCase() === c ? 'on' : ''}" style="background:${c}" data-act="allyColor" data-c="${c}" aria-label="Farbe ${c}"></button>`).join('')}</div><p class="note">So sehen alle Mitglieder euer Revier und eure Außenposten.</p></div>` : ''}
       <div class="block"><h3>Spieler einladen</h3>${invd}${invForm}</div>
       <div class="block"><h3>Regeln</h3>${intro}</div>
       <div class="block"><button class="btn ${armedKey === 'leave' ? 'danger' : 'ghost'}" data-act="allyLeave" type="button">${armedKey === 'leave' ? 'Wirklich austreten' : 'Bündnis verlassen'}</button>${lead ? '<p class="note">Als Anführer kannst du die Führung vorher übergeben. Verlässt du es, übernimmt das nächste Mitglied.</p>' : ''}</div>`;
-  return phead('🛡️', `${esc(a.name)} <span class="tag">${esc(a.tag)}</span>`, `${a.members.length} von ${cap} Mitgliedern`) + ptabs([['ov', 'Übersicht'], ['chat', 'Chat'], ['adm', lead ? 'Verwaltung' : 'Einladen', reqN]], tab, 'atab') + body;
+  return phead('🛡️', `${esc(a.name)} <span class="tag">${esc(a.tag)}</span>`, `${a.members.length} von ${cap} Mitgliedern`) + ptabs([['ov', 'Übersicht'], ['lager', 'Revier & Lager'], ['chat', 'Chat'], ['adm', lead ? 'Verwaltung' : 'Einladen', reqN]], tab, 'atab') + body;
 }
 
 /* ---------- Mehr: Partie, Rangliste, Chronik, Erste Schritte, Einstellungen ---------- */
@@ -522,7 +534,7 @@ function tutorialHTML() {
     ['Ein Heer zu einem Feld schicken', rp.some(r => r.kind === 'gather' || r.kind === 'return'), 'Karte → Feld antippen, Truppen wählen, Sammeln.'],
     ['Ein Banditenlager besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Stufe 1 und 2 sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
-    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Mehr → Revier & Lager); den ersten baut der Gründer. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
+    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
     ['Ein Heiligtum besetzen', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Die vier Heiligtümer geben dir und deinem Bündnis +15 % auf einen Rohstoff.']
   ];
@@ -559,25 +571,17 @@ function moreHTML() {
       <p class="note">Pro Person ist ein Konto vorgesehen. Mehrfachkonten fallen dem Admin auf und können entfernt werden.</p></div>
     <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
-  const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow(), al0 = view.ally, st = al0 ? al0.store : null;
-  const revier = !al0 ? '<p class="note">Außenposten, Bündnislager und gemeinsames Revier gibt es nur im Bündnis. Gründe eines oder tritt einem bei (Tab Bündnis).</p>' : `
-    <p class="note">Das Revier gehört dem Bündnis: Jede Burg und jeder Außenposten beansprucht ein Viereck. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} von ${maxOutposts(al0)} möglichen.</p>
-    <div class="block"><h3>🏛 Bündnislager</h3><div class="costs">${costHTML(RES.map(r => st[r]), { food: 1e12, wood: 1e12, stone: 1e12, ore: 1e12 })}</div>
-      <p class="note">Ein neuer Außenposten kostet:</p><div class="costs">${costHTML(OP_COST, st)}</div><p class="note">Wer im Bündnisgebiet Felder, Wälder, Brüche oder Minen abbaut, füllt das Lager zusätzlich um ${Math.round(CLAN_SHARE * 100)} % der Beute; dir wird nichts abgezogen.</p>
-      <div class="donate">${RES.map(r => `<label>${RES_DE[r]}<input id="dn_${r}" type="number" inputmode="numeric" min="0" placeholder="0"></label>`).join('')}</div>
-      <div class="row"><button class="btn" type="button" data-act="donate">In das Lager einzahlen</button></div></div>`
-    + (myOps.map(o => `<div class="mrow"><div><b>Außenposten</b><div class="note">${gt2 < o.done ? 'im Bau, noch ' + fmtT(real(o.done - gt2)) : 'fertig'} · Besatzung ${fmtN(o.total || 0)}</div></div><button class="btn ghost small" type="button" data-act="opGoto" data-id="${o.id}">Auf der Karte</button></div>`).join('') || (al0 ? '<p class="note">Noch kein Außenposten. Den ersten baut der Gründer: auf der Karte den Button „Außenposten“ benutzen (nur mit gefülltem Lager).</p>' : ''));
   const tasks = tutorialHTML(), taskDone = (tasks.match(/class="chk done"/g) || []).length, taskAll = (tasks.match(/class="chk/g) || []).length;
   const SUBS = {
     game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], revier: ['🏰', 'Revier & Lager', revier], shop: ['🛒', 'Shop', shopHTML()], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('revier', '🏰', 'Revier & Lager', view.ally ? myOps.length + ' von ' + maxOutposts(view.ally) + ' Außenposten' : 'braucht ein Bündnis')}${tile('shop', '🛒', 'Shop', 'Teleporter, Beschleuniger', itemN('teleport') + SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter, Beschleuniger', itemN('teleport') + SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -614,7 +618,7 @@ function updateTrainPanel() {
 let panelName = '', panelSig = '';
 function panelSignature() {
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
-  if (panelName === 'ally') return JSON.stringify([allyTab, view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
+  if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
   return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 function renderPanel(force) {
@@ -707,7 +711,7 @@ function placeStep() {
   el.textContent = placeWhy || 'Hier passt der Außenposten (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
   const poor = OP_COST.some((c, i) => view.ally.store[RES[i]] < c);
   $('placeGo').disabled = !!placeWhy || poor;
-  if (!placeWhy && poor) { el.className = 'pl-txt bad'; el.textContent = 'Der Platz passt, aber im Bündnislager fehlen Rohstoffe (Mehr → Revier & Lager).'; }
+  if (!placeWhy && poor) { el.className = 'pl-txt bad'; el.textContent = 'Der Platz passt, aber im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).'; }
   const tpw = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, t.x, t.y, gtNow());
   $('placeTp').disabled = !!tpw || itemN('teleport') < 1 || gtNow() - S.tpAt < TELEPORT_COOLDOWN; $('placeTp').title = tpw || (itemN('teleport') < 1 ? 'Kein Teleporter im Beutel (Mehr → Shop)' : '');
 }
@@ -857,7 +861,7 @@ function siteSheet(w) {
   else {
     body += pickerHTML();
     if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
-    body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Mehr → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Mindestens ${OP_MIN_TROOPS} Truppen bleiben als Besatzung dort. Du kannst sie jederzeit abziehen.</p>`;
+    body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Mindestens ${OP_MIN_TROOPS} Truppen bleiben als Besatzung dort. Du kannst sie jederzeit abziehen.</p>`;
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
