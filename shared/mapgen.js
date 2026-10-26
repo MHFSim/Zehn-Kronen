@@ -4,7 +4,7 @@
 // Browser minimal abweichen und würden Server und Client auseinanderlaufen lassen.
 
 export const N = 200;           // Kartengröße in Feldern
-export const SUB = 2;           // Höhenraster pro Feld
+export const SUB = 3;           // Höhenraster pro Feld
 export const G = N * SUB + 1;   // Gitterpunkte je Seite
 export const SEA = 0.30;        // Wasserstand
 export const MOUNT = 0.70;      // ab hier unpassierbares Gebirge
@@ -67,6 +67,7 @@ function heightAt(x, y, seed, zones) {
   const mmask = smooth(0.50, 0.68, fbm(x * 0.028 + 70, y * 0.028 + 70, seed + 7, 3));
   const ridge = 1 - Math.abs(2 * fbm(x * 0.05 + 130, y * 0.05 + 130, seed + 13, 4) - 1);
   let h = 0.43 + (base - 0.5) * 0.60 + mmask * (0.06 + ridge * ridge * 0.42);
+  h += (fbm(x * 0.21 + 300, y * 0.21 + 300, seed + 3, 3) - 0.5) * 0.09 * smooth(0.50, 0.68, h);   // Felsdetail im Gebirge
   h -= smooth(0.84, 1.04, r) * 0.62;               // Meer am Kartenrand
   for (const z of zones) {                         // Bauland einebnen
     const d = Math.sqrt((x - z.x) * (x - z.x) + (y - z.y) * (y - z.y));
@@ -85,7 +86,7 @@ function buildPass(H, F, zonesFlat) {
     const h = H[(ty * SUB + 1) * G + tx * SUB + 1];
     let p = 1;
     if (h < SEA + 0.005 || h > MOUNT) p = 0;
-    else if (F[(ty * SUB + 1) * G + tx * SUB + 1] > 0.535 && h < 0.62 && !zonesFlat(tx + .5, ty + .5)) p = 2;
+    else if (F[(ty * SUB + 1) * G + tx * SUB + 1] > 0.635 && h < 0.62 && !zonesFlat(tx + .5, ty + .5)) p = 2;
     pass[ty * N + tx] = p;
   }
   return pass;
@@ -177,8 +178,10 @@ export function generateMap(seed) {
     }
     return null;
   };
-  const nodeLv = (x, y) => Math.max(1, Math.min(6, 1 + Math.floor((0.80 - distC(x, y) / C) / 0.80 * 6.4 + rand() * 1.4 - 0.5)));
-  const campLv = (x, y) => Math.max(1, Math.min(10, 1 + Math.floor((0.80 - distC(x, y) / C) / 0.80 * 10.5 + rand() * 1.6 - 0.6)));
+  // Stufe steigt von 1 am Kartenrand bis zum Maximum rund um den Thron
+  const rim = (x, y) => Math.max(0, Math.min(1, (0.86 - distC(x, y) / C) / 0.66));
+  const nodeLv = (x, y) => Math.max(1, Math.min(6, 1 + Math.floor(rim(x, y) * 5.99 + rand() * 0.4 - 0.2)));
+  const campLv = (x, y) => Math.max(1, Math.min(10, 1 + Math.floor(rim(x, y) * 9.99 + rand() * 0.6 - 0.3)));
 
   // Rund um jeden Startplatz: gleich viel Frühspiel
   starts.forEach(s => {
@@ -187,9 +190,10 @@ export function generateMap(seed) {
     tryPlace('camp', s.x, s.y, 13, 19, 3, () => 2, 60);
   });
   // Rest der Karte
-  const scatter = (kind, count, minD, lvf) => { for (let i = 0; i < count; i++) tryPlace(kind, C, C, 6, C * 0.9, minD, lvf, 80); };
-  scatter('farm', 32, 4.2, nodeLv); scatter('wood', 32, 4.2, nodeLv); scatter('stone', 24, 4.2, nodeLv); scatter('ore', 24, 4.2, nodeLv);
-  scatter('camp', 62, 4.5, campLv);
+  const scatter = (kind, count, minD, lvf, r0 = 6) => { for (let i = 0; i < count; i++) tryPlace(kind, C, C, r0, C * 0.9, minD, lvf, 80); };
+  // Ressourcen: deutlich weniger und nie in Thronnähe
+  scatter('farm', 14, 6, nodeLv, 26); scatter('wood', 14, 6, nodeLv, 26); scatter('stone', 11, 6, nodeLv, 26); scatter('ore', 11, 6, nodeLv, 26);
+  scatter('camp', 14, 7, campLv);
   scatter('ruin', 35, 3.4, (x, y) => 1 + Math.floor(rand() * 3));
 
   const map = { seed, N, H, F, pass, reach, objects, starts, byId: Object.fromEntries(objects.map(o => [o.id, o])) };

@@ -159,8 +159,8 @@ body:not(.mode-map) .hud{display:none}
 .tpflash{position:fixed;inset:0;z-index:30;pointer-events:none;background:radial-gradient(circle at 50% 55%,#fff 0,#bfe9ff 35%,#0000 75%);opacity:0;animation:tpf 1.25s ease-out}
 @keyframes tpf{0%{opacity:0}18%{opacity:.85}45%{opacity:.15}62%{opacity:.7}100%{opacity:0}}
 
-.placebtn{position:fixed;z-index:6;right:16px;top:calc(env(safe-area-inset-top,0px) + 150px);border:2px solid #8a6a24;background:linear-gradient(#f3d77a,#c9962c);color:#3b2608;border-radius:999px;padding:10px 14px;font:inherit;font-weight:700;box-shadow:0 3px 8px #0007;cursor:pointer}
-.placebtn.tp{top:calc(env(safe-area-inset-top,0px) + 206px);background:linear-gradient(#bfe6ff,#5aa8d8);border-color:#2f6a94;color:#08283f}
+.placebtn{position:fixed;z-index:6;right:16px;top:calc(env(safe-area-inset-top,0px) + 150px);border:2px solid #8a6a24;background:linear-gradient(#f3d77a,#c9962c);color:#3b2608;border-radius:50%;width:40px;height:40px;padding:0;display:grid;place-items:center;font-size:19px;line-height:1;box-shadow:0 3px 8px #0007;cursor:pointer}
+.placebtn.tp{top:calc(env(safe-area-inset-top,0px) + 198px);background:linear-gradient(#bfe6ff,#5aa8d8);border-color:#2f6a94;color:#08283f}
 .placebtn[hidden],.placebar [hidden],.placebar[hidden],.placeinfo[hidden]{display:none}
 .placeinfo{position:fixed;z-index:6;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 150px);display:flex;flex-wrap:wrap;gap:6px;justify-content:center;pointer-events:none}
 .placeinfo span{background:#f6edd2ee;color:#2e2012;border:2px solid #7a5230;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;box-shadow:0 2px 6px #0006}
@@ -431,8 +431,8 @@ body.sheet-open .sheet.popup{transform:translate(-50%,0) scale(1);opacity:1;poin
     <div id="banner"></div>
   </header>
   <div class="hud" id="hud"></div>
-  <button class="placebtn" id="placeBtn" type="button" hidden>🏗 Außenposten</button>
-  <button class="placebtn tp" id="tpBtn" type="button" hidden>🌀 Teleportieren</button>
+  <button class="placebtn" id="placeBtn" type="button" title="Außenposten" aria-label="Außenposten" hidden>🏗</button>
+  <button class="placebtn tp" id="tpBtn" type="button" title="Teleportieren" aria-label="Teleportieren" hidden>🌀</button>
   <div class="placeinfo" id="placeInfo" hidden></div>
   <div class="placebar" id="placeBar" hidden><div class="pl-txt" id="placeTxt"></div><div class="row"><button class="btn ghost" type="button" id="placeCancel">Abbrechen</button><button class="btn ghost" type="button" id="placeTp">🌀 Teleport</button><button class="btn" type="button" id="placeGo">Hier bauen</button></div></div>
   <section class="sheet" id="sheet" aria-live="polite"><div class="sheet-inner" id="sheetInner"></div></section>

@@ -46,7 +46,7 @@ class MB {
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); return this.push(g, col, x, y, z, ry);
   }
   sph(r, x, y, z, col, seg = 8, sy = 1) { return this.push(new T.SphereGeometry(r, seg, Math.max(3, seg * .75 | 0)), col, x, y, z, 0, 1, sy, 1); }
-  ico(r, x, y, z, col, sy = 1, sx = 1, ry = 0) { return this.push(new T.IcosahedronGeometry(r, 0), col, x, y, z, ry, sx, sy, sx); }
+  ico(r, x, y, z, col, sy = 1, sx = 1, ry = 0, det = 0) { return this.push(new T.IcosahedronGeometry(r, det), col, x, y, z, ry, sx, sy, sx); }
   build() {
     const g = new T.BufferGeometry();
     g.setAttribute('position', new T.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(this.n, 3)); g.setAttribute('color', new T.Float32BufferAttribute(this.c, 3));
@@ -316,12 +316,16 @@ function buildUnit(type, col) {
 
 /* ---------- Bäume (Instanzen) ---------- */
 function treeGeo(kind) {
-  const b = new MB();
-  if (kind === 'pine') { b.cyl(.05, .07, .3, 5, 0, 0, 0, [90, 62, 38]); b.cone(.4, .55, 7, 0, .22, 0, [255, 255, 255]); b.cone(.32, .5, 7, 0, .5, 0, [235, 235, 235]); b.cone(.22, .45, 7, 0, .78, 0, [215, 215, 215]); }
-  else if (kind === 'snow') { b.cyl(.05, .07, .3, 5, 0, 0, 0, [90, 62, 38]); b.cone(.38, .55, 7, 0, .22, 0, [226, 238, 238]); b.cone(.3, .5, 7, 0, .5, 0, [214, 230, 232]); b.cone(.2, .45, 7, 0, .78, 0, [244, 248, 250]); }
-  else if (kind === 'oak') { b.cyl(.07, .09, .42, 5, 0, 0, 0, [98, 70, 44]); b.ico(.34, 0, .66, 0, [255, 255, 255], .9); b.ico(.22, .18, .84, .08, [235, 235, 235], .9); b.ico(.2, -.16, .78, -.1, [220, 225, 220], .9); }
-  else if (kind === 'bush') { b.ico(.2, 0, .13, 0, [255, 255, 255], .8); b.ico(.14, .16, .1, .06, [225, 225, 225], .8); }
-  else { b.ico(.24, 0, .1, 0, [255, 255, 255], .65); b.ico(.14, .2, .06, .08, [220, 220, 220], .7); }
+  const b = new MB(), W = [255, 255, 255];
+  if (kind === 'pine' || kind === 'snow') {
+    const c = kind === 'pine' ? [[255, 255, 255], [238, 238, 238], [220, 220, 220], [206, 206, 206]] : [[226, 238, 238], [214, 230, 232], [234, 244, 246], [244, 248, 250]];
+    b.cyl(.05, .075, .32, 8, 0, 0, 0, [90, 62, 38]);
+    b.cone(.42, .5, 14, 0, .2, 0, c[0]); b.cone(.35, .46, 14, 0, .44, 0, c[1]); b.cone(.27, .42, 14, 0, .68, 0, c[2]); b.cone(.17, .38, 12, 0, .9, 0, c[3]);
+  } else if (kind === 'oak') {
+    b.cyl(.06, .095, .46, 8, 0, 0, 0, [98, 70, 44]); b.cyl(.025, .04, .3, 6, .1, .3, 0, [98, 70, 44]);
+    b.ico(.34, 0, .68, 0, W, .88, 1, 0, 2); b.ico(.23, .2, .84, .08, [238, 238, 238], .88, 1, 0, 2); b.ico(.21, -.18, .78, -.1, [222, 226, 222], .88, 1, 0, 2); b.ico(.17, .02, .98, -.06, [246, 246, 246], .9, 1, 0, 1);
+  } else if (kind === 'bush') { b.ico(.2, 0, .13, 0, W, .8, 1, 0, 2); b.ico(.14, .16, .1, .06, [225, 225, 225], .8, 1, 0, 1); b.ico(.11, -.14, .09, .07, [236, 236, 236], .8, 1, 0, 1); }
+  else { b.ico(.24, 0, .1, 0, W, .65, 1, 0, 1); b.ico(.14, .2, .06, .08, [220, 220, 220], .7, 1, 0, 1); }
   return b.build();
 }
 
@@ -356,6 +360,7 @@ void main(){
 #include <fog_fragment>
 }`;
 
+const SKIRT = { farm: [[132, 108, 66], 2.2], wood: [[104, 84, 54], 1.9], stone: [[140, 134, 120], 2.0], ore: [[96, 90, 82], 2.1], camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
 const KIND_R = { start: 2.8, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, ore: 1.7, camp: 1.9, ruin: 1.7 };
 
 export class WorldMap {
@@ -397,6 +402,17 @@ export class WorldMap {
     const map = generateMap(data.seed); this.map = map; this.seed = data.seed;
     this.roads = new Float32Array(G * G); this.roadCells = new Uint8Array(N * N); this.roadSig = '';
     this.matVC = new T.MeshLambertMaterial({ vertexColors: true });
+    this.matTerr = new T.MeshLambertMaterial({ vertexColors: true });
+    this.matTerr.onBeforeCompile = sh => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = position;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vWP;
+float zh(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(zh(i),zh(i+vec2(1.,0.)),f.x), mix(zh(i+vec2(0.,1.)),zh(i+vec2(1.,1.)),f.x), f.y); }`).replace('#include <color_fragment>', `#include <color_fragment>
+{ vec2 p = vWP.xz; float a = zn(p*2.3)*.5 + zn(p*6.1)*.3 + zn(p*17.0)*.2; float bl = zn(vec2(p.x*38.0, p.y*7.0)) * zn(vec2(p.x*5.0, p.y*41.0));
+  float g = clamp(diffuseColor.g*2.2 - diffuseColor.r*1.2 - diffuseColor.b*.6, 0.0, 1.0);
+  diffuseColor.rgb *= .84 + a*.3 + g*(bl-.25)*.22; diffuseColor.rg += vec2(.012,.02)*g*a; }`);
+    };
     this.buildTerrain(map); this.buildWater(); this.buildTrees(map); this.buildObjects(map);
     this.territory = new T.Group(); this.scene.add(this.territory); this.preview = null; this.terrAt = 0; this.terrDirty = true;
     this.ringMesh = new T.Mesh(new T.RingGeometry(.9, 1.0, 40), new T.MeshBasicMaterial({ color: 0xf0d98a, transparent: true, opacity: .95, side: T.DoubleSide, depthTest: false }));
@@ -456,7 +472,7 @@ export class WorldMap {
       const g = new T.BufferGeometry(); g.setAttribute('position', this.posAttr); g.setAttribute('color', this.colAttr); g.setAttribute('normal', this.norAttr); g.setIndex(idx);
       let ymax = 0; for (let gy = y0; gy <= y1; gy += 4) for (let gx = x0; gx <= x1; gx += 4) ymax = Math.max(ymax, pos[(gy * G + gx) * 3 + 1]);
       g.boundingSphere = new T.Sphere(new T.Vector3((cx + .5) * CH, ymax / 2, (cy + .5) * CH), CH * .72 + ymax / 2);
-      const m = new T.Mesh(g, this.matVC); m.receiveShadow = true; this.scene.add(m); this.chunks.push(m);
+      const m = new T.Mesh(g, this.matTerr); m.receiveShadow = true; this.scene.add(m); this.chunks.push(m);
     }
     this.hilite = this.matVC;
   }
@@ -500,14 +516,14 @@ export class WorldMap {
       const h = this.hAt(x + .5, y + .5); if (h < SEA + .03) continue;
       const pass = map.pass[c], f = map.F[(y * SUB + 1) * G + x * SUB + 1], r = hash(x, y, seed), vr = hash(x, y, seed + 40);
       if (pass === 2 && h < .64) {
-        const cnt = 2 + (r > .55 ? 1 : 0) + (r > .9 ? 1 : 0);
+        const cnt = r > .3 ? 1 + (r > .8 ? 1 : 0) : 0;
         for (let i = 0; i < cnt; i++) {
           const a = hash(x * 7 + i, y * 3, seed + 5), b = hash(x * 5, y * 11 + i, seed + 6), kind = hash(x + i, y - i, seed + 8), sc = (.9 + hash(x, y + i, seed + 12) * .5) * 1.25;
           addT(h > .5 || kind > .55 ? 'pine' : 'oak', x + .1 + a * .8, y + .1 + b * .8, sc, c, hash(x + i, y, seed + 44));
         }
       } else if (pass === 1 && h < .6) {
-        if (r < (f > .45 ? .22 : .055)) addT(hash(x, y, seed + 3) > .5 ? 'oak' : 'pine', x + .2 + hash(x, y, seed + 5) * .6, y + .2 + hash(x, y, seed + 6) * .6, (.85 + hash(x, y, seed + 7) * .4) * 1.2, c, vr);
-        else if (r > .975) addT('bush', x + .5, y + .5, 1.3, c, vr);
+        if (r < (f > .45 ? .08 : .02)) addT(hash(x, y, seed + 3) > .5 ? 'oak' : 'pine', x + .2 + hash(x, y, seed + 5) * .6, y + .2 + hash(x, y, seed + 6) * .6, (.85 + hash(x, y, seed + 7) * .4) * 1.2, c, vr);
+        else if (r > .965) addT('bush', x + .5, y + .5, 1.3, c, vr);
         else if (r > .955) addT('rock', x + .5, y + .5, 1.2, c, vr);
       } else if (pass === 0 && h > .56) {
         if (r < .4) addT(h > .64 ? 'snow' : 'pine', x + .2 + hash(x, y, seed + 5) * .6, y + .2 + hash(x, y, seed + 6) * .6, 1.2, c, vr);
@@ -567,7 +583,7 @@ export class WorldMap {
     this.mesh = mesh;
     for (const o of map.objects) {
       const hd = { o, grp: new T.Group(), flags: [], vis: true }; this.obj[o.id] = hd;
-      const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' ? 2.5 : o.k === 'start' ? 2 : 1.2);
+      const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' ? 2.5 : o.k === 'start' ? 2 : 1.0);
       g.position.set(o.x + .5, y, o.y + .5); g.rotation.y = ['start', 'throne', 'sanct'].includes(o.k) ? 0 : hash(o.x, o.y, 3) * .5 - .25;
       if (o.k === 'start') { hd.slot = mesh(M.slot); g.add(hd.slot); hd.castle = null; }
       else if (o.k === 'camp') { hd.alive = mesh(M.campAlive); hd.deadM = mesh(M.campDead); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); this.attachParts(hd, M.campAlive); hd.smokeOffs = M.campAlive.smoke; }
@@ -579,6 +595,7 @@ export class WorldMap {
         if (o.k === 'throne') { this.addFlags(hd, M.throne.flags, 0xe9c860); this.attachParts(hd, M.throne); hd.smokeOffs = M.throne.smoke; }
         if (o.k === 'wood') hd.smokeOffs = M.wood.smoke;
       }
+      if (SKIRT[o.k]) { const [sc, r] = SKIRT[o.k], sb = new MB(); sb.cyl(r * .96, r * 1.22, 3.2, 14, 0, -3.1, 0, sc, .06); sb.cyl(r * .99, r * .99, .08, 14, 0, -.06, 0, mul(sc, 1.06), .04); const sm = new T.Mesh(sb.build(), this.matVC); sm.receiveShadow = true; g.add(sm); }
       this.scene.add(g);
     }
   }
