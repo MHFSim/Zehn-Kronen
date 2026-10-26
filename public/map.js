@@ -928,7 +928,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const a = this.groundAt(sx, sy); this.cam.dist /= factor; this.updateCamera();
     const b = a && this.groundAt(sx, sy); if (a && b) { this.cam.x += a.x - b.x; this.cam.z += a.z - b.z; this.updateCamera(); }
   }
-  rotateBy(da) { this.cam.yaw += da; this.updateCamera(); }
+  rotateBy() {}   // Karte ist nicht drehbar
   // Feld so verschieben, dass es bei (fx, fy) des Bildschirms liegt
   focus(tx, ty, dist, fy = .46) {
     if (dist) this.cam.dist = dist; this.cam.x = tx; this.cam.z = ty; this.updateCamera();

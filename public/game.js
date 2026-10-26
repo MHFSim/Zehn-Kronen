@@ -121,7 +121,7 @@ function setupInput() {
     else if (ptrs.size === 2 && pinch) {
       const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = dist(a, b), an = ang(a, b);
       let da = an - pinch.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
-      wm.zoomAt(mid.x, mid.y, d / pinch.d); wm.rotateBy(-da); pinch = { d, a: an };
+      wm.zoomAt(mid.x, mid.y, d / pinch.d); pinch = { d, a: an };
     }
   });
   const end = e => {
@@ -132,7 +132,7 @@ function setupInput() {
     if (ptrs.size < 2) pinch = null;
   };
   view.addEventListener('pointerup', end); view.addEventListener('pointercancel', end);
-  view.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey || e.ctrlKey) wm.rotateBy(e.deltaY * .003); else wm.zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : .89); }, { passive: false });
+  view.addEventListener('wheel', e => { e.preventDefault(); wm.zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : .89); }, { passive: false });
 }
 function tap(sx, sy) { mapTap(sx, sy); }
 
