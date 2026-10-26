@@ -19,22 +19,32 @@ const hexRGB = h => [h >> 16 & 255, h >> 8 & 255, h & 255];
 /* ---------- Mesh-Bauer: viele Körper zu einem Netz mit Vertexfarben ---------- */
 let T;   // THREE
 class MB {
-  constructor() { this.p = []; this.n = []; this.c = []; }
-  push(g, col, x = 0, y = 0, z = 0, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
+  constructor() { this.p = []; this.n = []; this.c = []; this.tri = 0; }
+  // Körper einfügen; jit = Helligkeitsschwankung je Dreieck (wirkt wie gemauerte Steine / Holzmaserung)
+  push(g, col, x = 0, y = 0, z = 0, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0, jit = .1) {
     g = g.index ? g.toNonIndexed() : g;
-    const m = new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz)), new T.Vector3(sx, sy, sz));
+    const m = new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz, 'YXZ')), new T.Vector3(sx, sy, sz));
     g.applyMatrix4(m); g.computeVertexNormals();
-    const p = g.attributes.position.array, nn = g.attributes.normal.array, k = 1 + (hash(Math.round(x * 31), Math.round(z * 17), Math.round(y * 13)) - .5) * .1;
-    const r = LIN(Math.min(255, col[0] * k)), gg = LIN(Math.min(255, col[1] * k)), b = LIN(Math.min(255, col[2] * k));
+    const p = g.attributes.position.array, nn = g.attributes.normal.array, k0 = 1 + (hash(Math.round(x * 31), Math.round(z * 17), Math.round(y * 13)) - .5) * .08;
     for (let i = 0; i < p.length; i++) { this.p.push(p[i]); this.n.push(nn[i]); }
-    for (let i = 0; i < p.length / 3; i++) this.c.push(r, gg, b);
+    for (let t = 0; t < p.length / 9; t++) {
+      const k = k0 * (1 + (hash(this.tri++, 7, 3) - .5) * jit), r = LIN(Math.min(255, col[0] * k)), gg = LIN(Math.min(255, col[1] * k)), b = LIN(Math.min(255, col[2] * k));
+      for (let v = 0; v < 3; v++) this.c.push(r, gg, b);
+    }
     g.dispose(); return this;
   }
-  box(w, h, d, x, y, z, col, ry = 0) { return this.push(new T.BoxGeometry(w, h, d), col, x, y + h / 2, z, ry); }
-  cyl(rt, rb, h, seg, x, y, z, col) { return this.push(new T.CylinderGeometry(rt, rb, h, seg), col, x, y + h / 2, z); }
-  cone(r, h, seg, x, y, z, col) { return this.push(new T.ConeGeometry(r, h, seg), col, x, y + h / 2, z); }
+  box(w, h, d, x, y, z, col, ry = 0, rx = 0, rz = 0) { return this.push(new T.BoxGeometry(w, h, d), col, x, y + h / 2, z, ry, 1, 1, 1, rx, rz); }
+  cyl(rt, rb, h, seg, x, y, z, col, jit) { return this.push(new T.CylinderGeometry(rt, rb, h, seg), col, x, y + h / 2, z, 0, 1, 1, 1, 0, 0, jit); }
+  cone(r, h, seg, x, y, z, col, jit) { return this.push(new T.ConeGeometry(r, h, seg), col, x, y + h / 2, z, 0, 1, 1, 1, 0, 0, jit); }
   // Pyramidendach über einem Rechteck w × d
   pyr(w, d, h, x, y, z, col) { const g = new T.ConeGeometry(1, h, 4); g.rotateY(Math.PI / 4); return this.push(g, col, x, y + h / 2, z, 0, w / 1.4142, 1, d / 1.4142); }
+  // Satteldach: Firstrichtung entlang x (ry dreht)
+  gable(w, d, h, x, y, z, col, ry = 0) {
+    const hw = w / 2, hd = d / 2, P = [[-hw, 0, -hd], [hw, 0, -hd], [hw, 0, hd], [-hw, 0, hd], [-hw, h, 0], [hw, h, 0]];
+    const tri = [[0, 4, 1], [1, 4, 5], [3, 2, 5], [3, 5, 4], [0, 3, 4], [1, 5, 2]], pos = [];
+    for (const t of tri) for (const i of t) pos.push(...P[i]);
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); return this.push(g, col, x, y, z, ry);
+  }
   sph(r, x, y, z, col, seg = 8, sy = 1) { return this.push(new T.SphereGeometry(r, seg, Math.max(3, seg * .75 | 0)), col, x, y, z, 0, 1, sy, 1); }
   ico(r, x, y, z, col, sy = 1, sx = 1, ry = 0) { return this.push(new T.IcosahedronGeometry(r, 0), col, x, y, z, ry, sx, sy, sx); }
   build() {
@@ -45,7 +55,7 @@ class MB {
 }
 
 /* ---------- Modelle ---------- */
-const STONE = [172, 164, 148], STONE_D = [128, 122, 110], WOOD = [118, 84, 52], PLASTER = [200, 190, 166], DIRT = [140, 112, 78], GRASS = [92, 130, 62];
+const STONE = [172, 164, 148], STONE_D = [128, 122, 110], WOOD = [118, 84, 52], WOOD_D = [84, 58, 36], PLASTER = [206, 196, 172], DIRT = [140, 112, 78], GRASS = [92, 130, 62], DARK = [30, 24, 20], LIGHT = [255, 214, 130], GOLD = [226, 188, 84], IRON = [128, 132, 140];
 const CASTLE_ROOFS = [[170, 62, 48], [60, 100, 170], [60, 140, 80], [140, 80, 160], [214, 128, 48], [48, 150, 148], [88, 88, 100], [208, 170, 60], [190, 86, 134], [120, 84, 54]];
 const CASTLE_STONES = [[172, 164, 148], [178, 170, 150], [160, 160, 156], [184, 168, 142], [166, 166, 168], [176, 160, 140], [150, 150, 146], [182, 174, 158], [170, 158, 150], [164, 158, 136]];
 const mul = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
@@ -55,147 +65,253 @@ function crenels(b, x0, z0, x1, z1, y, col, step = .42) {
   const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.floor(len / step)), ry = Math.atan2(-(z1 - z0), x1 - x0);
   for (let i = 0; i <= n; i += 2) { const u = i / n; b.box(.2, .17, .13, x0 + (x1 - x0) * u, y, z0 + (z1 - z0) * u, col, ry); }
 }
-function tower(b, x, z, y0, r, h, roofH, roofCol, st, flag) {
-  b.cyl(r * 1.12, r * 1.2, .35, 10, x, y0 - .35, z, mul(st, .75));
-  b.cyl(r, r * 1.08, h, 10, x, y0, z, st);
-  b.cyl(r * 1.18, r * 1.18, .16, 10, x, y0 + h - .05, z, mul(st, 1.05));
-  b.box(.12, .26, .08, x + r * .98, y0 + h * .6, z, [34, 30, 36]); b.box(.08, .26, .12, x, y0 + h * .6, z + r * .98, [34, 30, 36]);
-  b.cone(r * 1.35, roofH, 10, x, y0 + h + .1, z, roofCol);
-  if (flag) { b.cyl(.025, .025, .8, 5, x, y0 + h + .1 + roofH, z, [60, 44, 30]); flag.push([x, y0 + h + .1 + roofH + .62, z]); }
+// Mauerstück mit Sockelstein, Gesims und Schießscharten (Kante von (x0,z0) nach (x1,z1), Dicke wd)
+function wallSeg(b, x0, z0, x1, z1, y0, h, wd, col, slits = true) {
+  const len = Math.hypot(x1 - x0, z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, ry = Math.atan2(-(z1 - z0), x1 - x0);
+  b.box(len, h, wd, cx, y0, cz, col, ry);
+  b.box(len + .02, .1, wd + .06, cx, y0, cz, mul(col, .78), ry);                 // Sockelstein
+  b.box(len + .02, .07, wd + .08, cx, y0 + h * .55, cz, mul(col, 1.08), ry);     // Gesims
+  b.box(len + .02, .06, wd + .1, cx, y0 + h - .05, cz, mul(col, 1.1), ry);       // Mauerkrone
+  if (slits) { const n = Math.floor(len / 1.1); for (let i = 0; i < n; i++) { const u = (i + .5) / n - .5, px = cx + Math.cos(ry) * len * u, pz = cz - Math.sin(ry) * len * u, nx = Math.sin(ry) * (wd / 2 + .005), nz = Math.cos(ry) * (wd / 2 + .005); for (const sg of [1, -1]) b.box(.05, .22, .03, px + nx * sg, y0 + h * .32, pz + nz * sg, DARK, ry); } }
 }
-function house(b, x, z, y0, w, d, h, roofCol, ry = 0) { b.box(w, h, d, x, y0, z, [186, 156, 118], ry); b.pyr(w * 1.2, d * 1.2, h * .8, x, y0 + h, z, roofCol); }
+function tower(b, x, z, y0, r, h, roofH, roofCol, st, flag, windows = true) {
+  b.cyl(r * 1.16, r * 1.26, .38, 10, x, y0 - .38, z, mul(st, .72));
+  b.cyl(r * 1.08, r * 1.1, .22, 10, x, y0, z, mul(st, .84));
+  b.cyl(r, r * 1.06, h, 10, x, y0 + .2, z, st);
+  b.cyl(r * 1.07, r * 1.07, .06, 10, x, y0 + h * .5, z, mul(st, 1.1));
+  if (windows) for (const [dx, dz] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) { b.box(.13, .3, .06, x + dx * r * .98, y0 + h * .68, z + dz * r * .98, DARK, dx ? Math.PI / 2 : 0); b.box(.09, .22, .05, x + dx * r * 1.0, y0 + h * .68, z + dz * r * 1.0, LIGHT, dx ? Math.PI / 2 : 0); }
+  b.cyl(r * 1.28, r * 1.18, .28, 10, x, y0 + h, z, mul(st, 1.06));                       // Wehrgang-Auskragung
+  b.cyl(r * 1.3, r * 1.3, .1, 10, x, y0 + h + .26, z, WOOD_D);
+  const rf = roofH; b.cone(r * 1.55, rf * .42, 10, x, y0 + h + .3, z, mul(roofCol, .92)); b.cone(r * 1.32, rf * .85, 10, x, y0 + h + .32 + rf * .25, z, roofCol);
+  b.sph(.06, x, y0 + h + .3 + rf * 1.1, z, GOLD, 6);
+  if (flag) { b.cyl(.022, .022, .8, 5, x, y0 + h + .3 + rf * 1.05, z, WOOD_D); flag.push([x, y0 + h + .3 + rf * 1.05 + .62, z]); }
+}
+function house(b, x, z, y0, w, d, h, roofCol, ry = 0) {
+  b.box(w, h, d, x, y0, z, [196, 168, 128], ry); b.box(w + .02, .05, d + .02, x, y0 + h * .55, z, WOOD_D, ry);
+  for (const [px, pz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.box(.05, h, .05, x + px * w / 2, y0, z + pz * d / 2, WOOD_D, ry);
+  b.gable(w * 1.25, d * 1.2, h * .75, x, y0 + h, z, roofCol, ry); b.box(.1, .26, .1, x + w * .25, y0 + h, z - d * .1, STONE_D);
+}
+function well(b, x, z, y0) { b.cyl(.2, .22, .26, 8, x, y0, z, STONE); b.cyl(.14, .14, .02, 8, x, y0 + .25, z, [40, 70, 90]); b.box(.04, .45, .04, x - .17, y0, z, WOOD_D); b.box(.04, .45, .04, x + .17, y0, z, WOOD_D); b.gable(.5, .4, .16, x, y0 + .45, z, WOOD, Math.PI / 2); }
+function crate(b, x, z, y0, s = .2, ry = 0) { b.box(s, s, s, x, y0, z, [150, 112, 70], ry); b.box(s * 1.02, .03, s * 1.02, x, y0 + s * .5, z, WOOD_D, ry); }
+function barrel(b, x, z, y0) { b.cyl(.11, .11, .26, 8, x, y0, z, [124, 88, 54]); b.cyl(.115, .115, .03, 8, x, y0 + .06, z, IRON); b.cyl(.115, .115, .03, 8, x, y0 + .18, z, IRON); }
 
 function buildCastle(tier, v) {
-  const b = new MB(), flags = [], roofC = CASTLE_ROOFS[v % 10], ST = CASTLE_STONES[v % 10], STD = mul(ST, .82), L = v % 5, t = tier - 1;
-  const R = [1.5, 2.0, 2.5][t] * (L === 3 ? 1.1 : 1), wd = .3, wallH = [.8, 1.05, 1.3][t] + (L === 4 ? .22 : 0), y0 = .3;
+  const b = new MB(), flags = [], roofC = CASTLE_ROOFS[v % 10], ST = CASTLE_STONES[v % 10], STD = mul(ST, .84), L = v % 5, t = tier - 1;
+  const R = [1.5, 2.0, 2.5][t] * (L === 3 ? 1.1 : 1), wd = .32, wallH = [.85, 1.1, 1.35][t] + (L === 4 ? .22 : 0), y0 = .3, smoke = [];
   // Sockel mit Fundament (reicht nach unten, damit nichts schwebt)
-  b.box(2 * R + 1.0, 2.0, 2 * R + 1.0, 0, -1.7, 0, mul(ST, .7));
-  b.box(2 * R + .9, .12, 2 * R + .9, 0, y0 - .12, 0, mul(ST, .9));
-  b.box(2 * R - .2, .05, 2 * R - .2, 0, y0 - .03, 0, [126, 112, 82]);
+  b.box(2 * R + 1.1, 2.0, 2 * R + 1.1, 0, -1.7, 0, mul(ST, .66));
+  b.box(2 * R + .95, .14, 2 * R + .95, 0, y0 - .14, 0, mul(ST, .88));
+  b.box(2 * R - .2, .05, 2 * R - .2, 0, y0 - .03, 0, [122, 110, 80]);
+  for (let i = 0; i < 9; i++) b.box(.5, .02, .4, -R + .4 + hash(i, 4, v) * (2 * R - .8), y0 + .02, -R + .5 + hash(i, 9, v) * (2 * R - .9), [150 + hash(i, 1, v) * 20, 134, 100], hash(i, 2, v) * 3);   // Pflaster
   // Mauern
-  const gw = L === 3 ? 1.0 : .8;
-  b.box(2 * R, wallH, wd, 0, y0, -R, STD); b.box(wd, wallH, 2 * R, -R, y0, 0, STD); b.box(wd, wallH, 2 * R, R, y0, 0, ST);
-  b.box(R - gw / 2, wallH, wd, -(R + gw / 2) / 2, y0, R, ST); b.box(R - gw / 2, wallH, wd, (R + gw / 2) / 2, y0, R, ST);
+  const gw = L === 3 ? 1.05 : .85;
+  wallSeg(b, -R, -R, R, -R, y0, wallH, wd, STD); wallSeg(b, -R, -R, -R, R, y0, wallH, wd, STD); wallSeg(b, R, -R, R, R, y0, wallH, wd, ST);
+  wallSeg(b, -R, R, -gw / 2, R, y0, wallH, wd, ST); wallSeg(b, gw / 2, R, R, R, y0, wallH, wd, ST);
   crenels(b, -R, -R, R, -R, y0 + wallH, STD); crenels(b, -R, -R, -R, R, y0 + wallH, STD); crenels(b, R, -R, R, R, y0 + wallH, ST);
   crenels(b, -R, R, -gw / 2, R, y0 + wallH, ST); crenels(b, gw / 2, R, R, R, y0 + wallH, ST);
-  // Torhaus
-  b.box(gw + .6, wallH + .5, wd + .5, 0, y0, R, [190, 180, 160]);
-  b.box(gw * .66, wallH * .85, wd + .56, 0, y0, R, [30, 24, 20]);
-  b.pyr(gw + .85, wd + .75, .55, 0, y0 + wallH + .5, R, roofC);
+  // Strebepfeiler an der Rückwand ab Stufe 2
+  if (tier >= 2) for (const u of [-.5, .5]) { b.box(.22, wallH * .9, .26, u * R, y0, -R - .2, mul(STD, .92)); b.box(.22, wallH * .9, .26, -R - .2, y0, u * R, mul(STD, .92), Math.PI / 2); }
+  // Torhaus mit Fallgitter, Zugbrücke, Fackeln
+  b.box(gw + .7, wallH + .55, wd + .55, 0, y0, R, mul(ST, 1.06)); b.box(gw + .76, .07, wd + .6, 0, y0 + wallH * .55, R, mul(ST, 1.14));
+  b.box(gw * .7, wallH * .86, wd + .6, 0, y0, R, DARK);
+  for (let i = -2; i <= 2; i++) b.box(.03, wallH * .78, .03, i * gw * .14, y0 + wallH * .07, R + wd / 2 + .3, [70, 60, 56]);
+  b.box(gw * .7, .03, .03, 0, y0 + wallH * .55, R + wd / 2 + .3, [70, 60, 56]);
+  b.box(gw * .85, .06, 1.15, 0, y0 - .04, R + .85, WOOD, 0, -.12);
+  b.cyl(.015, .015, .75, 4, -gw * .42, y0 + .14, R + .5, [70, 66, 60]); b.cyl(.015, .015, .75, 4, gw * .42, y0 + .14, R + .5, [70, 66, 60]);
+  for (const sx of [-1, 1]) { b.cyl(.02, .02, .4, 5, sx * (gw / 2 + .45), y0 + .35, R + .3, WOOD_D); b.cone(.07, .14, 6, sx * (gw / 2 + .45), y0 + .75, R + .3, LIGHT); }
+  b.gable(gw + .95, wd + .8, .6, 0, y0 + wallH + .55, R, roofC);
+  b.box(.34, .42, .03, -gw / 2 - .85, y0 + wallH * .25, R + wd / 2 + .02, mul(roofC, 1.05)); b.box(.34, .42, .03, gw / 2 + .85, y0 + wallH * .25, R + wd / 2 + .02, mul(roofC, 1.05));   // Banner am Tor
   // Türme
   const tr = [.42, .5, .58][t], tH = wallH + [.7, 1.0, 1.35][t] + (L === 4 ? .5 : 0), rf = [.95, 1.15, 1.4][t];
   tower(b, -R, -R, y0, tr, tH + (L === 4 ? .6 : 0), rf, roofC, ST, flags);
   tower(b, R, -R, y0, tr, tH + (L === 1 ? -.3 : 0), rf, roofC, ST, null);
   tower(b, -R, R, y0, tr, tH, rf, roofC, ST, null);
   tower(b, R, R, y0, tr * 1.08, tH + .25, rf * 1.05, roofC, ST, flags);
-  if (tier >= 2) { tower(b, 0, -R, y0, tr * .8, wallH + .55, rf * .8, roofC, ST, null); tower(b, -R, 0, y0, tr * .8, wallH + .55, rf * .8, roofC, ST, null); tower(b, R, 0, y0, tr * .8, wallH + .55, rf * .8, roofC, ST, null); }
-  if (tier >= 3) { tower(b, -R * .5, R, y0, tr * .7, wallH + .45, rf * .7, roofC, ST, null); tower(b, R, R * .5, y0, tr * .7, wallH + .45, rf * .7, roofC, ST, null); }
+  if (tier >= 2) { for (const [x, z] of [[0, -R], [-R, 0], [R, 0]]) tower(b, x, z, y0, tr * .8, wallH + .55, rf * .8, roofC, ST, null, false); }
+  if (tier >= 3) { tower(b, -R * .5, R, y0, tr * .7, wallH + .45, rf * .7, roofC, ST, null, false); tower(b, R, R * .5, y0, tr * .7, wallH + .45, rf * .7, roofC, ST, null, false); }
   // Burgfried
   const ks = [1.15, 1.5, 1.9][t] * (L === 1 ? 1.15 : 1), kh = [1.5, 2.1, 2.8][t] + (L === 2 ? .4 : 0), ky = y0;
-  b.box(ks, kh, ks, 0, ky, 0, PLASTER); b.box(ks + .1, .14, ks + .1, 0, ky + kh - .07, 0, mul(ST, 1.05));
-  for (let i = 0; i < (tier === 1 ? 1 : 2); i++) { const o = -ks / 2 + ks * (.3 + i * .4); b.box(.16, .3, .06, o, ky + kh * .6, ks / 2 + .02, [34, 30, 36]); b.box(.06, .3, .16, ks / 2 + .02, ky + kh * .6, o, [34, 30, 36]); }
-  b.box(.3, .5, .06, 0, ky, ks / 2 + .02, [64, 44, 28]);
-  let top = ky + kh, rw = ks;
-  if (tier >= 2) { const uw = ks * .72, uh = .55 + .2 * tier; b.box(uw, uh, uw, 0, top, 0, PLASTER); b.box(uw + .1, .12, uw + .1, 0, top + uh - .06, 0, mul(ST, 1.05)); top += uh; rw = uw; }
-  if (L === 2) { b.cone(rw * .82, 1.2 + t * .35, 12, 0, top, 0, roofC); top += 1.2 + t * .35; }
-  else if (L === 1) { crenels(b, -rw / 2, -rw / 2, rw / 2, -rw / 2, top, ST, .35); crenels(b, rw / 2, -rw / 2, rw / 2, rw / 2, top, ST, .35); crenels(b, -rw / 2, rw / 2, rw / 2, rw / 2, top, ST, .35); crenels(b, -rw / 2, -rw / 2, -rw / 2, rw / 2, top, ST, .35); b.pyr(rw * .6, rw * .6, .7, 0, top, 0, roofC); top += .7; }
-  else { const rh = [.95, 1.2, 1.5][t] * (L === 3 ? 1.2 : 1); b.pyr(rw * 1.18, rw * 1.18, rh, 0, top, 0, roofC); top += rh; }
-  b.cyl(.03, .03, .9, 5, 0, top - .05, 0, [60, 44, 30]); flags.push([0, top + .75, 0]);
-  // Häuser im Hof
-  if (tier >= 2 || L >= 3) house(b, -R + .75, .35, y0, .6, .75, .4, mul(roofC, .85));
-  if (tier >= 3 || (L === 3 && tier >= 2)) house(b, R - .85, .55, y0, .65, .6, .38, mul(roofC, .75));
-  if (L === 0 && tier === 1) house(b, -R + .7, -.1, y0, .55, .55, .35, roofC);
-  return { geo: b.build(), flags, h: top + 1 };
+  b.box(ks + .12, .22, ks + .12, 0, ky, 0, mul(ST, .8)); b.box(ks, kh, ks, 0, ky + .22, 0, PLASTER); b.box(ks + .08, .07, ks + .08, 0, ky + kh * .5, 0, mul(ST, 1.1));
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.box(.13, kh, .13, sx * ks / 2, ky + .22, sz * ks / 2, mul(ST, 1.02));   // Ecksteine
+  for (let r = 0; r < (tier === 1 ? 1 : 2); r++) for (let i = 0; i < (tier === 1 ? 1 : 2); i++) {
+    const o = -ks / 2 + ks * (.3 + i * .4), wy = ky + kh * (.62 - r * .3);
+    b.box(.2, .36, .05, o, wy, ks / 2 + .02, mul(ST, 1.1)); b.box(.13, .3, .06, o, wy + .03, ks / 2 + .03, DARK); b.box(.09, .22, .06, o, wy + .05, ks / 2 + .035, LIGHT);
+    b.box(.05, .36, .2, ks / 2 + .02, wy, o, mul(ST, 1.1)); b.box(.06, .3, .13, ks / 2 + .03, wy + .03, o, DARK); b.box(.06, .22, .09, ks / 2 + .035, wy + .05, o, LIGHT);
+  }
+  b.box(.34, .52, .06, 0, ky + .22, ks / 2 + .02, WOOD_D); b.box(.4, .08, .08, 0, ky + .74, ks / 2 + .03, mul(ST, 1.1));
+  let top = ky + kh + .22, rw = ks;
+  b.box(ks + .22, .16, ks + .22, 0, top - .08, 0, mul(ST, 1.08));                                  // Kranzgesims
+  if (tier >= 2) { const uw = ks * .72, uh = .55 + .2 * tier; b.box(uw, uh, uw, 0, top, 0, PLASTER); b.box(.18, .3, .05, 0, top + uh * .35, uw / 2 + .02, DARK); b.box(.05, .3, .18, uw / 2 + .02, top + uh * .35, 0, DARK); b.box(uw + .12, .1, uw + .12, 0, top + uh - .04, 0, mul(ST, 1.08)); top += uh; rw = uw; }
+  if (L === 2) { b.cone(rw * .95, .5, 12, 0, top, 0, mul(roofC, .9)); b.cone(rw * .8, 1.2 + t * .35, 12, 0, top + .1, 0, roofC); top += 1.3 + t * .35; }
+  else if (L === 1) {
+    crenels(b, -rw / 2, -rw / 2, rw / 2, -rw / 2, top, ST, .35); crenels(b, rw / 2, -rw / 2, rw / 2, rw / 2, top, ST, .35); crenels(b, -rw / 2, rw / 2, rw / 2, rw / 2, top, ST, .35); crenels(b, -rw / 2, -rw / 2, -rw / 2, rw / 2, top, ST, .35);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { b.cyl(.12, .13, .5, 8, sx * rw / 2, top, sz * rw / 2, ST); b.cone(.17, .3, 8, sx * rw / 2, top + .5, sz * rw / 2, roofC); }
+    b.pyr(rw * .6, rw * .6, .7, 0, top, 0, roofC); top += .7;
+  } else {
+    const rh = [.95, 1.2, 1.5][t] * (L === 3 ? 1.2 : 1); b.pyr(rw * 1.2, rw * 1.2, rh, 0, top, 0, roofC); b.box(rw * 1.22, .08, rw * 1.22, 0, top - .04, 0, mul(roofC, .85)); top += rh;
+    if (L === 4 || tier === 3) b.gable(rw * .5, rw * .4, .45, 0, top - rh * .65, rw * .5, mul(roofC, 1.08), Math.PI / 2);   // Dachgaube
+  }
+  b.cyl(.025, .025, .9, 5, 0, top - .05, 0, WOOD_D); b.sph(.06, 0, top + .85, 0, GOLD, 6); flags.push([0, top + .75, 0]);
+  smoke.push([rw * .22, top - .5, rw * .15]); b.box(.14, .4, .14, rw * .22, top - .8, rw * .15, STONE_D);
+  // Hof: Häuser, Brunnen, Stände, Übungspuppe, Fässer
+  if (tier >= 2 || L >= 3) house(b, -R + .75, .45, y0, .62, .78, .42, mul(roofC, .85));
+  if (tier >= 3 || (L === 3 && tier >= 2)) house(b, R - .9, .6, y0, .68, .62, .4, mul(roofC, .75), .1);
+  if (L === 0 && tier === 1) house(b, -R + .7, -.1, y0, .55, .55, .36, roofC);
+  well(b, R * .35, R * .55, y0);
+  crate(b, -R * .25, R * .78, y0, .22, .3); crate(b, -R * .25 + .22, R * .78 + .04, y0, .18, -.2); barrel(b, -R * .25 + .1, R * .78 - .24, y0); barrel(b, R * .62, -R * .25, y0);
+  if (tier >= 2) { b.cyl(.025, .025, .5, 5, -R * .4, y0, R * .25, WOOD_D); b.box(.3, .05, .05, -R * .4, y0 + .38, R * .25, WOOD_D); b.box(.12, .18, .1, -R * .4, y0 + .22, R * .25, [180, 150, 100]); }
+  if (tier >= 3) { b.box(.8, .05, .45, R * .45, y0 + .36, -R * .55, mul(roofC, .95)); for (const [dx, dz] of [[-.36, -.2], [.36, -.2], [-.36, .2], [.36, .2]]) b.box(.03, .36, .03, R * .45 + dx, y0, -R * .55 + dz, WOOD_D); b.box(.5, .08, .25, R * .45, y0 + .28, -R * .55, WOOD); }
+  return { geo: b.build(), flags, h: top + 1, smoke };
 }
 
 function buildSlot() {
   const b = new MB();
   b.cyl(1.0, 1.1, .16, 12, 0, 0, 0, [140, 132, 116]); b.cyl(.6, .65, .1, 10, 0, .16, 0, [118, 104, 78]);
   b.cyl(.04, .04, 1.1, 5, 0, .2, 0, WOOD); b.box(.5, .24, .05, 0, .8, 0, [150, 112, 70]);
+  for (let i = 0; i < 5; i++) { const a = i / 5 * 6.28; b.box(.1, .22 + hash(i, 2) * .2, .1, Math.cos(a) * .85, .12, Math.sin(a) * .85, [150, 144, 128], a); }
   return { geo: b.build(), flags: [], h: 1.3 };
 }
 function buildThrone() {
-  const b = new MB(), G0 = [226, 188, 84], S = [196, 188, 168];
-  b.cyl(3.1, 3.4, 1.4, 16, 0, -1.2, 0, mul(S, .7));
-  b.cyl(2.9, 3.0, .28, 16, 0, .0, 0, S); b.cyl(2.3, 2.4, .28, 16, 0, .28, 0, mul(S, 1.06)); b.cyl(1.7, 1.8, .28, 16, 0, .56, 0, mul(S, 1.1));
-  for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832; b.cyl(.2, .22, 2.3, 8, Math.cos(a) * 2.05, .84, Math.sin(a) * 2.05, [214, 208, 190]); b.cyl(.3, .24, .16, 8, Math.cos(a) * 2.05, 3.08, Math.sin(a) * 2.05, G0); }
-  b.cyl(2.35, 2.35, .16, 16, 0, 3.24, 0, G0); b.cone(1.9, 1.2, 16, 0, 3.4, 0, [196, 150, 52]);
-  b.box(.9, .22, .9, 0, .84, 0, S); b.box(.7, .4, .7, 0, 1.06, 0, G0); b.box(.7, 1.0, .18, 0, 1.2, -.3, G0); b.box(.14, .5, .5, -.32, 1.06, .0, G0); b.box(.14, .5, .5, .32, 1.06, 0, G0);
-  b.cyl(.04, .04, 1.2, 5, 0, 4.6, 0, [60, 44, 30]);
-  return { geo: b.build(), flags: [[0, 5.5, 0]], h: 5.2 };
+  const b = new MB(), S = [196, 188, 168], parts = [], RED = [150, 36, 40];
+  b.cyl(3.1, 3.4, 1.4, 20, 0, -1.2, 0, mul(S, .7));
+  b.cyl(2.9, 3.0, .28, 20, 0, .0, 0, S); b.cyl(2.3, 2.4, .28, 20, 0, .28, 0, mul(S, 1.06)); b.cyl(1.7, 1.8, .28, 20, 0, .56, 0, mul(S, 1.1));
+  b.box(.9, .04, 3.0, 0, .86, 1.4, RED);                                                         // roter Teppich
+  for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832; b.cyl(.2, .24, 2.3, 10, Math.cos(a) * 2.05, .84, Math.sin(a) * 2.05, [218, 212, 194]); b.cyl(.3, .26, .16, 10, Math.cos(a) * 2.05, 3.08, Math.sin(a) * 2.05, GOLD); b.cyl(.27, .27, .1, 10, Math.cos(a) * 2.05, .84, Math.sin(a) * 2.05, mul(S, .9)); }
+  b.cyl(2.35, 2.35, .16, 20, 0, 3.24, 0, GOLD);
+  for (let i = 0; i < 8; i++) { const a = (i + .5) / 8 * 6.2832; b.box(.7, .9, .08, Math.cos(a) * 2.05, 2.5, Math.sin(a) * 2.05, [140, 30, 36], -a + Math.PI / 2); }   // Behänge
+  b.cone(1.9, .5, 20, 0, 3.4, 0, [196, 150, 52]); b.cone(1.4, 1.1, 20, 0, 3.7, 0, [214, 170, 62]); b.sph(.12, 0, 4.85, 0, GOLD, 6);
+  b.box(.9, .22, .9, 0, .84, 0, S); b.box(.75, .42, .75, 0, 1.06, 0, GOLD); b.box(.75, 1.1, .18, 0, 1.2, -.32, GOLD); b.box(.16, .55, .55, -.34, 1.06, 0, GOLD); b.box(.16, .55, .55, .34, 1.06, 0, GOLD); b.box(.5, .12, .5, 0, 1.48, .05, RED);
+  b.cyl(.04, .04, 1.2, 5, 0, 4.9, 0, WOOD_D);
+  for (const [x, z] of [[-1.4, 2.2], [1.4, 2.2]]) { b.cyl(.14, .18, .5, 8, x, .84, z, IRON); parts.push({ k: 'flame', pos: [x, 1.45, z], s: 1.1 }); }
+  return { geo: b.build(), flags: [[0, 5.5, 0]], h: 5.2, parts, smoke: [[-1.4, 1.8, 2.2], [1.4, 1.8, 2.2]] };
 }
 function buildSanct() {
-  const b = new MB();
-  b.cyl(2.0, 2.3, 1.0, 14, 0, -.8, 0, [150, 146, 134]); b.cyl(1.9, 2.0, .2, 14, 0, 0, 0, [214, 210, 196]); b.cyl(1.4, 1.5, .2, 14, 0, .2, 0, [226, 222, 208]);
-  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832; b.cyl(.14, .17, 1.6, 8, Math.cos(a) * 1.3, .4, Math.sin(a) * 1.3, [228, 224, 212]); b.box(.4, .12, .4, Math.cos(a) * 1.3, 2.0, Math.sin(a) * 1.3, [200, 196, 180]); }
-  b.cone(1.7, .55, 6, 0, 2.12, 0, [120, 150, 190]);
-  return { geo: b.build(), flags: [], h: 3, glow: true };
+  const b = new MB(), parts = [];
+  b.cyl(2.0, 2.3, 1.0, 16, 0, -.8, 0, [150, 146, 134]); b.cyl(1.9, 2.0, .2, 16, 0, 0, 0, [214, 210, 196]); b.cyl(1.4, 1.5, .2, 16, 0, .2, 0, [226, 222, 208]); b.cyl(.6, .75, .35, 12, 0, .4, 0, [200, 200, 190]);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832, x = Math.cos(a) * 1.3, z = Math.sin(a) * 1.3; b.cyl(.16, .19, 1.6, 8, x, .4, z, [230, 226, 214]); b.box(.42, .12, .42, x, 2.0, z, [204, 200, 184], -a); b.box(.36, .1, .36, x, .4, z, [190, 186, 172], -a); b.box(.05, .5, .02, x + Math.cos(a) * .17, 1.1, z + Math.sin(a) * .17, [140, 200, 235], -a + Math.PI / 2); }
+  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832, a2 = (i + 1) / 6 * 6.2832; b.box(1.35, .1, .16, (Math.cos(a) + Math.cos(a2)) * .65, 2.08, (Math.sin(a) + Math.sin(a2)) * .65, [204, 200, 184], -(a + a2) / 2 - Math.PI / 2); }
+  b.cone(1.7, .5, 12, 0, 2.15, 0, [120, 150, 190]);
+  return { geo: b.build(), flags: [], h: 3, glow: true, parts };
 }
 function buildFarm(lv) {
-  const b = new MB(), cols = [[214, 178, 64], [196, 160, 56], [138, 160, 62]];
+  const b = new MB(), cols = [[214, 178, 64], [196, 160, 56], [138, 160, 62]], parts = [];
   [[-1.1, -.9, 1.7, 1.2], [.7, -1.1, 1.5, 1.1], [-.9, .6, 1.7, 1.1]].forEach(([x, z, w, d], k) => {
-    b.box(w, .06, d, x, 0, z, mul(cols[k], .62));
-    for (let i = 0; i < 7; i++) b.box(w * .09, .1, d * .86, x - w / 2 + w * (i + .5) / 7, .05, z, mul(cols[k], .95 + (i % 2) * .25));
+    b.box(w, .06, d, x, 0, z, mul(cols[k], .6));
+    for (let i = 0; i < 8; i++) { b.box(w * .08, .09, d * .86, x - w / 2 + w * (i + .5) / 8, .05, z, mul(cols[k], .95 + (i % 2) * .25)); if (k < 2) for (let j = 0; j < 3; j++) b.cone(.03, .12, 4, x - w / 2 + w * (i + .5) / 8, .12, z - d * .3 + j * d * .3, [230, 196, 90]); }
+    for (let i = 0; i <= 4; i++) b.box(.04, .22, .04, x - w / 2 + w * i / 4, 0, z + d / 2 + .04, WOOD_D);      // Zaun
+    b.box(w, .04, .03, x, .16, z + d / 2 + .04, WOOD);
   });
-  b.box(1.05, .8, .85, 1.0, 0, .75, WOOD); b.pyr(1.3, 1.1, .6, 1.0, .8, .75, [150, 70, 50]); b.box(.3, .5, .05, 1.0, 0, 1.19, [60, 40, 24]);
-  b.cyl(.2, .2, .26, 8, .0, 0, 1.4, [204, 170, 72]); b.cyl(.2, .2, .26, 8, -.5, 0, 1.5, [204, 170, 72]);
-  return { geo: b.build(), flags: [], h: 1.6 };
+  b.box(1.05, .8, .85, 1.0, 0, .75, WOOD); b.gable(1.35, 1.1, .6, 1.0, .8, .75, [150, 70, 50], Math.PI / 2); b.box(.3, .5, .05, 1.0, 0, 1.19, WOOD_D); b.box(.55, .3, .05, 1.0, .5, 1.19, WOOD_D);
+  b.cyl(.28, .3, .8, 10, 1.9, 0, -.2, [196, 190, 176]); b.cone(.34, .35, 10, 1.9, .8, -.2, [150, 70, 50]);                      // Silo
+  b.cyl(.2, .2, .26, 8, .0, 0, 1.4, [204, 170, 72]); b.cyl(.2, .2, .26, 8, -.5, 0, 1.5, [204, 170, 72]); b.cone(.26, .45, 8, -1.4, 0, 1.55, [214, 180, 80]);
+  b.cyl(.025, .025, .6, 4, .5, 0, 1.6, WOOD_D); b.box(.4, .04, .04, .5, .45, 1.6, WOOD_D); b.sph(.07, .5, .68, 1.6, [190, 160, 90], 6); b.cone(.1, .12, 6, .5, .72, 1.6, [60, 50, 40]);   // Vogelscheuche
+  return { geo: b.build(), flags: [], h: 1.6, parts, smoke: [] };
 }
 function buildWood(lv) {
-  const b = new MB(), LOG = [140, 96, 56];
-  b.box(1.2, .75, 1.0, -.2, 0, -.7, [132, 94, 58]); b.pyr(1.5, 1.3, .6, -.2, .75, -.7, [92, 70, 44]); b.box(.3, .5, .05, -.2, 0, -.18, [50, 34, 22]);
-  for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) b.push(new T.CylinderGeometry(.13, .13, 1.1, 7), LOG, .7 + i * .26 + r * .13, .14 + r * .24, .9, 0, 1, 1, 1, 0, Math.PI / 2);
+  const b = new MB(), LOGC = [140, 96, 56];
+  b.box(1.2, .75, 1.0, -.2, 0, -.7, [132, 94, 58]); b.gable(1.55, 1.3, .62, -.2, .75, -.7, [92, 70, 44], Math.PI / 2); b.box(.3, .5, .05, -.2, 0, -.18, WOOD_D); b.box(.14, .14, .05, .2, .4, -.18, LIGHT); b.box(.1, .3, .1, .2, .75, -1.0, STONE_D);
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) b.push(new T.CylinderGeometry(.13, .13, 1.1, 7), LOGC, .7 + i * .26 + r * .13, .14 + r * .24, .9, 0, 1, 1, 1, 0, Math.PI / 2);
   for (const [x, z] of [[-1.2, .3], [-.8, 1.0], [-1.5, 1.0]]) { b.cyl(.16, .18, .22, 7, x, 0, z, [106, 74, 44]); b.cyl(.14, .14, .03, 7, x, .22, z, [216, 182, 130]); }
-  return { geo: b.build(), flags: [], h: 1.5 };
+  b.box(.04, .5, .5, 1.2, 0, .1, WOOD_D, 0, 0, .3); b.box(.04, .5, .5, 1.5, 0, .1, WOOD_D, 0, 0, -.3);
+  b.cyl(.03, .03, .9, 5, 1.1, .1, -.5, WOOD_D); b.box(.3, .05, .12, 1.1, .85, -.5, IRON); b.box(.06, .05, .5, 1.1, .1, -.5, WOOD_D, .5);                              // Axt im Klotz
+  return { geo: b.build(), flags: [], h: 1.5, smoke: [[-.1, 1.2, -1.0]] };
 }
 function buildStone(lv) {
   const b = new MB();
   for (let i = 0; i < 4; i++) { const s = 2.2 - i * .5; b.box(s, .22, s * .9, -.2, i * .22, 0, mul([168, 162, 148], 1 - i * .08)); }
   for (const [x, z, w, d, h] of [[1.2, -.9, .6, .5, .5], [1.4, -.2, .5, .5, .4], [-1.6, .9, .6, .5, .5], [-1.2, 1.3, .5, .4, .35]]) b.box(w, h, d, x, 0, z, [192, 186, 172]);
-  b.cyl(.06, .06, 1.7, 5, -.4, 0, 1.2, [90, 66, 40]); b.box(1.2, .07, .07, .1, 1.6, 1.2, [90, 66, 40]); b.box(.28, .22, .28, .6, 1.2, 1.2, [170, 164, 148]);
-  return { geo: b.build(), flags: [], h: 1.8 };
+  b.cyl(.06, .06, 1.9, 5, -.4, 0, 1.2, WOOD_D); b.box(1.5, .08, .08, .3, 1.8, 1.2, WOOD_D); b.box(.3, .08, .08, -.55, 1.8, 1.2, WOOD_D, 0, 0, .5); b.cyl(.012, .012, .5, 4, .9, 1.3, 1.2, [200, 180, 140]); b.box(.28, .22, .28, .9, 1.08, 1.2, [170, 164, 148]);
+  b.box(.3, .18, .3, -1.7, 0, -.4, [196, 190, 176]); b.ico(.16, -1.7, .28, -.4, [210, 204, 190], 1.1);                                                                          // Rohling
+  b.box(.45, .2, .3, -.8, 0, -1.2, [74, 58, 44]); b.cyl(.08, .08, .06, 8, -.95, .02, -1.05, [30, 30, 30], 0); b.cyl(.08, .08, .06, 8, -.65, .02, -1.05, [30, 30, 30], 0);
+  return { geo: b.build(), flags: [], h: 1.9 };
 }
 function buildOre(lv) {
   const b = new MB();
   b.ico(1.3, -.1, .45, -.1, [104, 98, 90], .8, 1.1, .3); b.ico(.95, .9, .35, -.5, [118, 110, 100], .8, 1, .9); b.ico(.8, -.9, .3, .6, [92, 88, 82], .8, 1, 1.4); b.ico(.7, .5, .3, .7, [110, 104, 94], .75, 1, .2);
   b.box(.7, .8, .3, .0, 0, 1.02, [14, 12, 10]); b.box(.12, .86, .12, -.42, 0, 1.06, WOOD); b.box(.12, .86, .12, .42, 0, 1.06, WOOD); b.box(.98, .12, .14, 0, .84, 1.06, WOOD);
   for (let i = 0; i < 5; i++) b.ico(.09, -.5 + i * .4, .72 + (i % 2) * .26, .45 + i * .07, [[232, 190, 90], [120, 190, 230], [236, 210, 130]][i % 3], 1.3);
-  b.box(.5, .26, .34, 1.4, .1, 1.0, [74, 58, 44]); b.cyl(.1, .1, .08, 8, 1.25, 0, 1.0, [30, 30, 30]);
+  b.box(.06, .03, 1.2, -.14, 0, 1.45, IRON); b.box(.06, .03, 1.2, .14, 0, 1.45, IRON); for (let i = 0; i < 5; i++) b.box(.4, .03, .05, 0, 0, 1.0 + i * .26, WOOD_D);
+  b.box(.5, .26, .34, .0, .08, 1.9, [74, 58, 44]); b.cyl(.09, .09, .06, 8, -.15, 0, 1.75, [30, 30, 30], 0); b.cyl(.09, .09, .06, 8, .15, 0, 1.75, [30, 30, 30], 0);
+  for (let i = 0; i < 4; i++) b.ico(.07, -.12 + i * .08, .42, 1.9, [232, 190, 90], 1);
+  b.cyl(.01, .01, .3, 4, .55, .5, .95, IRON); b.box(.1, .12, .1, .55, .38, .95, LIGHT);
   return { geo: b.build(), flags: [], h: 1.5 };
 }
 function buildCamp(dead) {
-  const b = new MB(), TC = [[150, 60, 48], [134, 98, 60], [100, 78, 60]];
+  const b = new MB(), TC = [[150, 60, 48], [134, 98, 60], [100, 78, 60]], parts = [];
   if (!dead) {
-    [[-.9, -.4, .0], [.8, -.6, .5], [.1, .8, 1.1]].forEach(([x, z, ry], i) => { b.push(new T.ConeGeometry(.75, 1.1, 4, 1), TC[i], x, .55, z, ry); });
-    for (let i = 0; i < 22; i++) { const a = i / 22 * 6.2832; const x = Math.cos(a) * 1.9, z = Math.sin(a) * 1.9; b.cone(.07, .6 + hash(i, 3) * .22, 5, x, 0, z, [112, 78, 46]); }
-    b.cyl(.03, .03, 1.5, 5, 1.3, 0, 1.1, [60, 44, 30]); b.sph(.1, 1.3, 1.5, 1.1, [230, 226, 214], 6);
-    b.cyl(.22, .26, .08, 8, .0, 0, .0, [48, 44, 40]);
+    [[-.95, -.45, .0], [.9, -.6, .5], [.15, .9, 1.1]].forEach(([x, z, ry], i) => { b.push(new T.ConeGeometry(.78, 1.15, 4, 1), TC[i], x, .57, z, ry); b.push(new T.ConeGeometry(.79, .3, 4, 1), mul(TC[i], .65), x, .2, z, ry); b.box(.2, .5, .04, x + Math.sin(ry) * .45, 0, z + Math.cos(ry) * .45, [30, 24, 20], ry); });
+    for (let i = 0; i < 24; i++) { const a = i / 24 * 6.2832, x = Math.cos(a) * 2.0, z = Math.sin(a) * 2.0; if (Math.abs(a - 1.2) < .25) continue; b.cone(.075, .62 + hash(i, 3) * .24, 5, x, 0, z, [112, 78, 46]); }
+    b.box(.05, .6, .05, 1.35, 0, 1.2, WOOD_D); b.cyl(.025, .025, 1.7, 5, 1.35, 0, 1.2, WOOD_D); b.cyl(.06, .06, .14, 6, 1.35, 1.7, 1.2, [230, 226, 214]); b.sph(.1, 1.35, 1.85, 1.2, [230, 226, 214], 6);
+    // Wachturm
+    for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.box(.06, 1.4, .06, -1.55 + dx * .3, 0, -1.3 + dz * .3, WOOD_D); b.box(.8, .08, .8, -1.55, 1.4, -1.3, WOOD); b.gable(1.0, .95, .38, -1.55, 1.9, -1.3, [96, 74, 50], Math.PI / 2);
+    for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.box(.04, .5, .04, -1.55 + dx * .38, 1.42, -1.3 + dz * .38, WOOD_D);
+    crate(b, .75, .35, 0, .26, .3); crate(b, 1.05, .5, 0, .2, -.2); barrel(b, .5, 1.0, 0); barrel(b, 1.0, 1.1, 0); b.box(.7, .06, .26, 0, .05, -.1, [70, 58, 44], .5);    // Kisten, Fässer, Holzscheite
+    b.cyl(.28, .32, .08, 10, .0, 0, .15, [58, 54, 50]); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; b.ico(.07, Math.cos(a) * .3, .06, .15 + Math.sin(a) * .3, [96, 92, 86], .8); }
+    parts.push({ k: 'flame', pos: [0, .22, .15], s: 1 });
   } else {
-    [[-.9, -.4], [.8, -.6], [.1, .8]].forEach(([x, z], i) => { b.cyl(.7, .75, .06, 7, x, 0, z, [48, 44, 40]); for (let k = 0; k < 3; k++) b.box(.05, .7 - k * .15, .05, x + (k - 1) * .3, 0, z, [54, 42, 34]); });
+    [[-.95, -.45], [.9, -.6], [.15, .9]].forEach(([x, z], i) => { b.cyl(.7, .75, .06, 7, x, 0, z, [48, 44, 40]); for (let k = 0; k < 3; k++) b.box(.05, .7 - k * .15, .05, x + (k - 1) * .3, 0, z, [54, 42, 34], 0, .1 * k, .2 * (k - 1)); });
+    for (let i = 0; i < 8; i++) b.box(.4, .04, .06, -.3 + hash(i, 1) * 1.5, .02, -.5 + hash(i, 2) * 1.4, [40, 34, 30], hash(i, 3) * 3);
   }
-  return { geo: b.build(), flags: [], h: 1.6 };
+  return { geo: b.build(), flags: [], h: 1.9, parts, smoke: dead ? [] : [[0, .6, .15]] };
 }
 function buildRuin(dead) {
   const b = new MB(), S = dead ? [118, 114, 100] : [152, 146, 128];
-  for (const [x, z, w, d, h, ry] of [[-.9, -.3, 1.6, .3, 1.1, .1], [.6, -.9, .3, 1.5, .8, 0], [-.2, .8, 1.2, .3, .5, -.15], [1.2, .5, .5, .5, 1.3, 0]]) b.box(w, h, d, x, 0, z, S, ry);
-  b.cyl(.2, .22, 1.4, 7, -1.5, 0, .7, [170, 164, 146]); b.cyl(.2, .22, .6, 7, 1.4, 0, -.6, [160, 154, 138]);
-  for (let i = 0; i < 9; i++) b.ico(.12 + hash(i, 5) * .1, -1 + hash(i, 1) * 2.2, .08, -.9 + hash(i, 2) * 2, mul(S, .85), .7);
-  b.sph(.5, .0, .2, .0, [80, 112, 60], 6, .5);
-  return { geo: b.build(), flags: [], h: 1.4 };
+  for (const [x, z, w, d, h, ry] of [[-.9, -.3, 1.6, .3, 1.1, .1], [.6, -.9, .3, 1.5, .8, 0], [-.2, .8, 1.2, .3, .5, -.15], [1.2, .5, .5, .5, 1.3, 0]]) { b.box(w, h, d, x, 0, z, S, ry); b.box(w * .5, .22, d + .04, x - w * .1, h, z, S, ry); }
+  b.cyl(.2, .22, 1.4, 8, -1.5, 0, .7, [170, 164, 146]); b.cyl(.2, .22, .6, 8, 1.4, 0, -.6, [160, 154, 138]); b.cyl(.28, .26, .1, 8, -1.5, 1.4, .7, [182, 176, 158]);
+  b.push(new T.CylinderGeometry(.18, .2, 1.1, 8), [166, 160, 142], .2, .12, -1.5, 0, 1, 1, 1, 0, Math.PI / 2);
+  for (let i = 0; i < 12; i++) b.ico(.12 + hash(i, 5) * .1, -1 + hash(i, 1) * 2.4, .08, -.9 + hash(i, 2) * 2.2, mul(S, .85), .7);
+  b.sph(.5, .0, .2, .0, [80, 112, 60], 6, .5); b.sph(.32, -.9, .55, -.3, [74, 108, 56], 6, .6); b.sph(.3, 1.2, 1.1, .5, [70, 104, 54], 6, .5);
+  if (!dead) { b.box(.5, .28, .34, .1, 0, .3, [120, 84, 52]); b.box(.52, .05, .36, .1, .28, .3, GOLD); }
+  return { geo: b.build(), flags: [], h: 1.5 };
 }
 function buildOutpost() {
   const b = new MB(), flags = [], S = [158, 150, 134];
-  b.cyl(1.0, 1.15, 1.6, 10, 0, -1.3, 0, mul(S, .75)); b.cyl(.62, .78, 2.5, 10, 0, .3, 0, S); b.cyl(.85, .85, .2, 10, 0, 2.7, 0, mul(S, 1.05));
-  for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832; b.box(.2, .22, .16, Math.cos(a) * .8, 2.9, Math.sin(a) * .8, S, -(a + Math.PI / 2)); }
-  b.box(.34, .6, .12, 0, .3, .77, [60, 40, 26]); b.box(.12, .3, .2, .55, 1.6, 0, [30, 26, 24]);
-  b.cyl(.03, .03, 1.2, 5, 0, 2.9, 0, [60, 44, 30]); flags.push([0, 3.85, 0]);
-  return { geo: b.build(), flags, h: 4.2 };
+  b.cyl(1.05, 1.2, 1.7, 12, 0, -1.4, 0, mul(S, .72)); b.cyl(.62, .8, 2.5, 12, 0, .3, 0, S); b.cyl(.66, .66, .06, 12, 0, 1.4, 0, mul(S, 1.1)); b.cyl(.88, .8, .28, 12, 0, 2.7, 0, mul(S, 1.06)); b.cyl(.9, .9, .1, 12, 0, 2.98, 0, WOOD_D);
+  for (let i = 0; i < 9; i++) { const a = i / 9 * 6.2832; b.box(.22, .24, .16, Math.cos(a) * .82, 3.08, Math.sin(a) * .82, S, -(a + Math.PI / 2)); }
+  b.box(.36, .62, .12, 0, .3, .78, WOOD_D); b.box(.12, .3, .2, .55, 1.6, 0, DARK); b.box(.12, .3, .2, -.55, 1.9, 0, DARK); b.box(.2, .3, .12, 0, 2.2, -.55, DARK);
+  b.box(.8, .05, .7, 0, .02, 1.3, WOOD, 0, .0); for (let i = 0; i < 5; i++) { const a = (i - 2) / 4 * 2.2, x = Math.sin(a) * 1.5, z = Math.cos(a) * 1.5; b.cone(.07, .6, 5, x * 1.0, 0, z * .9 + .2, [112, 78, 46]); }
+  b.cyl(.03, .03, 1.2, 5, 0, 3.08, 0, WOOD_D); b.sph(.05, 0, 4.3, 0, GOLD, 6); flags.push([0, 3.95, 0]);
+  b.cyl(.02, .02, .4, 4, .98, 1.4, 0, WOOD_D); b.cone(.07, .12, 6, .98, 1.8, 0, LIGHT);
+  return { geo: b.build(), flags, h: 4.4, smoke: [] };
 }
-function buildSoldier(col) {
-  const b = new MB();
-  b.cyl(.09, .11, .34, 7, 0, .1, 0, col); b.sph(.075, 0, .53, 0, [226, 190, 150], 6); b.cone(.085, .1, 6, 0, .56, 0, [150, 150, 158]);
-  b.cyl(.015, .015, .72, 4, .15, .05, 0, [90, 66, 40]); b.box(.05, .2, .2, -.13, .18, 0, mul(col, .8));
-  return b.build();
+
+/* ---------- Einheiten ---------- */
+// liefert Körper (starr) sowie zwei Beinpaare (schwingen); col = Spielerfarbe
+function buildUnit(type, col) {
+  const body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150], tab = col, dk = mul(col, .65);
+  const rider = (b, y, scale = 1, plate = false, lance = true) => {
+    const m = plate ? [170, 176, 188] : [120, 110, 100];
+    b.box(.18 * scale, .2 * scale, .12 * scale, 0, y, 0, plate ? m : tab); b.sph(.065 * scale, 0, y + .26 * scale, 0, SK, 6); b.sph(.075 * scale, 0, y + .29 * scale, 0, plate ? [180, 186, 198] : [150, 150, 158], 6, .8);
+    if (plate) b.box(.02, .1, .02, 0, y + .36 * scale, 0, tab);
+    if (lance) { b.cyl(.012, .012, 1.05, 4, .14, y - .25, .05, WOOD_D); b.cone(.025, .08, 4, .14, y + .8, .05, IRON); b.box(.14, .08, .01, .21, y + .6, .05, tab); }
+    b.sph(.09 * scale, -.14, y + .02, 0, tab, 6, 1.1); // Schild
+  };
+  const horse = (coat, barding) => {
+    body.box(.2, .22, .56, 0, .34, 0, coat); body.box(.12, .3, .12, 0, .44, .3, coat, 0, -.5); body.box(.1, .12, .2, 0, .66, .4, coat, 0, .3); body.box(.02, .1, .1, 0, .72, .26, mul(coat, .7));
+    body.box(.05, .05, .2, 0, .3, -.33, mul(coat, .7), 0, .6);
+    if (barding) { body.box(.24, .08, .5, 0, .46, 0, barding); body.box(.22, .2, .08, 0, .32, .26, barding); }
+    for (const [x, z, g] of [[-.07, .2, la], [.07, -.2, la], [.07, .2, lb], [-.07, -.2, lb]]) { g.box(.05, .26, .05, x, -.24, z, mul(coat, .85)); g.box(.06, .04, .06, x, -.27, z, [40, 34, 30]); }
+  };
+  if (type === 'speer') {
+    body.box(.17, .26, .12, 0, .22, 0, tab); body.box(.18, .1, .13, 0, .22, 0, mul(IRON, .9)); body.sph(.065, 0, .56, 0, SK, 6); body.cone(.075, .09, 6, 0, .56, 0, IRON); body.cyl(.014, .014, .95, 4, .15, .05, 0, WOOD_D); body.cone(.028, .08, 4, .15, .98, 0, IRON);
+    body.push(new T.SphereGeometry(.12, 8, 5, 0, Math.PI), dk, -.14, .32, .04, Math.PI / 2, 1, 1, .35); body.box(.02, .1, .1, -.14, .32, .06, tab);
+    la.box(.06, .2, .07, -.04, -.1, 0, [96, 78, 60]); lb.box(.06, .2, .07, .04, -.1, 0, [96, 78, 60]);
+  } else if (type === 'schwert') {
+    body.box(.18, .28, .13, 0, .22, 0, [140, 144, 152]); body.box(.19, .14, .14, 0, .32, 0, tab); body.sph(.068, 0, .58, 0, SK, 6); body.cone(.082, .1, 6, 0, .58, 0, IRON); body.box(.015, .08, .06, 0, .67, 0, tab);
+    body.box(.02, .4, .05, .16, .12, .0, [210, 214, 220]); body.box(.02, .05, .12, .16, .2, 0, GOLD); body.push(new T.ConeGeometry(.1, .22, 3), tab, -.15, .36, .04, 0, 1, 1, .4, Math.PI, 0);
+    la.box(.06, .2, .07, -.04, -.1, 0, [80, 80, 90]); lb.box(.06, .2, .07, .04, -.1, 0, [80, 80, 90]);
+  } else if (type === 'bogen') {
+    body.box(.16, .26, .12, 0, .22, 0, [78, 110, 64]); body.box(.17, .06, .13, 0, .36, 0, tab); body.sph(.064, 0, .54, 0, SK, 6); body.cone(.082, .13, 6, 0, .52, 0, [70, 100, 56]);
+    body.push(new T.TorusGeometry(.2, .012, 4, 10, Math.PI), WOOD, .17, .38, .05, 0, 1, 1, 1, 0, Math.PI / 2); body.box(.012, .4, .012, .17, .18, .05, [220, 214, 200]);
+    body.box(.05, .22, .06, -.08, .3, -.1, [110, 78, 48], 0, .3); for (let i = 0; i < 3; i++) body.box(.01, .08, .01, -.08 + i * .015, .5, -.12, tab);
+    la.box(.06, .2, .07, -.04, -.1, 0, [96, 78, 60]); lb.box(.06, .2, .07, .04, -.1, 0, [96, 78, 60]);
+  } else if (type === 'leicht') {
+    horse([150, 108, 66]); rider(body, .5, 1, false, true);
+  } else {   // schwer
+    horse([66, 60, 58], tab); rider(body, .56, 1.15, true, true); body.box(.2, .04, .5, 0, .62, 0, dk);
+  }
+  const fin = b => { const g = b.build(); return g; };
+  return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: type === 'leicht' || type === 'schwer' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' };
 }
 
 /* ---------- Bäume (Instanzen) ---------- */
@@ -209,6 +325,12 @@ function treeGeo(kind) {
   return b.build();
 }
 
+const SMOKE_VS = `
+attribute float aA; attribute float aS; uniform float uScale; varying float vA;
+void main(){ vA=aA; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_Position=projectionMatrix*mv; gl_PointSize=aS*uScale/max(1.0,-mv.z); }`;
+const SMOKE_FS = `
+varying float vA;
+void main(){ vec2 c=gl_PointCoord-.5; float d=length(c)*2.0; if(d>1.0) discard; gl_FragColor=vec4(.86,.86,.86,vA*(1.0-d*d)); }`;
 const WATER_VS = `
 attribute float aDepth; varying float vDepth; varying vec3 vW;
 #include <fog_pars_vertex>
@@ -282,6 +404,10 @@ export class WorldMap {
     this.routeGeo = new T.BufferGeometry(); this.routeGeo.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(3 * 1200), 3)); this.routeGeo.setDrawRange(0, 0);
     this.routeCol = new T.Color(1, 1, 1);
     this.routePts = new T.Points(this.routeGeo, new T.PointsMaterial({ size: 5, sizeAttenuation: false, color: 0xffffff, depthTest: false, transparent: true, opacity: .95 })); this.routePts.renderOrder = 15; this.routePts.frustumCulled = false; this.scene.add(this.routePts);
+    const NS = 320; this.smokeN = NS; const sg = new T.BufferGeometry();
+    sg.setAttribute('position', new T.BufferAttribute(new Float32Array(NS * 3), 3)); sg.setAttribute('aA', new T.BufferAttribute(new Float32Array(NS), 1)); sg.setAttribute('aS', new T.BufferAttribute(new Float32Array(NS), 1));
+    this.smokeMat = new T.ShaderMaterial({ vertexShader: SMOKE_VS, fragmentShader: SMOKE_FS, transparent: true, depthWrite: false, uniforms: { uScale: { value: 600 } } });
+    this.smoke = new T.Points(sg, this.smokeMat); this.smoke.frustumCulled = false; this.smoke.renderOrder = 5; this.scene.add(this.smoke);
     this.cam.x = this.cam.z = N / 2; this.updateCamera();
   }
   buildTerrain(map) {
@@ -433,7 +559,7 @@ export class WorldMap {
     this.models = {}; const M = this.models;
     M.slot = buildSlot(); M.throne = buildThrone(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true);
     for (const k of ['farm', 'wood', 'stone', 'ore']) M[k] = { farm: buildFarm, wood: buildWood, stone: buildStone, ore: buildOre }[k]();
-    this.soldierGeos = {}; this.castleCache = {};
+    this.unitGeos = {}; this.castleCache = {}; this.smokeList = [];
     this.flagGeo = new T.PlaneGeometry(.7, .42, 6, 2); this.flagGeo.translate(.35, 0, 0);
     this.fireGeo = new T.ConeGeometry(.2, .55, 6); this.fireMat = new T.MeshBasicMaterial({ color: 0xffb040 });
     this.glowMat = new T.MeshBasicMaterial({ color: 0x9fe2ff, transparent: true, opacity: .85 });
@@ -444,16 +570,21 @@ export class WorldMap {
       const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' ? 2.5 : o.k === 'start' ? 2 : 1.2);
       g.position.set(o.x + .5, y, o.y + .5); g.rotation.y = ['start', 'throne', 'sanct'].includes(o.k) ? 0 : hash(o.x, o.y, 3) * .5 - .25;
       if (o.k === 'start') { hd.slot = mesh(M.slot); g.add(hd.slot); hd.castle = null; }
-      else if (o.k === 'camp') { hd.alive = mesh(M.campAlive); hd.deadM = mesh(M.campDead); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); hd.fire = new T.Mesh(this.fireGeo, this.fireMat); hd.fire.position.set(0, .35, 0); g.add(hd.fire); }
+      else if (o.k === 'camp') { hd.alive = mesh(M.campAlive); hd.deadM = mesh(M.campDead); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); this.attachParts(hd, M.campAlive); hd.smokeOffs = M.campAlive.smoke; }
       else if (o.k === 'ruin') { hd.alive = mesh(M.ruin); hd.deadM = mesh(M.ruinDone); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); }
       else {
         const mdl = M[o.k]; hd.main = mesh(mdl); g.add(hd.main);
         if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { const k = .95 + .05 * o.lv; g.scale.setScalar(k); }
         if (o.k === 'sanct') { hd.glow = new T.Mesh(new T.OctahedronGeometry(.42), this.glowMat); hd.glow.position.set(0, 2.9, 0); g.add(hd.glow); }
-        if (o.k === 'throne') { this.addFlags(hd, M.throne.flags, 0xe9c860); }
+        if (o.k === 'throne') { this.addFlags(hd, M.throne.flags, 0xe9c860); this.attachParts(hd, M.throne); hd.smokeOffs = M.throne.smoke; }
+        if (o.k === 'wood') hd.smokeOffs = M.wood.smoke;
       }
       this.scene.add(g);
     }
+  }
+  attachParts(hd, mdl) {
+    hd.flames = hd.flames || [];
+    for (const p of mdl.parts || []) if (p.k === 'flame') { const f = new T.Mesh(this.fireGeo, this.fireMat); f.position.set(...p.pos); f.scale.setScalar(p.s || 1); f.userData.s = p.s || 1; hd.grp.add(f); hd.flames.push(f); }
   }
   addFlags(hd, pts, color) {
     for (const p of pts) {
@@ -488,14 +619,14 @@ export class WorldMap {
         if (h.castle) { h.grp.remove(h.castle); h.castle = null; }
         for (const f of h.flags) h.grp.remove(f); h.flags = [];
         h.slot.visible = !p;
-        if (p) { const mdl = this.castleModel(tier, p.slot % 10); h.castle = this.mesh(mdl); h.grp.add(h.castle); this.addFlags(h, mdl.flags, 0xffffff); h.h = mdl.h; }
+        if (p) { const mdl = this.castleModel(tier, p.slot % 10); h.castle = this.mesh(mdl); h.grp.add(h.castle); this.addFlags(h, mdl.flags, 0xffffff); h.h = mdl.h; h.smokeOffs = mdl.smoke; h.smokeOn = true; } else { h.smokeOffs = null; }
       }
       if (p) this.setFlagColor(h, parseInt(PLAYER_COLORS[p.slot % 10].slice(1), 16));
     }
     const gt = this.gtNow();
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o;
-      if (o.k === 'camp') { const dead = (view.world.camps[id] || 0) > gt; h.isDead = dead; h.alive.visible = !dead; h.deadM.visible = dead; h.fire.visible = !dead; }
+      if (o.k === 'camp') { const dead = (view.world.camps[id] || 0) > gt; h.isDead = dead; h.alive.visible = !dead; h.deadM.visible = dead; for (const f of h.flames) f.visible = !dead; h.smokeOn = !dead; }
       if (o.k === 'ruin') { const done = !!view.world.ruins[id]; h.isDead = done; h.alive.visible = !done; h.deadM.visible = done; }
       if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { const max = 3000 * o.lv, left = view.world.nodes[id] == null ? max : view.world.nodes[id]; h.frac = left / max; const k = (.95 + .05 * o.lv) * (.62 + .38 * Math.min(1, h.frac * 2)); h.grp.scale.set(k, k, k); }
     }
@@ -503,6 +634,7 @@ export class WorldMap {
     this.syncOutposts(view);
     const eg = this.roadEdges(view), sg = JSON.stringify(eg); if (sg !== this.roadSig) { this.roadSig = sg; this.setRoads(eg); }
     this.syncMarches(view);
+    this.smokeList = []; for (const id in this.obj) { const h = this.obj[id]; if (h.smokeOffs && h.smokeOn !== false) for (const off of h.smokeOffs) this.smokeList.push({ h, off }); }
     this.dirtyLabels = true;
   }
   // Burg an einen neuen Ort setzen (Teleporter)
@@ -601,27 +733,39 @@ export class WorldMap {
   }
 
   /* ---------- Heere ---------- */
+  unitGeo(type, col) { const k = type + col; return this.unitGeos[k] || (this.unitGeos[k] = buildUnit(type, hexRGB(col))); }
   syncMarches(view) {
     const keep = new Set();
     for (const m of view.world.marches) {
       keep.add(m.id); let s = this.marchObjs[m.id];
+      const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
+      const tr = m.troops || {}; let type = 'speer', best = 0, n = 0;
+      for (const u in tr) { if (u === 'n') continue; n += tr[u]; if (tr[u] > best) { best = tr[u]; type = u; } }
+      if (tr.n != null) n = tr.n; if (!n) n = Object.values(tr).reduce((a, c) => a + c, 0);
+      const cav = type === 'leicht' || type === 'schwer', cnt = cav ? clamp(Math.ceil(n / 60), 1, 3) : clamp(Math.ceil(n / 25), 2, 5);
       if (!s) {
-        const grp = new T.Group(), mat = this.matVC, sol = [];
-        for (const [x, z] of [[-.2, .1], [.2, .1], [0, -.2], [-.4, -.15], [.4, -.15]]) { const sm = new T.Mesh(this.soldierGeos.tmp || (this.soldierGeos.tmp = buildSoldier([200, 200, 200])), mat); sm.position.set(x, 0, z); sm.castShadow = true; grp.add(sm); sol.push(sm); }
-        const pole = new T.Mesh(new T.CylinderGeometry(.02, .02, 1.1, 5), new T.MeshLambertMaterial({ color: 0x4a3624 })); pole.position.set(0, .55, -.05); grp.add(pole);
-        const flag = new T.Mesh(this.flagGeo.clone(), new T.MeshLambertMaterial({ color: 0xffffff, side: T.DoubleSide })); flag.position.set(0, 1.05, -.05); flag.scale.setScalar(.65); flag.userData.base = flag.geometry.attributes.position.array.slice(); grp.add(flag);
-        this.scene.add(grp); s = this.marchObjs[m.id] = { grp, mat, flag, sol, lab: this.mkBadge('', 0x2a2f38) }; s.lab.el.classList.add('march');
+        const grp = new T.Group(); this.scene.add(grp);
+        const pole = new T.Mesh(new T.CylinderGeometry(.02, .02, 1.5, 5), new T.MeshLambertMaterial({ color: 0x4a3624 })); pole.position.set(0, .75, -.1); grp.add(pole);
+        const flag = new T.Mesh(this.flagGeo.clone(), new T.MeshLambertMaterial({ color: 0xffffff, side: T.DoubleSide })); flag.position.set(0, 1.4, -.1); flag.scale.setScalar(.7); flag.userData.base = flag.geometry.attributes.position.array.slice(); grp.add(flag);
+        s = this.marchObjs[m.id] = { grp, flag, units: [], lab: this.mkBadge('', 0x2a2f38) }; s.lab.el.classList.add('march');
       }
-      s.m = m; const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
-      s.col = col; s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
-      const geo = this.soldierGeos[col] || (this.soldierGeos[col] = buildSoldier(hexRGB(col)));
-      s.sol.forEach(sm => { sm.geometry = geo; });
-      const n = m.troops.n != null ? m.troops.n : Object.values(m.troops).reduce((a, b) => a + b, 0);
+      s.m = m; s.col = col;
+      if (s.sig !== type + col + cnt) {
+        s.sig = type + col + cnt; for (const u of s.units) s.grp.remove(u.g); s.units = [];
+        const ug = this.unitGeo(type, col), pos = cav ? [[-.34, .15], [.34, .15], [0, -.45]] : [[-.28, .2], [.28, .2], [0, -.12], [-.52, -.28], [.52, -.28]];
+        for (let i = 0; i < cnt; i++) {
+          const g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
+          const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
+          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(cav ? 1.5 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav });
+        }
+      }
+      s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
       const txt = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : '') + n;
       this.setBadge(s.lab, txt, 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
     }
     for (const id in this.marchObjs) if (!keep.has(Number(id))) { const s = this.marchObjs[id]; this.scene.remove(s.grp); s.lab.el.remove(); delete this.marchObjs[id]; }
   }
+
 
   /* ---------- Revier und Außenposten ---------- */
   rectList() {
@@ -783,7 +927,7 @@ export class WorldMap {
     for (const im of this.treeChunks) { const u = im.userData; sph.set(new T.Vector3(u.cx, u.cy, u.cz), CH * .8 + 4); im.visible = frustum.intersectsSphere(sph); }
     for (const id in this.obj) {
       const h = this.obj[id];
-      if (h.fire && h.fire.visible) { h.fire.scale.set(1 + Math.sin(t * 13 + h.o.x) * .15, .85 + Math.sin(t * 17 + h.o.y) * .25, 1); h.fire.rotation.y = t * 2; }
+      if (h.flames) for (const f of h.flames) if (f.visible) { const k = f.userData.s; f.scale.set(k * (1 + Math.sin(t * 13 + h.o.x) * .15), k * (.85 + Math.sin(t * 17 + h.o.y) * .25), k); f.rotation.y = t * 2; }
       if (h.glow) { h.glow.rotation.y = t; h.glow.position.y = 2.9 + Math.sin(t * 2) * .12; }
       if (h.flags.length) this.waveFlags(h.flags, t);
     }
@@ -796,7 +940,10 @@ export class WorldMap {
       s.grp.position.set(p.x, Math.max(0, y), p.y); s.grp.visible = true;
       const ahead = m.path[Math.min(m.path.length - 1, p.i + 1)], [ax, ay] = cellXY(ahead);
       if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.grp.rotation.y = Math.atan2(dx, dz); }
-      s.sol.forEach((sm, k) => { sm.position.y = p.still ? 0 : Math.abs(Math.sin(t * 9 + k * 1.7 + Number(id))) * .06; });
+      s.units.forEach((u, k) => {
+        const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
+        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
+      });
       this.waveFlags([s.flag], t);
       if (m.own || (this.sel && this.sel.type === 'march' && this.sel.id === m.id)) {
         const pts = [[p.x, p.y]]; for (let i = p.i + 1; i < m.path.length; i++) { const [x, yy] = cellXY(m.path[i]); pts.push([x + .5, yy + .5]); }
@@ -812,8 +959,25 @@ export class WorldMap {
     else if (this.sel && this.sel.type === 'site') ring = { x: this.sel.x + .5, z: this.sel.y + .5, r: .9 + Math.sin(t * 4) * .07 };
     else if (this.sel && this.sel.type === 'march') { const s = this.marchObjs[this.sel.id]; if (s) ring = { x: s.grp.position.x, z: s.grp.position.z, r: 1 }; }
     if (ring) { this.ringMesh.visible = true; this.ringMesh.position.set(ring.x, Math.max(0, this.yAt(ring.x, ring.z)) + .15, ring.z); this.ringMesh.scale.setScalar(ring.r); } else this.ringMesh.visible = false;
+    this.stepSmoke(t);
     this.projectLabels();
     this.renderer.render(this.scene, this.camera);
+  }
+  stepSmoke(t) {
+    const g = this.smoke.geometry, P = g.attributes.position.array, A = g.attributes.aA.array, S = g.attributes.aS.array, list = this.smokeList, cx = this.cam.x, cz = this.cam.z;
+    this.smokeMat.uniforms.uScale.value = this.H / (2 * Math.tan(this.camera.fov * Math.PI / 360)) * this.renderer.getPixelRatio() / this.renderer.getPixelRatio();
+    let n = 0;
+    for (const sm of list) {
+      const gp = sm.h.grp.position, dx = gp.x - cx, dz = gp.z - cz; if (dx * dx + dz * dz > 5500 || !sm.h.grp.visible) continue;
+      const k = sm.h.grp.scale.x;
+      for (let i = 0; i < 4 && n < this.smokeN; i++, n++) {
+        const age = (t * .22 + i * .25 + (sm.h.o.x * 7 % 5) * .13) % 1;
+        P[n * 3] = gp.x + sm.off[0] * k + age * 1.1 + Math.sin(t + i) * .08 * age; P[n * 3 + 1] = gp.y + sm.off[1] * k + age * 2.4; P[n * 3 + 2] = gp.z + sm.off[2] * k + age * .5;
+        A[n] = .5 * Math.sin(Math.min(1, age * 1.6) * Math.PI * .5) * (1 - age); S[n] = .22 + age * .75;
+      }
+    }
+    for (let i = n; i < this.smokeN; i++) { A[i] = 0; S[i] = 0; }
+    g.attributes.position.needsUpdate = true; g.attributes.aA.needsUpdate = true; g.attributes.aS.needsUpdate = true;
   }
   updateRoutes(routes, t) {
     const a = this.routeGeo.attributes.position.array; let n = 0; const off = (t * 1.2) % .7;
