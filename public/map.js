@@ -62,6 +62,7 @@ void main(){
   gl_FragColor=vec4(outc,1.0);
 }`;
 
+const SHOW_NAMES = false;
 export class WorldMap {
   constructor(PIXI, app) {
     this.PIXI = PIXI; this.app = app;
@@ -354,6 +355,7 @@ export class WorldMap {
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
         col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; y = o.k === 'sanct' ? -86 : -130;
       }
+      if (txt !== null && !SHOW_NAMES && !['farm', 'wood', 'stone', 'ore'].includes(o.k)) txt = null;   // Textbeschriftungen aus; nur Stufenzahlen bleiben
       if (txt === null) { if (h.lab) h.lab.visible = false; continue; }
       let lab = h.lab;
       if (!lab || h.labTxt !== txt || h.labCol !== col) {
