@@ -3,10 +3,10 @@
 // das Wasser wird im Shader animiert, der Nebel kommt als Textur dazu. Bäume, Burgen und Lager sind Sprites aus dem
 // Atlas (art.js). Netz und Sprites werden in waagerechten Streifen abwechselnd gezeichnet, damit Berge Dinge dahinter
 // richtig verdecken.
-import { N, G, SUB, SEA, MOUNT, vnoise, fbm, smooth, generateMap, findPath, cellOf, SANCT_R } from '/shared/mapgen.js';
+import { N, G, SUB, SEA, MOUNT, vnoise, fbm, smooth, generateMap, findPath, cellOf, SANCT_R, roadPaths, setMapRoads } from '/shared/mapgen.js';
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
 import { buildAtlas, proj } from '/public/art.js';
-import { rectsOf, OP_R } from '/shared/outpost.js';
+import { rectsOf, OP_R, roadEdgesOf } from '/shared/outpost.js';
 
 export const ELEV = 96;                    // Pixel Höhe pro Höheneinheit über dem Meer
 const BW = 4, NB = Math.ceil(2 * N / BW);  // Streifen aus je 4 Diagonalen
@@ -93,20 +93,10 @@ export class WorldMap {
   }
   // Wege entstehen mit den Außenposten: je Bündnis von der Burg des Gründers zum ersten Posten, dann jeder Posten zum nächsten bestehenden
   roadEdges(view) {
-    const gt = this.gtNow(), edges = [];
-    for (const al of view.match.alliances || []) {
-      const ld = view.match.players.find(p => p.id === al.leader); if (!ld) continue;
-      const ops = (view.world.outposts || []).filter(o => o.al === al.id && gt >= o.done).sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)));
-      const nodes = [[ld.pos[0], ld.pos[1]]];
-      for (const o of ops) {
-        let best = nodes[0], bd = 1e9; for (const q of nodes) { const d = Math.hypot(q[0] - o.x, q[1] - o.y); if (d < bd) { bd = d; best = q; } }
-        edges.push([best[0], best[1], o.x, o.y]); nodes.push([o.x, o.y]);
-      }
-    }
-    return edges;
+    return roadEdgesOf(view.match.alliances || [], id => { const p = view.match.players.find(x => x.id === id); return p && p.pos; }, view.world.outposts || [], this.gtNow());
   }
   setRoads(edges) {
-    const map = this.map, mask = new Float32Array(G * G);
+    const map = this.map, mask = new Float32Array(G * G), paths = roadPaths(map, edges);
     const splat = (x, y) => {
       const gx = x * SUB, gy = y * SUB, r = 1.5;
       for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) {
@@ -115,14 +105,15 @@ export class WorldMap {
         if (w > mask[iy * G + ix]) mask[iy * G + ix] = w;
       }
     };
-    for (const [ax, ay, bx, by] of edges) {
-      const p = findPath(map, ax, ay, bx, by, 1.2); let px = null, py = null;
-      const pts = p ? p.map(c => { const [x, y] = cellXY(c); return [x + .5, y + .5]; }) : [[ax + .5, ay + .5], [bx + .5, by + .5]];
-      for (const [cx, cy] of pts) {
+    for (const p of paths) {
+      let px = null, py = null;
+      for (const c of p) {
+        const [x, y] = cellXY(c), cx = x + .5, cy = y + .5;
         if (px !== null) for (let k = 0; k < 4; k++) splat(px + (cx - px) * k / 4, py + (cy - py) * k / 4);
         splat(cx, cy); px = cx; py = cy;
       }
     }
+    setMapRoads(map, paths);
     const old = this.roads; this.roads = mask;
     for (let i = 0; i < mask.length; i++) if (mask[i] !== old[i]) this.paintVertex(i, mask[i]);
     const cells = new Uint8Array(N * N);

@@ -12,7 +12,7 @@ import {
 } from './core.js';
 import { afterLaunch, applyBonuses, arriveCity, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
-import { arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, storeOf } from './outpost.js';
+import { refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, storeOf } from './outpost.js';
 import { RES } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
@@ -107,7 +107,7 @@ export function syncMatch(match, players, now) {
   if (!match.world) match.world = newWorld(now, { phase: 'running' });
   const w = ensureWorld(match.world), ctx = mkCtx(match, players, now);
   for (const p of players) ensureState(p.state);
-  migrate(ctx);
+  migrate(ctx); refreshRoads(match, players, w.gt);
   if (w.phase !== 'running') { w.at = now; for (const p of players) p.state.at = now; return { events: 0 }; }
   const speed = match.speed, target = w.gt + Math.max(0, now - w.at) / 1000 * speed;
   let events = 0;
@@ -199,7 +199,7 @@ export function removePlayer(match, players, pid, now) {
 
 /* ---------- Befehle ---------- */
 export function command(match, players, player, cmd, now) {
-  syncMatch(match, players, now);
+  syncMatch(match, players, now); refreshRoads(match, players, match.world.gt);
   const S = player.state, w = match.world, ctx = mkCtx(match, players, now);
   if (!cmd || typeof cmd !== 'object') return 'Ungültiger Befehl';
   if (cmd.type === 'readReports') { S.reports.forEach(r => { r.read = true; }); return ''; }

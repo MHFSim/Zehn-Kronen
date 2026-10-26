@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
 import { syncMatch, addPlayer, command, viewFor, setSpeed, setWeeks, startMatch, pauseMatch, resumeMatch, endMatch, removePlayer } from '../shared/world.js';
 import { mapOf, newWorld, takeNotes } from '../shared/core.js';
+import { cheat } from '../shared/cheat.js';
 import { makeVapid, sendPush } from './push.js';
 import { mkdirSync, readdirSync, unlinkSync, existsSync } from 'node:fs';
 
@@ -339,6 +340,7 @@ const routes = {
     else if (b.action === 'pause') err = pauseMatch(c.match, c.players, t);
     else if (b.action === 'resume') err = resumeMatch(c.match, c.players, t);
     else if (b.action === 'end') err = endMatch(c.match, c.players, t);
+    else if (b.action === 'cheat') err = cheat(c.match, c.players, b.cheat || {}, t);
     else if (b.action === 'kick') {
       const pid = Number(b.playerId); if (!c.players.some(p => p.id === pid)) return fail(res, 404, 'Spieler nicht gefunden');
       removePlayer(c.match, c.players, pid, t); c.players = c.players.filter(p => p.id !== pid); saveMatch(c);

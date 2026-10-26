@@ -3,7 +3,7 @@
 // das gemeinsame Revier. Ein neuer Außenposten muss das Revier des Bündnisses berühren und wird aus dem Bündnislager
 // bezahlt. Bündnismitglieder bewachen ihn mit eigenen Truppen. Heiligtümer und Thron kann nur besetzen, wessen
 // Gruppe sie mit einem Viereck berührt. Feindliche Außenposten kann nur angreifen, wer selbst einen berührenden hat.
-import { N, isWater } from './mapgen.js';
+import { N, isWater, roadPaths, setMapRoads } from './mapgen.js';
 import { battle, sum, forceOf } from './combat.js';
 import {
   mapOf, byId, groupOf, groupLabel, allianceOf, pushReport, note, chron, settleAway, sendHome, fmtDur, planFrom, launch,
@@ -52,6 +52,28 @@ export function territory(match, players, gt) {
   return rectsOf(cities, ops, gt);
 }
 const BASE_OK = (map, x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 3 && y >= 3 && x <= N - 4 && y <= N - 4 && map.pass[y * N + x];
+
+/* ---------- Wege: von der Burg des Gründers zum ersten Außenposten, jeder weitere zum nächsten bestehenden Punkt ---------- */
+export function roadEdgesOf(alliances, posOf, ops, gt) {
+  const edges = [];
+  for (const al of alliances) {
+    const pos = posOf(al.leader); if (!pos) continue;
+    const mine = ops.filter(o => o.al === al.id && gt >= o.done).sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)));
+    const nodes = [[pos[0], pos[1]]];
+    for (const o of mine) {
+      let best = nodes[0], bd = 1e9; for (const q of nodes) { const d = Math.hypot(q[0] - o.x, q[1] - o.y); if (d < bd) { bd = d; best = q; } }
+      edges.push([best[0], best[1], o.x, o.y]); nodes.push([o.x, o.y]);
+    }
+  }
+  return edges;
+}
+// Server: Wege der Karte auf den Stand der Partie bringen (vor jeder Wegplanung aufrufen)
+export function refreshRoads(match, players, gt) {
+  const w = match.world, map = mapOf(match);
+  const edges = roadEdgesOf(Object.values(w.alliances || {}), id => { const p = byId(players, id); return p && p.state.pos; }, Object.values(w.outposts || {}), gt);
+  const sig = JSON.stringify(edges); if (map._roadSig === sig) return;
+  map._roadSig = sig; setMapRoads(map, roadPaths(map, edges));
+}
 
 /* ---------- Bauplatz prüfen ---------- */
 // Gibt '' zurück, wenn dort (x, y) ein Außenposten des Bündnisses von me stehen darf, sonst den Grund.

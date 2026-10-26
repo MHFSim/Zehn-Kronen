@@ -56,6 +56,14 @@ assert.equal(viewFor(match, players, c, clock).world.outposts[0].garr, undefined
 assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].speer, 60);
 
 assert.equal(territory(match, players, gt()).filter(r => r.k === 'city' && r.group === 'a1').length, 0, 'danach entfällt das Burg-Viereck');
+// Auf Wegen läuft man 30 % schneller
+{ const { planFrom } = await import('../shared/core.js'), { ROAD_SPEED } = await import('../shared/mapgen.js');
+  const from = [a.state.pos[0], a.state.pos[1]], saved = map.roads;
+  assert.ok(map.roads && map.roads.some(Boolean), 'Weg zum Außenposten existiert');
+  const withRoad = planFrom(map, from, op.x, op.y, { speer: 10 }, a.state); map.roads = null;
+  const without = planFrom(map, from, op.x, op.y, { speer: 10 }, a.state); map.roads = saved;
+  assert.ok(withRoad.duration < without.duration * 0.9, 'Weg macht schneller: ' + withRoad.duration + ' < ' + without.duration);
+  assert.ok(ROAD_SPEED === 1.3); }
 // Fremde dürfen nicht überlappen; weiterbauen nur am eigenen Revier
 assert.match(checkSite(match, players, c, op.x, op.y + 3, gt()), /überlappen|Zu nah|Hier steht/);
 const site2 = findSite(a, [op.x, op.y], [2 * OP_R + 1, 2 * OP_R, 2 * OP_R - 2]); assert.ok(site2, 'zweiter Bauplatz am ersten Außenposten');

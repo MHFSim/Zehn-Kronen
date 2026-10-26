@@ -202,15 +202,16 @@ export function generateMap(seed) {
 const SQ2 = 1.4142135623730951;
 // Nur Wasser ist als Ziel ausgeschlossen: Auf Berge kann man zwar nicht laufen, aber (z. B. für Außenposten) hinmarschieren
 export const isWater = (map, x, y) => map.H[(y * SUB + 1) * G + x * SUB + 1] < SEA + 0.005;
+export const ROAD_SPEED = 1.3;   // auf Wegen ist man 30 % schneller
 export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
-  const pass = map.pass;
+  const pass = map.pass, rd = map.roads, rk = rd ? 1 / ROAD_SPEED : 1;
   if (!pass[cellOf(sx, sy)] || (!pass[cellOf(gx, gy)] && isWater(map, gx, gy))) return null;
   const g = new Float64Array(N * N).fill(Infinity), came = new Int32Array(N * N).fill(-1), closed = new Uint8Array(N * N);
   const heap = []; // Einträge [f, g, cell]
   const less = (a, b) => a[0] < b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] < b[2])));
   const push = e => { heap.push(e); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (!less(heap[i], heap[p])) break; [heap[i], heap[p]] = [heap[p], heap[i]]; i = p; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && less(heap[l], heap[m])) m = l; if (r < heap.length && less(heap[r], heap[m])) m = r; if (m === i) break; [heap[i], heap[m]] = [heap[m], heap[i]]; i = m; } } return top; };
-  const hf = (x, y) => { const dx = Math.abs(x - gx), dy = Math.abs(y - gy); return (dx + dy) + (SQ2 - 2) * Math.min(dx, dy); };
+  const hf = (x, y) => { const dx = Math.abs(x - gx), dy = Math.abs(y - gy); return ((dx + dy) + (SQ2 - 2) * Math.min(dx, dy)) * rk; };
   const s = cellOf(sx, sy), goal = cellOf(gx, gy);
   g[s] = 0; push([hf(sx, sy), 0, s]);
   while (heap.length) {
@@ -224,7 +225,7 @@ export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
       const n = cellOf(nx, ny), pn = pass[n];
       if ((!pn && n !== goal) || closed[n]) continue;
       if (n !== goal && dx && dy && (!pass[cellOf(cx + dx, cy)] || !pass[cellOf(cx, cy + dy)])) continue;
-      const ng = gc + (dx && dy ? SQ2 : 1) * (pn === 2 ? forestCost : 1);
+      const ng = gc + (dx && dy ? SQ2 : 1) * (pn === 2 ? forestCost : 1) * (rd && rd[n] ? rk : 1);
       if (ng < g[n]) { g[n] = ng; came[n] = c; push([ng + hf(nx, ny), ng, n]); }
     }
   }
@@ -238,8 +239,19 @@ export function pathTimes(map, path, speed, forestCost) {
   const arr = [0];
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1], b = path[i], ax = a % N, ay = (a - ax) / N, bx = b % N, by = (b - bx) / N;
-    const step = (ax !== bx && ay !== by ? SQ2 : 1) * (map.pass[b] === 2 ? forestCost : 1);
+    const step = (ax !== bx && ay !== by ? SQ2 : 1) * (map.pass[b] === 2 ? forestCost : 1) / (map.roads && map.roads[b] ? ROAD_SPEED : 1);
     arr.push(arr[i - 1] + step / speed * 3600);
   }
   return arr;
+}
+
+/* ---------- Wege (entstehen mit den Außenposten) ---------- */
+// Pfade für die Wegstücke [ax, ay, bx, by]; unabhängig von bestehenden Wegen berechnet, damit Server und Anzeige dasselbe sehen
+export function roadPaths(map, edges) {
+  const saved = map.roads; map.roads = null;
+  try { return edges.map(([ax, ay, bx, by]) => findPath(map, ax, ay, bx, by, 1.2)).filter(Boolean); } finally { map.roads = saved; }
+}
+export function setMapRoads(map, paths) {
+  const cells = new Uint8Array(N * N); for (const p of paths) for (const c of p) cells[c] = 1;
+  map.roads = cells; return cells;
 }

@@ -84,9 +84,14 @@ Ohne Bündnis gibt es kein Revier. Zu Beginn sieht nur der Gründer das Viereck 
 - **Lager:** Wer im Bündnisgebiet Felder, Wälder, Brüche oder Minen abbaut, füllt das Lager zusätzlich um 25 % der Beute (dem Spieler wird nichts abgezogen). Eigene Rohstoffe kann man jederzeit einzahlen (Mehr → Revier & Lager).
 - **Angriff:** Einen feindlichen Außenposten kann nur angreifen, wer einen eigenen, fertigen Außenposten direkt daneben gebaut hat. Gewinnt der Angreifer, verschwindet der Posten samt Revier.
 - **Heiligtümer und Thron** lassen sich nur besetzen, solange ein Viereck der Gruppe sie berührt.
+- **Wege:** Mit den Außenposten entstehen Wege (Burg des Gründers → erster Außenposten, dann jeweils zum nächsten bestehenden Punkt). Auf Wegen sind Heere 30 % schneller (`ROAD_SPEED` in `shared/mapgen.js`).
+- **Platzieren:** Der Button „Außenposten“ auf der Karte zeigt oben, wie viele Felder, Wälder, Steinbrüche und Erzminen im Viereck liegen.
 - **Shop** (Mehr → Shop, bezahlt mit Gold): *Teleporter* (800 Gold, versetzt die Burg an einen freien Ort im Bündnisgebiet, danach 12 Stunden Pause, mit Lichteffekt) und *Beschleuniger* (5 Min. 15 Gold, 1 Std. 150, 8 Std. 1000), die Bau, Ausbildung oder Forschung verkürzen (⚡ beim jeweiligen Auftrag).
 
 Die Regeln stehen in `shared/outpost.js` und `shared/rules.js` (ITEMS), die Zahlen oben in diesen Dateien.
+
+## Cheats (Admin)
+Im Admin-Bereich hat jede Partie einen Block „🛠 Cheats“ (`shared/cheat.js`): Rohstoffe und Gold geben, Lager füllen, Truppen geben, alle Gebäude auf eine Stufe setzen, Bau/Ausbildung/Forschung fertigstellen, Bündnislager füllen, Außenposten sofort fertigbauen, Teleporter und Beschleuniger geben, Schutz aufheben oder setzen, Karte aufdecken, Lager und Vorkommen erneuern und die Zeit vorspulen. Jeder Cheat gilt für einen Spieler oder alle.
 
 ## Datensicherung
 

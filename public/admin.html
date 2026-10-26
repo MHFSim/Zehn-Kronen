@@ -22,6 +22,7 @@ th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;le
 .inline{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
 .inline .field{flex:1;min-width:140px}
 .small{padding:5px 10px;font-size:13px}
+.cheats{margin-top:12px;border:1px dashed var(--line);border-radius:10px;padding:8px 12px}.cheats summary{cursor:pointer;font-weight:700}.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:8px}.cbox{border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px}.cbox input,.cbox select{min-width:0;flex:1;width:80px}
 </style>
 </head>
 <body>
@@ -67,7 +68,7 @@ function ago(ms) {
   const h = Math.floor(m / 60); if (h < 48) return 'vor ' + h + ' h';
   return 'vor ' + Math.floor(h / 24) + ' Tagen';
 }
-const armed = {};
+const armed = {}, cheatOpen = {};
 const PHASE = { lobby: 'Lobby', running: 'läuft', paused: 'pausiert', ended: 'beendet' };
 async function load() {
   const r = await api('/api/admin/overview');
@@ -93,9 +94,47 @@ async function load() {
         <button class="btn ghost" data-act="weeks" data-id="${m.id}" type="button">Länge setzen</button>
         <button class="btn ${armed['d' + m.id] ? 'danger' : 'ghost'}" data-act="delete" data-id="${m.id}" type="button" style="margin-left:auto">${armed['d' + m.id] ? 'Partie wirklich löschen' : 'Partie löschen'}</button>
       </div>
+      <details class="cheats" data-id="${m.id}" ${cheatOpen[m.id] ? 'open' : ''}><summary>🛠 Cheats</summary>
+        <div class="field"><label for="cp${m.id}">Betrifft</label><select id="cp${m.id}"><option value="all">Alle Spieler</option>${m.players.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
+        <div class="cgrid">
+          <div class="cbox"><b>Rohstoffe</b><div class="inline">${['food', 'wood', 'stone', 'ore', 'gold'].map(r => `<input id="c${r}${m.id}" type="number" min="0" placeholder="${{ food: 'Nahrung', wood: 'Holz', stone: 'Stein', ore: 'Erz', gold: 'Gold' }[r]}">`).join('')}</div>
+            <div class="inline"><button class="btn small" data-cheat="resources" data-id="${m.id}" type="button">Geben</button><button class="btn ghost small" data-cheat="fill" data-id="${m.id}" type="button">Lager voll</button></div></div>
+          <div class="cbox"><b>Truppen</b><div class="inline"><input id="ctc${m.id}" type="number" min="1" value="100"><select id="ctu${m.id}"><option value="">alle Arten</option><option value="speer">Speer</option><option value="schwert">Schwert</option><option value="bogen">Bogen</option><option value="leicht">Leichte Reiterei</option><option value="schwer">Schwere Reiterei</option></select></div>
+            <button class="btn small" data-cheat="troops" data-id="${m.id}" type="button">Geben</button></div>
+          <div class="cbox"><b>Aufträge &amp; Gebäude</b><div class="inline"><input id="clv${m.id}" type="number" min="1" max="20" value="10"><button class="btn ghost small" data-cheat="levels" data-id="${m.id}" type="button">Alle Gebäude auf Stufe</button></div>
+            <button class="btn small" data-cheat="finish" data-id="${m.id}" type="button">Bau, Ausbildung, Forschung fertig</button></div>
+          <div class="cbox"><b>Bündnis &amp; Revier</b><div class="inline"><input id="cst${m.id}" type="number" min="1" value="5000"><button class="btn small" data-cheat="store" data-id="${m.id}" type="button">Bündnislager füllen</button></div>
+            <button class="btn ghost small" data-cheat="outposts" data-id="${m.id}" type="button">Außenposten sofort fertig</button></div>
+          <div class="cbox"><b>Shop-Gegenstände</b><div class="inline"><input id="ctp${m.id}" type="number" min="0" placeholder="Teleporter"><input id="c5${m.id}" type="number" min="0" placeholder="5 Min."><input id="c60${m.id}" type="number" min="0" placeholder="1 Std."><input id="c480${m.id}" type="number" min="0" placeholder="8 Std."></div>
+            <div class="inline"><button class="btn small" data-cheat="items" data-id="${m.id}" type="button">Geben</button><button class="btn ghost small" data-cheat="resetTp" data-id="${m.id}" type="button">Teleporter-Pause aufheben</button></div></div>
+          <div class="cbox"><b>Welt</b><div class="inline"><button class="btn ghost small" data-cheat="revealAll" data-id="${m.id}" type="button">Karte aufdecken</button><button class="btn ghost small" data-cheat="respawn" data-id="${m.id}" type="button">Lager &amp; Vorkommen erneuern</button></div>
+            <div class="inline"><button class="btn ghost small" data-cheat="protOff" data-id="${m.id}" type="button">Schutz aufheben</button><button class="btn ghost small" data-cheat="protOn" data-id="${m.id}" type="button">4 Tage Schutz</button></div>
+            <div class="inline"><input id="cth${m.id}" type="number" min="1" max="336" value="24"><button class="btn small" data-cheat="time" data-id="${m.id}" type="button">Stunden vorspulen</button></div></div>
+        </div><p class="note" id="cmsg${m.id}"></p>
+      </details>
     </section>`;
   }).join('') : '<p class="note">Noch keine Partie. Erstelle oben die erste.</p>';
 }
+
+document.addEventListener('toggle', e => { const d = e.target; if (d.classList && d.classList.contains('cheats')) cheatOpen[d.dataset.id] = d.open; }, true);
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-cheat]'); if (!el) return;
+  const id = Number(el.dataset.id), k = el.dataset.cheat, v = n => $(n + id).value, msg = $('cmsg' + id);
+  const c = { player: v('cp') };
+  if (k === 'resources') { c.kind = 'resources'; for (const r of ['food', 'wood', 'stone', 'ore', 'gold']) c[r] = v('c' + r); }
+  else if (k === 'troops') { c.kind = 'troops'; c.count = v('ctc'); c.unit = v('ctu'); }
+  else if (k === 'levels') { c.kind = 'levels'; c.level = v('clv'); }
+  else if (k === 'store') { c.kind = 'store'; c.amount = v('cst'); }
+  else if (k === 'items') { c.kind = 'items'; c.teleport = v('ctp'); c.sp5 = v('c5'); c.sp60 = v('c60'); c.sp480 = v('c480'); }
+  else if (k === 'resetTp') { c.kind = 'items'; c.resetTp = true; }
+  else if (k === 'revealAll') c.kind = 'reveal';
+  else if (k === 'protOff') { c.kind = 'protection'; c.on = false; }
+  else if (k === 'protOn') { c.kind = 'protection'; c.on = true; }
+  else if (k === 'time') { c.kind = 'time'; c.hours = v('cth'); }
+  else c.kind = k;
+  const r = await api('/api/admin/match', { action: 'cheat', id, cheat: c });
+  msg.textContent = r.ok ? 'Erledigt: ' + el.textContent.trim() : (r.data.error || 'Fehler');
+});
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const r = await api('/api/admin/login', { password: $('pw').value });

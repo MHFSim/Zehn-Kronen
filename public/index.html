@@ -157,7 +157,10 @@ body:not(.mode-map) .hud{display:none}
 @keyframes tpf{0%{opacity:0}18%{opacity:.85}45%{opacity:.15}62%{opacity:.7}100%{opacity:0}}
 
 .placebtn{position:fixed;z-index:6;right:16px;top:calc(env(safe-area-inset-top,0px) + 150px);border:2px solid #8a6a24;background:linear-gradient(#f3d77a,#c9962c);color:#3b2608;border-radius:999px;padding:10px 14px;font:inherit;font-weight:700;box-shadow:0 3px 8px #0007;cursor:pointer}
-.placebtn[hidden],.placebar[hidden]{display:none}
+.placebtn[hidden],.placebar[hidden],.placeinfo[hidden]{display:none}
+.placeinfo{position:fixed;z-index:6;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 150px);display:flex;flex-wrap:wrap;gap:6px;justify-content:center;pointer-events:none}
+.placeinfo span{background:#f6edd2ee;color:#2e2012;border:2px solid #7a5230;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;box-shadow:0 2px 6px #0006}
+.placeinfo span.z{opacity:.6;font-weight:400}
 .placebar{position:fixed;z-index:7;left:12px;right:12px;bottom:calc(var(--nav) + 64px);background:#f6edd2;color:#2e2012;border:3px solid #7a5230;border-radius:14px;padding:12px;box-shadow:0 4px 14px #000a}
 .placebar .pl-txt{font-size:14px;margin-bottom:8px}.placebar .pl-txt.bad{color:#9a2a1c}.placebar .pl-txt.ok{color:#2c6a2f}
 .placebar .row{display:flex;gap:8px;justify-content:flex-end;margin:0}
@@ -373,6 +376,7 @@ body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overs
   </header>
   <div class="hud" id="hud"></div>
   <button class="placebtn" id="placeBtn" type="button" hidden>🏗 Außenposten</button>
+  <div class="placeinfo" id="placeInfo" hidden></div>
   <div class="placebar" id="placeBar" hidden><div class="pl-txt" id="placeTxt"></div><div class="row"><button class="btn ghost" type="button" id="placeCancel">Abbrechen</button><button class="btn ghost" type="button" id="placeTp">🌀 Teleport</button><button class="btn" type="button" id="placeGo">Hier bauen</button></div></div>
   <section class="sheet" id="sheet" aria-live="polite"><div class="sheet-inner" id="sheetInner"></div></section>
   <section class="panel" id="reports" hidden aria-live="polite"><div class="sheet-inner" id="reportsInner"></div></section>

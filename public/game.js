@@ -683,12 +683,24 @@ function placeTile() {
   const c = wm.root, s = c.scale.x;
   return wm.tileAt((app.screen.width / 2 - c.x) / s, (app.screen.height * .42 - c.y) / s);
 }
+// Welche Rohstoffpunkte liegen im Viereck (nur Erkundetes)?
+function placeInfo(t) {
+  const cnt = { farm: 0, wood: 0, stone: 0, ore: 0, sanct: 0, throne: 0 }, lv = { farm: 0, wood: 0, stone: 0, ore: 0 };
+  for (const o of wm.map.objects) {
+    if (!(o.k in cnt) || Math.abs(o.x - t.x) > OP_R || Math.abs(o.y - t.y) > OP_R || !wm.exploredBit(o.x, o.y)) continue;
+    cnt[o.k]++; if (o.k in lv) lv[o.k] += o.lv;
+  }
+  const chip = (ico, name, k) => `<span class="${cnt[k] ? '' : 'z'}">${ico} ${cnt[k]} ${name}${cnt[k] ? ' (Stufe ' + lv[k] + ' gesamt)' : ''}</span>`;
+  $('placeInfo').innerHTML = chip('🌾', 'Felder', 'farm') + chip('🌲', 'Wälder', 'wood') + chip('⛰', 'Steinbrüche', 'stone') + chip('⛏', 'Erzminen', 'ore')
+    + (cnt.sanct ? `<span>✨ ${cnt.sanct} Heiligtum</span>` : '') + (cnt.throne ? '<span>👑 Thron</span>' : '');
+}
 function placeStep() {
   const show = mode === 'map' && view && view.ally && !msel && view.match.phase === 'running';
-  $('placeBtn').hidden = !show || placing; $('placeBar').hidden = !(show && placing);
+  $('placeBtn').hidden = !show || placing; $('placeBar').hidden = !(show && placing); $('placeInfo').hidden = !(show && placing);
   if (!placing || !show) { if (placing && !show) placing = false; return; }
   const t = placeTile(), key = t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60);
   if (key === placeKey) return; placeKey = key;
+  placeInfo(t);
   const { mt, pls } = siteCtx(); placeWhy = checkSite(mt, pls, { id: me.id }, t.x, t.y, gtNow());
   wm.setPreview({ x: t.x, y: t.y, r: OP_R, ok: !placeWhy });
   const el = $('placeTxt'); el.className = 'pl-txt ' + (placeWhy ? 'bad' : 'ok');
@@ -805,7 +817,7 @@ function mapSignature() {
 }
 function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
 function planFor(o) {
-  const t = sendList(), key = o.id + JSON.stringify(t) + S.pos;
+  const t = sendList(), key = o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
   if (!sum(t)) return null;
   if (planCache.key !== key) planCache = { key, plan: planMarch(wm.map, S, o, t) };
   return planCache.plan;
