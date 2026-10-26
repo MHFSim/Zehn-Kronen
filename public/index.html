@@ -96,6 +96,48 @@ table.rep th{color:var(--muted);font-weight:500}
 body.mode-map .hint{display:none}
 body.reports-open #stage{visibility:hidden}
 
+/* Stadtmenü */
+body:not(.mode-map) #stage{display:none}
+body:not(.mode-map) .hud{display:none}
+.city{position:fixed;z-index:3;inset:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-user-select:none;user-select:none;padding:calc(env(safe-area-inset-top,0px) + 108px) max(14px,env(safe-area-inset-left,0px)) calc(var(--nav) + 28px);background:radial-gradient(120% 60% at 50% 0,#252b33,var(--bg) 70%)}
+.city-in{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.hero{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--brass);aspect-ratio:16/9;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.4)}
+.hero img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-t{position:absolute;left:0;right:0;bottom:0;padding:34px 14px 12px;background:linear-gradient(transparent,rgba(12,10,6,.88));display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.hero-name{font-family:'IM Fell English SC',serif;font-size:24px;line-height:1.1;color:#f3e7c5}
+.hero-sub{font-size:13px;color:#cdbf9a}
+.hero-lv{min-width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(21,17,12,.9);border:2px solid var(--brass);color:var(--brass);font-size:20px;font-weight:700}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.stats-row div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 4px;display:flex;flex-direction:column;gap:2px}
+.stats-row b{font-size:17px;font-variant-numeric:tabular-nums;color:var(--brass)}
+.stats-row span{font-size:11px;color:var(--muted)}
+.sec{margin:0 0 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:10px}
+.sec::after{content:'';flex:1;height:1px;background:var(--line)}
+.qrow{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;width:100%;text-align:left;color:var(--ink);font-family:inherit;font-size:14px}
+.qrow img{width:54px;height:34px;object-fit:cover;border-radius:6px}
+.qrow .qmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.qrow.free{color:var(--muted);border-style:dashed;background:none}
+.qrow.go{cursor:pointer;border-color:var(--brass)}
+.bgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:640px){.bgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:transform .12s,border-color .12s}
+.bcard:active{transform:scale(.985);border-color:var(--brass)}
+.bimg{position:relative;aspect-ratio:16/10;background:#222}
+.bimg img{width:100%;height:100%;object-fit:cover;display:block}
+.bcard.empty .bimg img{filter:grayscale(.75) brightness(.78)}
+.bcard.locked .bimg img{filter:grayscale(1) brightness(.42)}
+.blv{position:absolute;top:6px;left:6px;min-width:28px;height:28px;border-radius:14px;padding:0 6px;display:grid;place-items:center;background:rgba(21,17,12,.88);border:1.5px solid var(--brass);color:var(--brass);font-weight:700;font-size:14px}
+.btag{position:absolute;top:6px;right:6px;background:var(--brass);color:var(--brass-ink);border-radius:999px;font-size:11px;font-weight:700;padding:3px 8px}
+.bname{padding:8px 10px 0;font-weight:700;font-size:16px}
+.bmeta{padding:2px 10px 0;font-size:12.5px;color:var(--muted);line-height:1.35;min-height:2.7em}
+.bmeta b{color:var(--ink)}
+.bfoot{margin-top:auto;padding:8px 10px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.bfoot .costs.sm{font-size:12px;gap:2px 8px}
+.bprog{margin-top:auto;padding:10px;display:flex;align-items:center;gap:8px}
+.why.one{padding:0 10px 8px;font-size:11.5px;line-height:1.3}
+.sh-img{width:100%;height:110px;object-fit:cover;object-position:50% 72%;border-radius:10px;display:block}
+.hud{bottom:calc(var(--nav) + 10px)}
+
 /* Anmeldung */
 .auth{min-height:100%;display:grid;place-items:center;padding-block:32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .auth-card{width:100%;max-width:380px;display:flex;flex-direction:column;gap:14px}
@@ -121,7 +163,8 @@ body.reports-open #stage{visibility:hidden}
 </main>
 
 <div id="game" hidden>
-  <div id="stage" aria-label="Isometrische Stadtansicht"></div>
+  <div id="stage" aria-label="Weltkarte"></div>
+  <main class="city" id="city" aria-label="Stadt"></main>
   <header class="topbar">
     <div class="brand">
       <div><h1>Zehn Kronen</h1><small id="matchName"></small></div>

@@ -1,6 +1,6 @@
 # Zehn Kronen
 
-Browser-Strategiespiel für bis zu 10 Spieler. Stand: Schritt 3 des Entwicklungsplans – Stadt-Ausbau plus gemeinsame Weltkarte (96 x 96 Felder, Nebel des Krieges, Felder, Banditenlager, Ruinen, Heere mit Marsch und Kampf, Berichte, Lazarett).
+Browser-Strategiespiel für bis zu 10 Spieler. Stand: Schritt 3 des Entwicklungsplans – Stadt als Bildmenü (wie Lords & Knights) plus gemeinsame Weltkarte (96 x 96 Felder, Nebel des Krieges, Felder, Banditenlager, Ruinen, Heere mit Marsch und Kampf, Berichte, Lazarett).
 
 ## Was du brauchst
 
@@ -47,6 +47,7 @@ shared/rules.js    Stadtregeln – laufen auf dem Server und im Browser
 shared/mapgen.js   Kartenerzeugung aus einem Seed und Wegfindung (identisch auf Server und Client)
 shared/world.js    Weltregeln: Märsche, Sammeln, Kämpfe, Berichte, Nebel
 public/map.js      Kartendarstellung (PixiJS, eigener Gelände-Shader, Wasser, Nebel)
+public/art.js      (auch die Gebäudebilder des Stadtmenüs)
 public/art.js      Bilder der Karte, beim Start per Canvas gemalt (kein Download)
 test/              Regel- und Welttests (npm test)
 ```

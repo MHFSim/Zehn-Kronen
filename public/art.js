@@ -199,9 +199,9 @@ function castle(c, tier, withFlag) {
   if (tier >= 3) { wallBox(c, R - .95, .1, .6, .55, 8, [186, 156, 118]); hipRoof(c, R - 1.0, .05, .7, .65, 8, 8, [118, 66, 44]); }
   return { flag: [apx[0], apx[1] - (24 + tier * 4)], flag2: [fr[0], fr[1] - 14] };
 }
-function flagCloth(c) { // Fahne: weiß, wird mit der Spielerfarbe eingefärbt
+function flagCloth(c, col) { // Fahne: weiß, wird mit der Spielerfarbe eingefärbt
   c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(5, -2, 9, 3, 15, 0); c.lineTo(15, 9); c.bezierCurveTo(9, 12, 5, 7, 0, 9); c.closePath();
-  const g = c.createLinearGradient(0, 0, 15, 0); g.addColorStop(0, '#fff'); g.addColorStop(1, '#bbb'); c.fillStyle = g; c.fill();
+  const g = c.createLinearGradient(0, 0, 15, 0); g.addColorStop(0, col || '#fff'); g.addColorStop(1, col ? '#7a1e1a' : '#bbb'); c.fillStyle = g; c.fill();
   c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(0, 4, 15, 1.4);
 }
 
@@ -413,7 +413,7 @@ export function buildAtlas(PIXI) {
     const W = [190, 250, 310][t - 1], Hh = [190, 250, 310][t - 1], AY = [130, 175, 215][t - 1];
     add('castle' + t, W, Hh, W / 2, AY, c => castle(c, t));
   }
-  add('flag', 18, 14, 1, 2, flagCloth);
+  add('flag', 18, 14, 1, 2, c => flagCloth(c));
   add('farm', 220, 190, 110, 122, farm); add('wood', 220, 180, 110, 114, wood); add('stone', 220, 190, 110, 120, stone); add('ore', 230, 190, 115, 118, ore);
   add('camp', 220, 180, 110, 112, camp); add('campDead', 200, 100, 100, 70, campDead);
   add('ruin', 220, 190, 110, 118, ruin); add('sanct', 250, 240, 125, 150, sanct); add('throne', 330, 290, 165, 190, throne); add('slot', 130, 80, 65, 50, slot);
@@ -442,4 +442,113 @@ export function buildAtlas(PIXI) {
     anchor[d.name] = [d.ax / d.w, d.ay / d.h]; if (d.meta) meta[d.name] = d.meta;
   }
   return { tex, anchor, meta, SC, canvas: cv };
+}
+
+
+/* ---------- Bilder für das Stadtmenü ---------- */
+function backdrop(c, W, H) {
+  const sky = c.createLinearGradient(0, 0, 0, H * .66); sky.addColorStop(0, '#6fa6d2'); sky.addColorStop(1, '#e3ecdf');
+  c.fillStyle = sky; c.fillRect(0, 0, W, H);
+  const sun = c.createRadialGradient(W * .8, H * .2, 2, W * .8, H * .2, H * .5); sun.addColorStop(0, 'rgba(255,244,200,.85)'); sun.addColorStop(1, 'rgba(255,244,200,0)'); c.fillStyle = sun; c.fillRect(0, 0, W, H);
+  const r = lcg(5);
+  for (let i = 0; i < 4; i++) { const x = r() * W, y = H * (.08 + r() * .25); c.fillStyle = 'rgba(255,255,255,.55)'; for (let k = 0; k < 4; k++) { c.beginPath(); c.ellipse(x + k * 14, y + (k % 2) * 3, 22 - k * 3, 8, 0, 0, 7); c.fill(); } }
+  for (const [y0, col, amp] of [[.52, 'rgba(96,128,150,.8)', 22], [.58, 'rgba(78,112,92,.95)', 16]]) {
+    c.beginPath(); c.moveTo(0, H); c.lineTo(0, H * y0);
+    for (let x = 0; x <= W; x += 8) c.lineTo(x, H * y0 - Math.sin(x * .021 + y0 * 9) * amp * .6 - Math.sin(x * .053) * amp * .4);
+    c.lineTo(W, H); c.closePath(); c.fillStyle = col; c.fill();
+  }
+  const g = c.createLinearGradient(0, H * .58, 0, H); g.addColorStop(0, '#6f9a49'); g.addColorStop(1, '#4e7a38');
+  c.beginPath(); c.moveTo(0, H * .66); c.quadraticCurveTo(W * .5, H * .58, W, H * .66); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fillStyle = g; c.fill();
+  for (let i = 0; i < 150; i++) { c.fillStyle = r() > .5 ? 'rgba(130,170,80,.35)' : 'rgba(40,80,40,.3)'; c.fillRect(r() * W, H * (.66 + r() * .34), 2, 3); }
+  // Baumreihe hinten
+  for (let i = 0; i < 9; i++) { c.save(); c.translate(W * (.04 + i * .12) + r() * 10, H * .66 + r() * 6); c.scale(.55, .55); (i % 3 ? pine : oak)(c, i, false); c.restore(); }
+}
+function warehouse(c) {
+  const r = lcg(301); shadow(c, 110, 42, .36, 2, 2); grass(c, 90, 34, 24, r);
+  wallBox(c, -1.2, -.9, 2.4, 1.6, 17, [152, 112, 70], { jit: .18 });
+  hipRoof(c, -1.3, -1.0, 2.6, 1.8, 17, 17, [118, 62, 44]);
+  door(c, -.45, .6, .9, .1, 14, 'L'); c.strokeStyle = '#4a3624'; c.lineWidth = 1.2; const a = P(0, .7, 0); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(a[0], a[1] - 14); c.stroke();
+  for (const [x, y, z] of [[.9, .9, 0], [1.25, .85, 0], [1.05, .85, 9]]) wallBox(c, x, y, .32, .32, 9, [172, 132, 80], { jit: .1 });
+  for (const [x, y] of [[-1.5, .8], [-1.3, 1.05]]) { const p = P(x, y); c.fillStyle = '#7b5632'; c.fillRect(p[0] - 5, p[1] - 11, 10, 11); c.fillStyle = '#3a2a1c'; c.fillRect(p[0] - 5, p[1] - 8, 10, 1.3); c.fillRect(p[0] - 5, p[1] - 3, 10, 1.3); }
+}
+function barracks(c) {
+  const r = lcg(311); shadow(c, 120, 46, .36, 2, 2); grass(c, 100, 36, 20, r);
+  wallBox(c, -1.5, -.8, 3.0, 1.5, 20, [172, 162, 142]);
+  for (let i = 0; i < 4; i++) window2(c, -1.2 + i * .55, .7, 12, 'L');
+  door(c, -.15, .6, .6, .1, 14, 'L');
+  const ap = hipRoof(c, -1.6, -.9, 3.2, 1.7, 20, 16, [96, 112, 132]);
+  flagPole(c, ap, 28); c.save(); c.translate(ap[0], ap[1] - 28); flagCloth(c, '#b8322a'); c.restore();
+  // Waffenständer und Übungspuppe
+  for (let i = 0; i < 5; i++) { const p = P(1.2 + i * .06, 1.2 - i * .05); c.strokeStyle = '#5a4128'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(p[0] - 6 + i * 3, p[1]); c.lineTo(p[0] - 3 + i * 3, p[1] - 26); c.stroke(); c.fillStyle = '#cfd2d6'; c.fillRect(p[0] - 4 + i * 3, p[1] - 29, 2, 4); }
+  const d = P(-1.5, 1.3); c.strokeStyle = '#6b4c2c'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(d[0], d[1]); c.lineTo(d[0], d[1] - 24); c.moveTo(d[0] - 7, d[1] - 18); c.lineTo(d[0] + 7, d[1] - 18); c.stroke(); c.fillStyle = '#c9a647'; c.beginPath(); c.arc(d[0], d[1] - 26, 4, 0, 7); c.fill();
+}
+function archery(c) {
+  const r = lcg(321); shadow(c, 120, 46, .34, 2, 2); grass(c, 100, 36, 24, r);
+  wallBox(c, -1.5, -1.0, 1.2, 1.0, 14, [140, 102, 64], { jit: .2 }); hipRoof(c, -1.6, -1.1, 1.4, 1.2, 14, 13, [102, 78, 48]);
+  door(c, -1.2, -.1, .4, .1, 10, 'L');
+  const target = (x, y, sc) => { const p = P(x, y); c.strokeStyle = '#4a3624'; c.lineWidth = 2; c.beginPath(); c.moveTo(p[0] - 6 * sc, p[1]); c.lineTo(p[0], p[1] - 22 * sc); c.lineTo(p[0] + 6 * sc, p[1]); c.stroke();
+    const cx = p[0], cy = p[1] - 26 * sc; ['#f4efe0', '#c33a2e', '#f4efe0', '#c33a2e', '#e8c24a'].forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.arc(cx, cy, (11 - i * 2.2) * sc, 0, 7); c.fill(); });
+    c.strokeStyle = '#6b4c2c'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(cx + 1, cy - 1); c.lineTo(cx + 13 * sc, cy - 7 * sc); c.stroke(); };
+  target(.2, -.9, .8); target(.9, -.4, .9); target(1.5, .1, 1.0);
+  const b = P(-.5, .9); c.strokeStyle = '#6b4c2c'; c.lineWidth = 1.6; c.beginPath(); c.arc(b[0], b[1] - 10, 9, -1.2, 1.2); c.stroke(); c.strokeStyle = '#ddd'; c.lineWidth = .8; c.beginPath(); c.moveTo(b[0] + 3, b[1] - 18); c.lineTo(b[0] + 3, b[1] - 2); c.stroke();
+}
+function stable(c) {
+  const r = lcg(331); shadow(c, 120, 46, .34, 2, 2); grass(c, 100, 36, 26, r);
+  wallBox(c, -1.5, -1.0, 2.2, 1.3, 15, [146, 104, 66], { jit: .2 }); hipRoof(c, -1.6, -1.1, 2.4, 1.5, 15, 15, [186, 150, 70]);
+  door(c, -.8, .2, .5, .1, 11, 'L'); door(c, -.1, .2, .5, .1, 11, 'L');
+  // Koppel mit Zaun
+  c.strokeStyle = '#6b4c2c'; c.lineWidth = 2;
+  const f = [P(-.4, 1.1), P(1.6, 1.1), P(1.6, -.3)]; c.beginPath(); f.forEach((p, i) => i ? c.lineTo(p[0], p[1] - 9) : c.moveTo(p[0], p[1] - 9)); c.stroke();
+  c.beginPath(); f.forEach((p, i) => i ? c.lineTo(p[0], p[1] - 4) : c.moveTo(p[0], p[1] - 4)); c.stroke();
+  for (let i = 0; i <= 8; i++) { const p = P(-.4 + i * .25, 1.1); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p[0], p[1] - 12); c.stroke(); }
+  // Pferd
+  const h = P(.7, .6); c.fillStyle = '#7a4a2a'; c.beginPath(); c.ellipse(h[0], h[1] - 15, 12, 6, 0, 0, 7); c.fill();
+  c.beginPath(); c.moveTo(h[0] + 8, h[1] - 18); c.lineTo(h[0] + 14, h[1] - 28); c.lineTo(h[0] + 19, h[1] - 26); c.lineTo(h[0] + 15, h[1] - 15); c.fill();
+  c.strokeStyle = '#5a3418'; c.lineWidth = 2; for (const dx of [-8, -4, 5, 9]) { c.beginPath(); c.moveTo(h[0] + dx, h[1] - 11); c.lineTo(h[0] + dx, h[1]); c.stroke(); }
+  c.fillStyle = '#2c1d12'; c.fillRect(h[0] - 14, h[1] - 19, 5, 3);
+  for (const [x, y] of [[1.0, 1.5], [1.4, 1.35]]) { const p = P(x, y); c.fillStyle = '#c9a647'; c.beginPath(); c.ellipse(p[0], p[1] - 4, 6, 4.5, 0, 0, 7); c.fill(); }
+}
+function infirmary(c) {
+  const r = lcg(341); shadow(c, 120, 46, .34, 2, 2); grass(c, 100, 36, 24, r);
+  wallBox(c, -1.3, -.9, 2.4, 1.6, 17, [236, 230, 218], { jit: .05 });
+  hipRoof(c, -1.4, -1.0, 2.6, 1.8, 17, 16, [96, 124, 142]);
+  for (let i = 0; i < 3; i++) window2(c, -1.0 + i * .8, .7, 10, 'L');
+  const p = P(0, .7, 22); c.fillStyle = '#c0322c'; c.fillRect(p[0] - 2.4, p[1] - 8, 4.8, 16); c.fillRect(p[0] - 8, p[1] - 2.4, 16, 4.8);
+  door(c, .55, .6, .5, .1, 12, 'L');
+  for (const [x, y, col] of [[1.4, .5, '#4f8a3c'], [1.6, .9, '#6aa04a'], [1.3, 1.2, '#79b04f']]) { const q = P(x, y); c.fillStyle = col; c.beginPath(); c.arc(q[0], q[1] - 5, 6, 0, 7); c.fill(); }
+}
+function academy(c) {
+  const r = lcg(351); shadow(c, 120, 46, .36, 2, 2); grass(c, 100, 36, 22, r);
+  wallBox(c, -1.3, -.8, 2.4, 1.6, 17, [200, 192, 172]);
+  hipRoof(c, -1.4, -.9, 2.6, 1.8, 17, 15, [62, 84, 124]);
+  for (let i = 0; i < 3; i++) window2(c, -1.0 + i * .7, .8, 9, 'L');
+  wallBox(c, .25, -.55, .9, .9, 54, [212, 204, 184]);
+  const t = P(.7, -.1, 54); cone(c, t[0], t[1] + 2, 22, 28, [58, 78, 122], lcg(9), 7);
+  for (let k = 0; k < 2; k++) { const w = P(.7, .35, 40 - k * 14); c.fillStyle = '#f2d77a'; c.fillRect(w[0] - 2.5, w[1] - 6, 5, 8); }
+  const g = c.createRadialGradient(t[0], t[1] - 32, 1, t[0], t[1] - 32, 20); g.addColorStop(0, 'rgba(255,230,140,.8)'); g.addColorStop(1, 'rgba(255,230,140,0)'); c.fillStyle = g; c.fillRect(t[0] - 24, t[1] - 56, 48, 48);
+  c.fillStyle = '#f0c24a'; c.beginPath(); c.arc(t[0], t[1] - 32, 3.4, 0, 7); c.fill();
+}
+function gatehouse(c) {
+  const r = lcg(361); shadow(c, 130, 46, .36, 2, 2); grass(c, 110, 36, 24, r);
+  wallBox(c, -1.9, -.3, 3.8, .6, 20, [160, 152, 138]);
+  crenels(c, -1.9, -.3, 3.8, .6, 20, [160, 152, 138]);
+  for (const x of [-1.9, 1.1]) { wallBox(c, x, -.5, .8, .9, 34, [170, 162, 146]); const t = P(x + .4, -.05, 34); cone(c, t[0], t[1] + 2, 17, 20, [124, 52, 40], lcg(x + 7), 7); window2(c, x + .15, .4, 20, 'L'); }
+  door(c, -.55, .25, 1.1, .1, 20, 'L');
+  c.strokeStyle = '#3a2a1c'; c.lineWidth = 1.2; const a = P(0, .35, 0); for (let i = -4; i <= 4; i++) { c.beginPath(); c.moveTo(a[0] + i * 4.4, a[1] - 3 + Math.abs(i) * .4); c.lineTo(a[0] + i * 4.4, a[1] - 20); c.stroke(); }
+}
+const SCALE = { rathaus: [1.4, 1.08, .85], farm: 1.0, saege: 1.1, stein: 1.0, mine: .95, lager: 1.1, kaserne: 1.0, schiess: 1.1, stall: 1.05, lazarett: 1.05, akademie: 1.05, mauer: 1.05 };
+export function buildingImage(id, tier = 1, W = 320, H = 220) {
+  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+  const c = cv.getContext('2d'); c.scale(2, 2); backdrop(c, W, H);
+  c.save(); c.translate(W / 2, H * .73);
+  const sc = id === 'rathaus' ? SCALE.rathaus[tier - 1] : SCALE[id] || 1; c.scale(sc, sc);
+  switch (id) {
+    case 'rathaus': { const m = castle(c, tier); for (const k of ['flag', 'flag2']) { c.save(); c.translate(m[k][0], m[k][1]); flagCloth(c, '#c8372d'); c.restore(); } break; }
+    case 'farm': farm(c); break; case 'saege': wood(c); break; case 'stein': stone(c); break; case 'mine': ore(c); break;
+    case 'lager': warehouse(c); break; case 'kaserne': barracks(c); break; case 'schiess': archery(c); break; case 'stall': stable(c); break;
+    case 'lazarett': infirmary(c); break; case 'akademie': academy(c); break; case 'mauer': gatehouse(c); break;
+  }
+  c.restore();
+  const v = c.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * .95); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(10,8,4,.38)'); c.fillStyle = v; c.fillRect(0, 0, W, H);
+  return cv;
 }

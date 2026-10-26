@@ -7,6 +7,7 @@ import {
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos, battle, campTroops, campMult, campLoot, capacityOf, sum } from '/shared/world.js';
 import { NODE_MAX } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
+import { buildingImage } from '/public/art.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
@@ -22,7 +23,6 @@ function accept(v) {
   if (!v || !v.state) return;
   S = v.state; speed = v.match.speed; me = v.me; match = v.match; view = v;
   offset = v.now - Date.now();
-  dirty = true;
   if (wm && mapReady) wm.sync(v, me.id, offset);
 }
 const serverNow = () => Date.now() + offset;
@@ -78,241 +78,20 @@ function toast(msg) {
   el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
 }
 
-/* ---------- Isometrische Welt (PixiJS) ---------- */
-const TW = 96, TH = 48, N = 13, BRASS = 0xd2a94e;
-const iso = (x, y) => ({ x: (x - y) * TW / 2, y: (x + y) * TH / 2 });
-const up = (p, h) => ({ x: p.x, y: p.y - h });
-const shade = (c, f) => { const r = Math.min(255, (c >> 16 & 255) * f), g = Math.min(255, (c >> 8 & 255) * f), b = Math.min(255, (c & 255) * f); return (r << 16) | (g << 8) | b; };
-const hash = (x, y) => (((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000 / 1000;
-let app, world, ground, selG, og, badges, dirty = true, sel = null;
-const bounds = {}, badgeCache = {}, pick = {};
+let app, sel = null;
+const pick = {};
 
-function poly(g, pts, col, a = 1) { g.beginFill(col, a); g.drawPolygon(pts.flatMap(p => [p.x, p.y])); g.endFill(); }
-const diamond = (x, y, w, d) => [iso(x, y), iso(x + w, y), iso(x + w, y + d), iso(x, y + d)];
-function box(g, x, y, w, d, h, col) {
-  const n = iso(x, y), e = iso(x + w, y), s = iso(x + w, y + d), wv = iso(x, y + d);
-  poly(g, [wv, s, up(s, h), up(wv, h)], shade(col, .8));
-  poly(g, [s, e, up(e, h), up(s, h)], shade(col, .63));
-  poly(g, [up(n, h), up(e, h), up(s, h), up(wv, h)], col);
-  g.lineStyle(1, shade(col, .45), .55); g.moveTo(s.x, s.y); g.lineTo(s.x, s.y - h); g.lineStyle(0);
-  return { n: up(n, h), e: up(e, h), s: up(s, h), w: up(wv, h), cx: (n.x + s.x) / 2, cy: (n.y + s.y) / 2 - h };
-}
-function roof(g, c, rh, col) {
-  const a = { x: c.cx, y: c.cy - rh };
-  poly(g, [c.n, c.w, a], shade(col, .55)); poly(g, [c.n, c.e, a], shade(col, .5));
-  poly(g, [c.w, c.s, a], shade(col, .92)); poly(g, [c.s, c.e, a], shade(col, .7));
-  return a;
-}
-function face(g, side, x, y, w, d, u0, u1, v0, v1, col) {
-  const P = (u, v) => side === 'L' ? up(iso(x + u * w, y + d), v) : up(iso(x + w, y + u * d), v);
-  poly(g, [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)], col);
-}
-function flag(g, p, col) {
-  g.lineStyle(2, 0x3a3128, 1); g.moveTo(p.x, p.y); g.lineTo(p.x, p.y - 20); g.lineStyle(0);
-  poly(g, [{ x: p.x, y: p.y - 20 }, { x: p.x + 14, y: p.y - 16 }, { x: p.x, y: p.y - 12 }], col);
-}
-function tree(g, tx, ty, k) {
-  const c = iso(tx + .5, ty + .5), s = .8 + k * .5;
-  g.beginFill(0x4a3624); g.drawRect(c.x - 2, c.y - 10 * s, 4, 10 * s); g.endFill();
-  poly(g, [{ x: c.x - 14 * s, y: c.y - 8 * s }, { x: c.x + 14 * s, y: c.y - 8 * s }, { x: c.x, y: c.y - 34 * s }], shade(0x355c2c, .9 + k * .2));
-  poly(g, [{ x: c.x - 11 * s, y: c.y - 20 * s }, { x: c.x + 11 * s, y: c.y - 20 * s }, { x: c.x, y: c.y - 44 * s }], shade(0x41703a, .9 + k * .2));
-}
-function drawGround() {
-  ground.clear();
-  for (let x = -5; x < N + 5; x++) for (let y = -5; y < N + 5; y++) {
-    const inside = x >= 0 && y >= 0 && x < N && y < N, k = hash(x + 20, y + 20);
-    poly(ground, diamond(x, y, 1, 1), inside ? shade(0x5f7d3b, .9 + k * .18) : shade(0x445a2b, .85 + k * .2));
-  }
-  [[6, 8], [7, 8], [6, 9], [7, 9], [6, 10], [7, 10], [6, 13], [7, 13], [6, 14], [7, 14]]
-    .forEach(([x, y]) => poly(ground, diamond(x + .05, y, .9, 1), shade(0x8b6c47, .92 + hash(x, y) * .12)));
-  for (let x = -5; x < N + 5; x++) for (let y = -5; y < 0; y++) if (hash(x, y) > .55) tree(ground, x, y, hash(y, x));
-  for (let y = 0; y < N + 5; y++) for (let x = -5; x < 0; x++) if (hash(x, y) > .55) tree(ground, x, y, hash(y, x));
-}
-
-const STYLE = {
-  rathaus: [0xcfbd99, 0x8e3d2f], farm: [0x9a5a34, 0x6e4a2a], saege: [0x8b6a45, 0x5c4a36], stein: [0x9a978f, 0x66645f],
-  mine: [0x5d5952, 0x47433d], lager: [0xb08a5a, 0x5b4632], kaserne: [0xa49a88, 0x4a5560], schiess: [0x9c8466, 0x4f6a3e],
-  stall: [0x8f6b4a, 0x7a5530], lazarett: [0xd9d4c7, 0x5f7d8c], akademie: [0xbab3a4, 0x3d4f73], mauer: [0x9b968c, 0x55524d]
-};
-function plot(g, b, locked) {
-  poly(g, diamond(b.x + .1, b.y + .1, b.w - .2, b.w - .2), locked ? 0x3f4a2e : 0x7b6243, locked ? .55 : 1);
-  if (!locked) {
-    g.lineStyle(2, 0x5a4530, 1);
-    [[.18, .18], [b.w - .18, .18], [b.w - .18, b.w - .18], [.18, b.w - .18]].forEach(([u, v]) => { const p = iso(b.x + u, b.y + v); g.moveTo(p.x, p.y); g.lineTo(p.x, p.y - 9); });
-    g.lineStyle(0);
-  }
-  return iso(b.x + b.w / 2, b.y + b.w / 2).y - 6;
-}
-function drawBuilding(g, id) {
-  const b = B[id], L = S.lv[id], q = inQueue(S, id), [wc, rc] = STYLE[id], x = b.x, y = b.y;
-  let top;
-  if (L === 0 && !q) return plot(g, b, S.lv.rathaus < b.unlock);
-  const l = Math.max(L, 1);
-  if (q && L === 0) poly(g, diamond(x + .1, y + .1, b.w - .2, b.w - .2), 0x7b6243);
-  switch (id) {
-    case 'rathaus': {
-      const h = 32 + l * 2.4, c = box(g, x + .35, y + .35, 2.3, 2.3, h, wc);
-      face(g, 'L', x + .35, y + .35, 2.3, 2.3, .42, .58, 0, h * .42, 0x3b2c20);
-      face(g, 'R', x + .35, y + .35, 2.3, 2.3, .25, .38, h * .55, h * .78, 0x2d3440);
-      face(g, 'R', x + .35, y + .35, 2.3, 2.3, .62, .75, h * .55, h * .78, 0x2d3440);
-      roof(g, c, 26, rc);
-      const t = box(g, x + .15, y + .15, .8, .8, h + 26 + l, shade(wc, .95)), a = roof(g, t, 26, rc);
-      flag(g, a, BRASS); top = a.y - 22; break;
-    }
-    case 'farm': {
-      poly(g, diamond(x + .1, y + .1, b.w - .2, b.w - .2), 0xc5a24a);
-      g.lineStyle(2, 0x9f7f33, .9);
-      for (let i = 1; i < 6; i++) { const p0 = iso(x + .1 + i * .3, y + .1), p1 = iso(x + .1 + i * .3, y + 1.9); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); }
-      g.lineStyle(0);
-      const c = box(g, x + .15, y + .15, .95, 1.05, 14 + l * 1.4, wc);
-      face(g, 'L', x + .15, y + .15, .95, 1.05, .35, .65, 0, 9, 0x3b2c20);
-      top = roof(g, c, 16, rc).y; break;
-    }
-    case 'saege': {
-      const c = box(g, x + .2, y + .2, 1.5, 1.0, 15 + l * 1.4, wc);
-      face(g, 'L', x + .2, y + .2, 1.5, 1.0, .4, .6, 0, 10, 0x2e241a);
-      top = roof(g, c, 15, rc).y;
-      for (let i = 0; i < 3; i++) box(g, x + .3 + i * .45, y + 1.45, .38, .35, 6 + (i === 1 ? 4 : 0), 0x7a5232);
-      break;
-    }
-    case 'stein': {
-      const c = box(g, x + .2, y + .2, .9, .9, 13 + l, wc);
-      top = roof(g, c, 14, rc).y;
-      box(g, x + 1.05, y + .95, .6, .5, 9, 0x8d8a82); box(g, x + 1.25, y + 1.4, .45, .4, 6, 0x7f7c75); box(g, x + .4, y + 1.35, .5, .45, 7, 0x96938b);
-      break;
-    }
-    case 'mine': {
-      const c = box(g, x + .2, y + .2, 1.6, 1.6, 8 + l, wc), a = roof(g, c, 26 + l, 0x6f6a5f);
-      face(g, 'L', x + .2, y + .2, 1.6, 1.6, .4, .6, 0, 8 + l, 0x15130f);
-      box(g, x + .55, y + 1.85, .9, .12, 2, 0x6b5136); top = a.y; break;
-    }
-    case 'lager': {
-      const c = box(g, x + .15, y + .25, 1.7, 1.45, 16 + l * 1.5, wc);
-      face(g, 'L', x + .15, y + .25, 1.7, 1.45, .3, .7, 0, 12, 0x3b2c20);
-      top = roof(g, c, 18, rc).y; break;
-    }
-    case 'kaserne': {
-      const h = 19 + l * 1.7, c = box(g, x + .2, y + .2, 1.6, 1.6, h, wc);
-      face(g, 'L', x + .2, y + .2, 1.6, 1.6, .43, .57, 0, h * .45, 0x2e241a);
-      const a = roof(g, c, 14, rc); flag(g, a, 0xa8322a); top = a.y - 20; break;
-    }
-    case 'schiess': {
-      const c = box(g, x + .2, y + .2, 1.0, 1.6, 15 + l * 1.4, wc);
-      top = roof(g, c, 13, rc).y;
-      const p = iso(x + 1.55, y + 1.05);
-      g.beginFill(0x2e2a24); g.drawRect(p.x - 1, p.y - 18, 2, 18); g.endFill();
-      g.beginFill(0xe8e0cc); g.drawEllipse(p.x, p.y - 20, 9, 9); g.endFill();
-      g.beginFill(0xa8322a); g.drawEllipse(p.x, p.y - 20, 5, 5); g.endFill();
-      break;
-    }
-    case 'stall': {
-      const c = box(g, x + .2, y + .2, 1.6, 1.0, 15 + l * 1.4, wc);
-      face(g, 'L', x + .2, y + .2, 1.6, 1.0, .2, .35, 0, 9, 0x2e241a); face(g, 'L', x + .2, y + .2, 1.6, 1.0, .6, .75, 0, 9, 0x2e241a);
-      top = roof(g, c, 14, rc).y;
-      g.lineStyle(2, 0x6b5136, 1); const f0 = iso(x + .2, y + 1.85), f1 = iso(x + 1.8, y + 1.85), f2 = iso(x + 1.8, y + 1.3);
-      g.moveTo(f0.x, f0.y - 6); g.lineTo(f1.x, f1.y - 6); g.lineTo(f2.x, f2.y - 6); g.lineStyle(0); break;
-    }
-    case 'lazarett': {
-      const h = 17 + l * 1.5, c = box(g, x + .2, y + .2, 1.6, 1.6, h, wc);
-      for (let i = 0; i < 3; i++) face(g, 'R', x + .2, y + .2, 1.6, 1.6, .15 + i * .28, .3 + i * .28, h * .45, h * .75, 0x3c4d57);
-      face(g, 'L', x + .2, y + .2, 1.6, 1.6, .42, .58, 0, h * .45, 0x3b2c20);
-      top = roof(g, c, 14, rc).y; break;
-    }
-    case 'akademie': {
-      const h = 19 + l * 1.6, c = box(g, x + .25, y + .25, 1.5, 1.5, h, wc);
-      roof(g, c, 10, rc);
-      const t = box(g, x + .6, y + .6, .8, .8, h + 26, shade(wc, .97));
-      face(g, 'R', x + .6, y + .6, .8, .8, .35, .65, h + 8, h + 18, 0x2d3440);
-      top = roof(g, t, 26, rc).y; break;
-    }
-    case 'mauer': {
-      const hw = L ? 16 + L * 2 : 11, col = L ? wc : 0x7a5a3a;
-      const a1 = box(g, x + .05, y + .35, .65, .65, hw + 14, col);
-      box(g, x + .7, y + .45, .6, .45, hw + 4, shade(col, .95));
-      face(g, 'L', x + .7, y + .45, .6, .45, .15, .85, 0, hw - 2, 0x1f1a14);
-      const a2 = box(g, x + 1.3, y + .35, .65, .65, hw + 14, col);
-      if (L) { roof(g, a1, 14, rc); top = roof(g, a2, 14, rc).y; } else top = a2.n.y - 6;
-      break;
-    }
-  }
-  if (q) {
-    const f = diamond(x + .12, y + .12, b.w - .24, b.w - .24);
-    g.lineStyle(2, 0x6e5233, .95);
-    [f[1], f[2], f[3]].forEach(p => { g.moveTo(p.x, p.y); g.lineTo(p.x, p.y - 30); });
-    g.moveTo(f[3].x, f[3].y - 15); g.lineTo(f[2].x, f[2].y - 15); g.lineTo(f[1].x, f[1].y - 15);
-    g.moveTo(f[3].x, f[3].y); g.lineTo(f[2].x, f[2].y - 30); g.lineStyle(0);
-    const cx = iso(x + b.w / 2, y + b.w / 2).x, py = top - 34;
-    g.beginFill(0x1b1f24, .85); g.drawRoundedRect(cx - 30, py, 60, 8, 4); g.endFill();
-    g.beginFill(BRASS); g.drawRoundedRect(cx - 29, py + 1, 58 * Math.max(0, 1 - q.left / q.total), 6, 3); g.endFill();
-    top = py;
-  }
-  return top;
-}
-function wallSegs() {
-  const L = S.lv.mauer, h = L ? 13 + L * 2 : 9, col = L ? 0x9b968c : 0x7a5a3a, out = [];
-  const seg = (x, y, w, d, hh) => out.push({ d: x + w / 2 + y + d / 2, fn: g => box(g, x, y, w, d, hh, col) });
-  for (let i = 0; i < N; i++) {
-    seg(i, 0, 1, .35, h); seg(0, i, .35, 1, h); seg(N - .35, i, .35, 1, h);
-    if (i !== 6 && i !== 7) seg(i, N - .35, 1, .35, h);
-  }
-  [[0, 0], [N - .6, 0], [0, N - .6], [N - .6, N - .6]].forEach(([x, y]) => seg(x, y, .6, .6, h + 10));
-  return out;
-}
-function placeBadge(id, x, y) {
-  const L = S.lv[id], locked = S.lv.rathaus < B[id].unlock && L === 0;
-  let bd = badgeCache[id];
-  if (!bd) {
-    bd = new PIXI.Container();
-    const bg = new PIXI.Graphics(), tx = new PIXI.Text('', { fontFamily: 'Alegreya Sans, sans-serif', fontSize: 13, fontWeight: '700', fill: 0xebe5d6 });
-    tx.anchor.set(.5); tx.resolution = 2; bd.addChild(bg, tx); bd.bg = bg; bd.tx = tx; badgeCache[id] = bd; badges.addChild(bd);
-  }
-  const label = L ? String(L) : (locked ? 'R' + B[id].unlock : '+');
-  if (bd.label !== label || bd.isSel !== (sel === id)) {
-    bd.label = label; bd.isSel = sel === id;
-    bd.tx.text = label; bd.tx.style.fill = L ? 0xebe5d6 : (locked ? 0xa29b8b : 0x1b1f24);
-    const w = Math.max(22, bd.tx.width + 12);
-    bd.bg.clear(); bd.bg.lineStyle(1.5, bd.isSel ? 0xebe5d6 : BRASS, 1); bd.bg.beginFill(L || locked ? 0x232830 : BRASS, .95);
-    bd.bg.drawRoundedRect(-w / 2, -11, w, 22, 11); bd.bg.endFill();
-  }
-  bd.position.set(x, y);
-}
-function redraw() {
-  og.clear();
-  const items = wallSegs();
-  [[4, 10, .2], [3, 11, .7], [4, 7, .4], [8, 4, .9], [4, 4, .1], [3, 2, .6]].forEach(([tx, ty, k]) => items.push({ d: tx + ty + 1, fn: g => tree(g, tx, ty, k) }));
-  for (const id in B) {
-    const b = B[id];
-    items.push({ d: b.x + b.y + b.w, fn: g => {
-      const top = drawBuilding(g, id), c = iso(b.x + b.w / 2, b.y + b.w / 2);
-      bounds[id] = { x0: iso(b.x, b.y + b.w).x, x1: iso(b.x + b.w, b.y).x, y0: top - 18, y1: iso(b.x + b.w, b.y + b.w).y, d: b.x + b.y + b.w };
-      placeBadge(id, c.x, top - 12);
-    } });
-  }
-  items.sort((a, b) => a.d - b.d).forEach(it => it.fn(og));
-  selG.clear();
-  if (sel) { const b = B[sel]; selG.lineStyle(3, BRASS, 1); selG.drawPolygon(diamond(b.x + .04, b.y + .04, b.w - .08, b.w - .08).flatMap(p => [p.x, p.y])); selG.lineStyle(0); }
-}
-
-/* ---------- Kamera (Stadt und Karte teilen sich die Bedienung) ---------- */
-const cam = () => mode === 'map' && wm ? wm.root : world;
+/* ---------- Kamera der Karte ---------- */
+const cam = () => wm.root;
 function clampCam() {
   const c = cam(), s = c.scale.x, W = app.screen.width, H = app.screen.height;
-  if (mode === 'map') {
-    c.x = Math.min(W / 2 + 3072 * s, Math.max(W / 2 - 3072 * s, c.x));
-    c.y = Math.min(H * .7, Math.max(H * .3 - 3300 * s, c.y));
-    return;
-  }
-  c.x = Math.min(W * .85 + N * TW / 2 * s, Math.max(W * .15 - N * TW / 2 * s, c.x));
-  c.y = Math.min(H * .85 + 40 * s, Math.max(H * .2 - (N * TH + 40) * s, c.y));
+  c.x = Math.min(W / 2 + 3072 * s, Math.max(W / 2 - 3072 * s, c.x));
+  c.y = Math.min(H * .7, Math.max(H * .3 - 3300 * s, c.y));
 }
 function zoomAt(p, ns) {
-  const c = cam(), s = c.scale.x; ns = mode === 'map' ? Math.min(1.7, Math.max(.14, ns)) : Math.min(1.8, Math.max(.32, ns));
+  const c = cam(), s = c.scale.x; ns = Math.min(1.7, Math.max(.14, ns));
   const wx = (p.x - c.x) / s, wy = (p.y - c.y) / s;
   c.scale.set(ns); c.x = p.x - wx * ns; c.y = p.y - wy * ns; clampCam();
-}
-function centerCam() {
-  const s = Math.min(1, Math.max(.42, app.screen.width / 760)), c = iso(6.5, 6.5);
-  world.scale.set(s); world.x = app.screen.width / 2 - c.x * s; world.y = app.screen.height * .56 - c.y * s; clampCam();
 }
 function focusMap(tx, ty, zoom) {
   const c = wm.root, s = zoom || c.scale.x, p = wm.worldPos(tx, ty);
@@ -346,16 +125,7 @@ function setupInput() {
   view.addEventListener('wheel', e => { e.preventDefault(); zoomAt({ x: e.clientX, y: e.clientY }, cam().scale.x * (e.deltaY < 0 ? 1.12 : .89)); }, { passive: false });
   window.addEventListener('resize', () => setTimeout(clampCam, 50));
 }
-let hinted = false;
-try { hinted = localStorage.getItem('zk-hint') === '1'; } catch {}
-function tap(sx, sy) {
-  if (mode === 'map') return mapTap(sx, sy);
-  const s = world.scale.x, wx = (sx - world.x) / s, wy = (sy - world.y) / s;
-  let best = null;
-  for (const id in bounds) { const r = bounds[id]; if (wx >= r.x0 && wx <= r.x1 && wy >= r.y0 && wy <= r.y1 && (!best || r.d > bounds[best].d)) best = id; }
-  if (best) openSheet(best); else closeSheet();
-  if (!hinted) { hinted = true; try { localStorage.setItem('zk-hint', '1'); } catch {} }
-}
+function tap(sx, sy) { mapTap(sx, sy); }
 
 /* ---------- Oberfläche ---------- */
 const $ = id => document.getElementById(id);
@@ -377,7 +147,6 @@ function renderHud() {
   const tq = queuedTroops(S);
   parts.push(`<div class="chip">Truppen ${fmtN(troopCount(S))}${tq ? ' · ' + fmtN(tq) + ' in Ausbildung' : ''}</div>`);
   for (const m of ownMarches()) parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}</button>`);
-  if (!hinted) parts.push('<div class="chip hint">Tippe ein Gebäude an</div>');
   $('hud').innerHTML = parts.join('');
 }
 function statsHTML(id) {
@@ -437,7 +206,7 @@ function renderSheet() {
   if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
-  $('sheetInner').innerHTML = `<div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
+  $('sheetInner').innerHTML = `<img class="sh-img" alt="" src="${imgOf(id)}"><div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
     <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${id === 'rathaus' || (b.units && L) ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'rathaus' ? matchHTML() : ''}`;
   sheetSig = signature();
 }
@@ -450,12 +219,8 @@ function updateSheet() {
   const o = (S.train[sel] || [])[0];
   if (o) { const p = $('trProg'), t = $('trTime'); if (p) p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
 }
-function openSheet(id) {
-  const b = B[id], s = world.scale.x, c = iso(b.x + b.w / 2, b.y + b.w / 2);
-  world.x = app.screen.width / 2 - c.x * s; world.y = app.screen.height * .26 - c.y * s; clampCam();
-  sel = id; document.body.classList.add('sheet-open'); renderSheet(); dirty = true;
-}
-function closeSheet() { sel = null; msel = null; if (wm) wm.select(null); document.body.classList.remove('sheet-open'); dirty = true; }
+function openSheet(id) { msel = null; sel = id; document.body.classList.add('sheet-open'); renderSheet(); }
+function closeSheet() { sel = null; msel = null; if (wm) wm.select(null); document.body.classList.remove('sheet-open'); }
 
 async function command(cmd) {
   if (busy) return false; busy = true;
@@ -463,7 +228,7 @@ async function command(cmd) {
   busy = false;
   if (r.data && r.data.state) accept(r.data);
   if (!r.ok) toast(r.data.error || 'Das hat nicht geklappt.');
-  renderSheet(); renderTop(); renderHud(); renderNav();
+  renderSheet(); renderTop(); renderHud(); renderNav(); renderCity(true);
   return r.ok;
 }
 function setupSheet() {
@@ -481,6 +246,83 @@ function setupSheet() {
     }
     if (act === 'heal') return command({ type: 'heal', unit: u, count: Math.min(S.wounded[u] || 0, Number(el.dataset.n) || 1e9) });
     if (act === 'logout') { await api('/api/logout', {}); location.href = '/'; }
+  });
+}
+
+/* ---------- Stadt als Menü (wie bei Lords & Knights) ---------- */
+const BGROUPS = [['Wirtschaft', ['farm', 'saege', 'stein', 'mine', 'lager']], ['Militär', ['kaserne', 'schiess', 'stall', 'lazarett']], ['Verwaltung', ['akademie', 'mauer']]];
+const imgCache = {};
+const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
+function imgOf(id) {
+  const t = id === 'rathaus' ? tierOf(S.lv.rathaus) : 1, key = id + t;
+  if (!imgCache[key]) imgCache[key] = buildingImage(id, t).toDataURL('image/jpeg', .86);
+  return imgCache[key];
+}
+function cityMeta(id) {
+  const L = S.lv[id], b = B[id];
+  if (!L) return S.lv.rathaus < b.unlock ? 'Noch gesperrt' : 'Noch nicht gebaut';
+  if (b.prod) return `<b>+${fmtN(prodAt(id, L))}</b>/h ${RES_DE[b.prod]}`;
+  if (id === 'lager') return `Lager <b>${fmtN(cap(S))}</b> · Schutz ${protectedPct(S)} %`;
+  if (id === 'mauer') return `Verteidigung <b>+${5 * L} %</b>`;
+  if (id === 'lazarett') return `Verwundete <b>${fmtN(woundedCount(S))}</b> / ${fmtN(lazarettCap(S))}`;
+  if (b.units) return `Ausbildung <b>−${Math.round((1 - Math.pow(.95, L - 1)) * 100)} %</b> Zeit`;
+  if (id === 'akademie') return 'Forschung folgt';
+  return b.desc;
+}
+function buildingCard(id) {
+  const b = B[id], L = S.lv[id], q = inQueue(S, id), locked = L === 0 && S.lv.rathaus < b.unlock, why = locked ? '' : blocker(S, id);
+  const t = (S.train[id] || [])[0];
+  let foot;
+  if (q) foot = `<div class="bprog"><div class="prog"><i data-qprog="${id}" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" data-qtime="${id}">${fmtT(real(q.left))}</span></div>`;
+  else if (locked) foot = `<div class="bfoot"><span class="why">Rathaus Stufe ${b.unlock} nötig</span></div>`;
+  else if (id === 'rathaus' && L >= 20) foot = '<div class="bfoot"><span class="note">Höchststufe</span></div>';
+  else foot = `<div class="bfoot"><span class="costs sm">${costHTML(costOf(id, L + 1))}</span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button></div>${why ? `<div class="why one">${why}</div>` : ''}`;
+  const extra = t ? `<div class="bmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
+  return `<article class="bcard ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="bimg"><img alt="" src="${imgOf(id)}"><span class="blv">${L || '–'}</span>${q ? '<span class="btag">Im Bau</span>' : ''}</div>
+    <div class="bname">${b.name}</div><div class="bmeta">${cityMeta(id)}</div>${extra}${foot}</article>`;
+}
+function citySig() {
+  return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
+    Object.keys(B).map(id => (S.lv[id] === 0 && S.lv.rathaus < B[id].unlock) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name]);
+}
+let citySigV = '';
+function renderCity(force) {
+  if (!S || !$('city')) return;
+  const sig = citySig(); if (!force && sig === citySigV) return; citySigV = sig;
+  const L = S.lv.rathaus, q = S.queue, marches = ownMarches();
+  const tr = []; for (const k in S.train) for (const [i, o] of S.train[k].entries()) tr.push({ k, o, first: i === 0 });
+  const queueRows = q.map(x => `<div class="qrow"><img alt="" src="${imgOf(x.id)}"><div class="qmain"><b>${B[x.id].name}</b> → Stufe ${x.target}<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div></div><span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span></div>`).join('')
+    + (q.length < maxQueues(S) ? `<div class="qrow free"><div class="qmain">Bauschleife frei – wähle unten ein Gebäude zum Ausbau.</div></div>` : '');
+  const trainRows = tr.map(({ k, o, first }) => `<div class="qrow"><img alt="" src="${imgOf(k)}"><div class="qmain"><b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}${first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : ''}</div><span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span></div>`).join('');
+  const marchRows = marches.map(m => `<button class="qrow go" type="button" data-march="${m.id}"><div class="qmain"><b>Heer</b> · ${KIND_SHORT[m.tk] || ''}</div><span class="time" data-mtime="${m.id}">${marchLine(m)}</span></button>`).join('');
+  const home = homeTroops(S), away = awayTroops(S), wd = woundedCount(S);
+  $('city').innerHTML = `<div class="city-in">
+    <article class="hero" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="hero-t"><div><div class="hero-name">Burg von ${esc(me.name)}</div><div class="hero-sub">Rathaus Stufe ${L} · Partie „${esc(match.name)}“</div></div><span class="hero-lv">${L}</span></div>
+    </article>
+    <div class="stats-row"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
+    <section><h3 class="sec">Aufträge</h3>${queueRows}${trainRows}${marchRows}</section>
+    ${BGROUPS.map(([title, ids]) => `<section><h3 class="sec">${title}</h3><div class="bgrid">${ids.map(buildingCard).join('')}</div></section>`).join('')}
+  </div>`;
+}
+function updateCity() {
+  renderCity(false);
+  for (const x of S.queue) {
+    const p = document.querySelectorAll(`[data-qprog="${x.id}"]`), t = document.querySelectorAll(`[data-qtime="${x.id}"]`);
+    p.forEach(e => { e.style.width = Math.max(0, 1 - x.left / x.total) * 100 + '%'; }); t.forEach(e => { e.textContent = fmtT(real(x.left)); });
+  }
+  for (const k in S.train) { const o = S.train[k][0]; if (!o) continue;
+    document.querySelectorAll(`[data-tprog="${k}"]`).forEach(e => { e.style.width = (1 - o.left / o.per) * 100 + '%'; });
+    document.querySelectorAll(`[data-ttime="${k}"]`).forEach(e => { e.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); });
+    document.querySelectorAll(`[data-tinfo="${k}"]`).forEach(e => { e.textContent = `${o.count}× ${U[o.unit].name}${o.heal ? ' (Heilung)' : ''} · ${fmtT(real(o.left + (o.count - 1) * o.per))}`; }); }
+  for (const m of ownMarches()) document.querySelectorAll(`[data-mtime="${m.id}"]`).forEach(e => { e.textContent = marchLine(m); });
+}
+function setupCity() {
+  $('city').addEventListener('click', async e => {
+    const up = e.target.closest('[data-up]');
+    if (up) { e.stopPropagation(); return void command({ type: 'upgrade', id: up.dataset.up }); }
+    const mb = e.target.closest('[data-march]');
+    if (mb) { await setMode('map'); if (mode === 'map') selectMap({ type: 'march', id: Number(mb.dataset.march) }, true); return; }
+    const c = e.target.closest('[data-b]'); if (c) openSheet(c.dataset.b);
   });
 }
 
@@ -646,11 +488,17 @@ async function buildMap() {
   const el = $('loading'); el.hidden = false; await new Promise(r => setTimeout(r, 40));
   try {
     const r = await api('/api/map'); if (!r.ok) throw new Error(r.data.error || 'Karte nicht verfügbar');
-    wm = new WorldMap(PIXI, app); wm.load(r.data); mapReady = true; wm.sync(view, me.id, offset);
+    document.body.classList.add('mode-map');   // damit die Zeichenfläche eine Größe hat
+    app = new PIXI.Application({ resizeTo: window, backgroundColor: 0x05182d, antialias: true, resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true });
+    $('stage').appendChild(app.view);
+    wm = new WorldMap(PIXI, app); wm.load(r.data); app.stage.addChild(wm.root); mapReady = true; wm.sync(view, me.id, offset);
     const own = wm.map.starts[S.slot] || { x: 48, y: 48 };
     wm.root.scale.set(Math.min(.8, Math.max(.45, app.screen.width / 640)));
-    mode = 'map'; focusMap(own.x + .5, own.y + .5); mode = 'city';
-  } catch (e) { toast(String(e.message || e)); el.hidden = true; return false; }
+    focusMap(own.x + .5, own.y + .5);
+    setupInput();
+    app.ticker.add(() => { if (mode !== 'map') return; const c = wm.root, s = c.scale.x, H = app.screen.height; wm.frame(app.ticker.deltaMS / 1000, s, { y0: -c.y / s, y1: (H - c.y) / s }); });
+    document.body.classList.remove('mode-map');
+  } catch (e) { document.body.classList.remove('mode-map'); toast(String(e.message || e)); el.hidden = true; return false; }
   el.hidden = true; return true;
 }
 async function setMode(m) {
@@ -658,8 +506,9 @@ async function setMode(m) {
   if (m === mode && (m === 'city' || mapReady)) return;
   if (m === 'map' && !(await buildMap())) return;
   closeSheet(); mode = m;
-  app.stage.removeChildren(); app.stage.addChild(m === 'map' ? wm.root : world);
-  document.body.classList.toggle('mode-map', m === 'map'); setNav(m); dirty = true; renderHud();
+  document.body.classList.toggle('mode-map', m === 'map'); setNav(m);
+  if (app) { if (m === 'map') app.ticker.start(); else app.ticker.stop(); }
+  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') renderCity(true);
 }
 function setupNav() {
   $('nav').addEventListener('click', e => {
@@ -692,27 +541,14 @@ async function resync() {
 function startGame() {
   $auth.hidden = true; $('game').hidden = false; document.body.classList.add('playing');
   $('matchName').textContent = match.name;
-  app = new PIXI.Application({ resizeTo: window, backgroundColor: 0x1b1f24, antialias: true, resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true });
-  $('stage').appendChild(app.view);
-  world = new PIXI.Container(); app.stage.addChild(world);
-  ground = new PIXI.Graphics(); selG = new PIXI.Graphics(); og = new PIXI.Graphics(); badges = new PIXI.Container();
-  world.addChild(ground, selG, og, badges);
-  setupInput(); setupSheet(); setupNav(); renderNav(); drawGround(); centerCam(); live = true; redraw(); renderTop(); renderHud();
+  setupSheet(); setupNav(); setupCity(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
   connect();
   setInterval(resync, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resync(); });
-  let acc = 0;
-  app.ticker.add(() => {
+  setInterval(() => {
     advanceTo(S, serverNow(), speed); // dieselben Regeln wie auf dem Server, nur zur Anzeige
-    acc += app.ticker.deltaMS / 1000;
-    const slow = acc >= .25;
-    if (mode === 'map' && mapReady) {
-      const c = wm.root, s = c.scale.x, H = app.screen.height;
-      wm.frame(app.ticker.deltaMS / 1000, s, { y0: -c.y / s, y1: (H - c.y) / s });
-      if (slow) { acc = 0; renderTop(); renderHud(); updateSheet(); }
-    } else if (slow) { acc = 0; redraw(); renderTop(); renderHud(); updateSheet(); dirty = false; }
-    else if (dirty) { redraw(); dirty = false; }
-  });
+    renderTop(); renderHud(); updateSheet(); if (mode === 'city') updateCity();
+  }, 250);
 }
-window.__zk = { get wm() { return wm; }, get cam() { return cam(); }, get sel() { return msel; } };   // nur für Tests
+window.__zk = { get wm() { return wm; }, get cam() { return wm && wm.root; }, get sel() { return msel; } };   // nur für Tests
 boot();
