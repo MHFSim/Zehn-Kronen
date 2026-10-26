@@ -160,9 +160,7 @@ function wallRing(pc, lvM, roofCol) {
   b.box(g * 2 + .2, 1.0, 1.1, 0, h + .05, gz, mul(ST, 1.1)); b.box(g * 2 + .3, .1, 1.2, 0, h + .05, gz, mul(ST, 1.2)); crenels(b, -g, gz + .5, g, gz + .5, h + 1.05, ST, .4);
   b.box(g * 2, h + .05, 1.0, 0, 0, gz, DARK);
   for (let i = -3; i <= 3; i++) b.box(.04, h * .92, .04, i * g * .3, .06, gz + .5, [64, 58, 54]); for (let k = 0; k < 4; k++) b.box(g * 2, .04, .04, 0, .3 + k * .35, gz + .5, [64, 58, 54]);
-  for (let i = 0; i < 28; i++) b.box(g * 1.7, .06, .17, 0, .0, gz + .4 + i * .16, mul([138, 100, 64], .86 + hash(i, 2, 8) * .3), 0);
-  for (const sx of [-1, 1]) { b.box(.1, .08, 4.6, sx * g * .86, .0, gz + 2.6, WOOD_D); for (let i = 0; i < 5; i++) { b.cyl(.04, .04, .6, 5, sx * g * .86, .0, gz + .8 + i * 1.0, WOOD); } b.box(.06, .06, 4.2, sx * g * .86, .55, gz + 2.7, WOOD); for (let i = 0; i < 3; i++) b.cyl(.09, .1, 1.1, 6, sx * g * .7, -1.0, gz + 1.4 + i * 1.3, WOOD_D); }
-  for (const sx of [-1, 1]) { b.cyl(.012, .012, 1.6, 3, sx * g * .5, h * .55, gz + .7, [60, 56, 52], 0); }
+  for (let i = 0; i < 28; i++) b.box(g * 1.7, .06, .17, 0, .0, gz + .4 + i * .16, mul(PATH, .86 + hash(i, 2, 8) * .3), 0);
   b.box(.7, .5, .04, -g * .55, h + .15, gz + .55, mul(pc, .9)); b.box(.7, .5, .04, g * .55, h + .15, gz + .55, mul(pc, .9)); b.box(.2, .25, .05, 0, h + .6, gz + .56, GOLD);
   b.gable(g * 2 + .4, 1.1, .6, 0, h + 1.15, gz, mul(roof, .9), Math.PI);
   for (const s of [-1, 1]) { b.cyl(.03, .03, .7, 5, s * (g + .1), .0, gz + 1.0, WOOD_D); b.cone(.1, .2, 6, s * (g + .1), .7, gz + 1.0, LIGHT); }
@@ -223,9 +221,8 @@ const dOct = (x, z) => Math.max(Math.max(Math.abs(x), Math.abs(z)) - W, (Math.ab
 const MOAT0 = 1.5, MOAT1 = 4.4;
 const hOut = (x, z) => {
   const d = Math.max(dOct(x, z), 0), r = Math.hypot(x, z);
-  if (d < MOAT0) return -.05;
-  if (d < MOAT1) { const t = (d - MOAT0) / (MOAT1 - MOAT0); return -.95 * Math.pow(Math.sin(t * Math.PI), .55) - .05; }
-  const t = smooth(MOAT1, 44, d), n = vnoise(x * .06, z * .06, 11) * 5 + vnoise(x * .17, z * .17, 12) * 1.4;
+  if (d < 2.2) return -.05;
+  const t = smooth(2.2, 44, d), n = vnoise(x * .06, z * .06, 11) * 5 + vnoise(x * .17, z * .17, 12) * 1.4;
   return t * (n * .9 + 2) - .05 + smooth(55, 120, r) * 14;
 };
 function outerGround() {
@@ -234,7 +231,6 @@ function outerGround() {
   for (let i = 0; i < P.count; i++) {
     const x = P.getX(i), z = P.getZ(i), y = hOut(x, z), d = Math.max(dOct(x, z), 0), a = vnoise(x * .09, z * .09, 4), b = vnoise(x * .5, z * .5, 6);
     let c = mixc([76, 128, 52], [116, 160, 66], a); c = mixc(c, [150, 126, 86], (1 - smooth(MOAT1, MOAT1 + 6, d)) * .5 * (.5 + b)); c = mixc(c, [128, 120, 106], smooth(8, 20, y)); c = mixc(c, [236, 240, 246], smooth(15, 22, y));
-    if (d > MOAT0 - .3 && d < MOAT1 + .3) c = mixc(c, [92, 84, 64], smooth(-.1, -.7, y) * .9);
     const k = .86 + b * .22; col[i * 3] = LIN(c[0] * k); col[i * 3 + 1] = LIN(c[1] * k); col[i * 3 + 2] = LIN(c[2] * k); P.setY(i, y);
   }
   g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
@@ -337,11 +333,12 @@ export class CityView {
     const mat = this.matVC, geos = { pine: treeGeo('pine'), oak: treeGeo('oak'), bush: treeGeo('bush'), rock: treeGeo('rock') };
     const GREEN = { pine: [[36, 84, 48], [44, 98, 56]], oak: [[84, 140, 52], [100, 152, 58]], bush: [[76, 120, 56], [92, 134, 60]], rock: [[146, 140, 128], [128, 122, 112]], blossom: [[240, 160, 184], [226, 130, 168]] };
     const lists = { pine: [], oak: [], bush: [], rock: [], blossom: [] };
-    for (let i = 0; i < 900 && lists.pine.length + lists.oak.length < 230; i++) {
+    for (let i = 0; i < 9000 && lists.pine.length + lists.oak.length < 760; i++) {
       const x = (hash(i, 1, 21) - .5) * 150, z = (hash(i, 2, 21) - .5) * 150, d = Math.max(dOct(x, z), 0);
-      if (d < 6 || Math.abs(x) > 74 || Math.abs(z) > 74) continue; const dens = vnoise(x * .05, z * .05, 22); if (dens < .42 && d < 20) continue;
+      if (d < 6 || Math.abs(x) > 74 || Math.abs(z) > 74) continue; const dens = vnoise(x * .05, z * .05, 22); if (dens < .36 && d < 26) continue;
       const k = hash(i, 3, 21); lists[k > .45 ? 'pine' : 'oak'].push([x, hOut(x, z), z, 1.5 + hash(i, 4, 21) * 1.2, hash(i, 5, 21) * 6.28, hash(i, 6, 21)]);
-      if (k > .8) lists.bush.push([x + 1, hOut(x + 1, z), z, 1.6, 0, hash(i, 7, 21)]);
+      if (k > .6) lists.bush.push([x + 1, hOut(x + 1, z), z, 1.6, 0, hash(i, 7, 21)]);
+      if (k > .93) lists.blossom.push([x - 1.4, hOut(x - 1.4, z), z, 2.1, 0, hash(i, 8, 21)]);
     }
     for (let i = 0; i < 60; i++) { const x = (hash(i, 31, 21) - .5) * 100, z = (hash(i, 32, 21) - .5) * 100, d = Math.max(dOct(x, z), 0); if (d < 6) continue; lists.rock.push([x, hOut(x, z), z, 1.4 + hash(i, 5, 24) * 2, hash(i, 6, 24) * 6, hash(i, 7, 24)]); }
     // Kirschbäume und Büsche im Innenhof (Randstreifen)
@@ -362,10 +359,6 @@ export class CityView {
 
   decor() {
     const sc = this.scene, mat = this.matVC;
-    // Wassergraben
-    const wg = new T.PlaneGeometry(W * 2 + 30, W * 2 + 30, 1, 1); wg.rotateX(-Math.PI / 2);
-    this.waterMat = new T.ShaderMaterial({ vertexShader: WATER_V, fragmentShader: WATER_F, transparent: true, fog: true, uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uTime: { value: 0 } }]) });
-    const wm = new T.Mesh(wg, this.waterMat); wm.position.y = -.2; wm.renderOrder = 1; sc.add(wm);
     // Gras, Blumen
     const segs = segWorld(), plots = Object.keys(this.layout || {});
     const tg = new MB(); for (let k = 0; k < 4; k++) tg.push(new T.ConeGeometry(.035, .3 + k % 2 * .08, 4), [255, 255, 255], Math.cos(k * 1.6) * .05, .15, Math.sin(k * 1.6) * .05, k, 1, 1, 1, Math.sin(k * 2.1) * .35, Math.cos(k * 1.3) * .35, 0);
@@ -386,6 +379,14 @@ export class CityView {
     tufts.forEach(([x, z, k, r, v], i) => { tq.setFromEuler(te.set(0, r, 0)); tm.compose(new T.Vector3(x, .02, z), tq, new T.Vector3(k, k, k)); tim.setMatrixAt(i, tm); const g = GR[Math.floor(v * 3.99)]; tc.setRGB(LIN(g[0]), LIN(g[1]), LIN(g[2])); tim.setColorAt(i, tc); });
     flowers.forEach(([x, z, v], i) => { tq.setFromEuler(te.set(0, v * 6, 0)); tm.compose(new T.Vector3(x, .02, z), tq, new T.Vector3(1, 1, 1)); fim.setMatrixAt(i, tm); const g = FL[Math.floor(v * 4.99)]; tc.setRGB(LIN(g[0]), LIN(g[1]), LIN(g[2])); fim.setColorAt(i, tc); });
     tim.frustumCulled = false; fim.frustumCulled = false; sc.add(tim, fim);
+    // Wiese rund um die Mauern: Gräser und Wildblumen
+    const ot = [], of = [];
+    for (let i = 0; i < 26000 && ot.length < 7000; i++) { const x = (hash(i, 1, 71) - .5) * 80, z = (hash(i, 2, 71) - .5) * 80, d = dOct(x, z); if (d < 1.2 || d > 36) continue; ot.push([x, z, .6 + hash(i, 3, 71) * .9, hash(i, 4, 71) * 6.28, hash(i, 5, 71)]); }
+    for (let i = 0; i < 9000 && of.length < 1100; i++) { const x = (hash(i, 6, 72) - .5) * 80, z = (hash(i, 7, 72) - .5) * 80, d = dOct(x, z); if (d < 1.2 || d > 36 || vnoise(x * .15, z * .15, 5) < .45) continue; of.push([x, z, hash(i, 8, 72)]); }
+    const oim = new T.InstancedMesh(tg.build(), mat, ot.length), ofm = new T.InstancedMesh(fb.build(), mat, of.length);
+    ot.forEach(([x, z, k, r, v], i) => { tq.setFromEuler(te.set(0, r, 0)); tm.compose(new T.Vector3(x, hOut(x, z) - .02, z), tq, new T.Vector3(k, k, k)); oim.setMatrixAt(i, tm); const g = GR[Math.floor(v * 3.99)]; tc.setRGB(LIN(g[0]), LIN(g[1]), LIN(g[2])); oim.setColorAt(i, tc); });
+    of.forEach(([x, z, v], i) => { tq.setFromEuler(te.set(0, v * 6, 0)); tm.compose(new T.Vector3(x, hOut(x, z) - .02, z), tq, new T.Vector3(1.2, 1.2, 1.2)); ofm.setMatrixAt(i, tm); const g = FL[Math.floor(v * 4.99)]; tc.setRGB(LIN(g[0]), LIN(g[1]), LIN(g[2])); ofm.setColorAt(i, tc); });
+    oim.frustumCulled = false; ofm.frustumCulled = false; sc.add(oim, ofm);
     // Landschaft vor den Mauern: Felder, Häuser, Weg, Windmühle, Schafe
     const ob = new MB(), rows = (x0, z0, w, d, ry, k) => {
       for (let i = 0; i < 12; i++) { const u = (i + .5) / 12 - .5, cx = x0 + Math.cos(ry) * 0, cz = z0 + u * d; const y = hOut(x0, cz);
@@ -413,7 +414,7 @@ export class CityView {
     this.villagers = []; const vg = [], TUN = [[170, 80, 60], [70, 100, 160], [90, 140, 80], [180, 150, 70], [130, 90, 140], [200, 190, 170]], HAT = [[110, 80, 50], [150, 60, 50], [60, 90, 70], [190, 170, 100]];
     const loop = [[4, 4], [9, 4], [9, 9], [4, 9]].map(([a, b]) => [gw(a), gw(b)]); let perim = 0; const lens = loop.map((p, i) => { const q = loop[(i + 1) % 4], l = Math.hypot(q[0] - p[0], q[1] - p[1]); perim += l; return l; });
     this.loop = { pts: loop, lens, perim };
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 0; i++) {
       const ug = villager(TUN[i % 6], HAT[i % 4]), g = new T.Group(), body = new T.Mesh(ug.body, mat), la = new T.Mesh(ug.la, mat), lb = new T.Mesh(ug.lb, mat);
       la.position.y = ug.hip; lb.position.y = ug.hip; body.castShadow = true; g.add(body, la, lb); g.scale.setScalar(1.45); sc.add(g);
       this.villagers.push({ g, la, lb, t: hash(i, 1, 60) * perim, dir: i % 3 === 0 ? -1 : 1, spd: .5 + hash(i, 2, 60) * .35, off: (hash(i, 3, 60) - .5) * .5, ph: i * 1.7, gate: i >= 12 });
@@ -442,7 +443,7 @@ export class CityView {
       this.wallKey = lvM + ':' + this.color;
       for (const c of [...this.wallGroup.children]) { this.wallGroup.remove(c); c.geometry.dispose(); }
       this.flagMeshes = this.flagMeshes.filter(f => f.userData.grp !== 'wall');
-      const w = wallRing(pc, lvM, mixc(pc, [64, 86, 130], .75)), m = this.mesh(w.geo, { bid: 'mauer' }); this.wallGroup.add(m);
+      const w = wallRing(pc, lvM, [66, 98, 150]), m = this.mesh(w.geo, { bid: 'mauer' }); this.wallGroup.add(m);
       this.wallFlags = w.flags;
       for (const p of w.flags) this.addFlag(this.wallGroup, p, 'wall');
       this.pickables();
