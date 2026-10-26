@@ -9,7 +9,7 @@ export const B = {
   rathaus:  { name: 'Rathaus', x: 5, y: 5, w: 3, unlock: 1, base: [200, 250, 150, 0], time: 80,
               desc: 'Herz der Stadt. Seine Stufe begrenzt alle anderen Gebäude und bringt Steuergold.' },
   farm:     { name: 'Farm', x: 1, y: 1, w: 2, unlock: 1, base: [0, 60, 20, 0], time: 8, prod: 'food',
-              desc: 'Erzeugt Nahrung. Jede Einheit isst eine Nahrung pro Stunde.' },
+              desc: 'Erzeugt Nahrung für Bau, Ausbildung und Forschung. Truppen kosten keinen Unterhalt.' },
   saege:    { name: 'Sägewerk', x: 1, y: 4, w: 2, unlock: 1, base: [50, 30, 20, 0], time: 8, prod: 'wood',
               desc: 'Erzeugt Holz für Gebäude, Speere, Bögen und Rammen.' },
   stein:    { name: 'Steinbruch', x: 1, y: 7, w: 2, unlock: 2, base: [50, 80, 0, 0], time: 10, prod: 'stone',
@@ -102,9 +102,7 @@ export const bonusOf = (S, r) => 1 + ((S.bonus && S.bonus[r]) || 0);
 export function rate(S, r) {
   if (r === 'gold') return (5 + 10 * S.lv.rathaus) * bonusOf(S, 'gold') * techMult(S, 'gold');
   const id = Object.keys(B).find(k => B[k].prod === r);
-  let v = (15 + prodAt(id, S.lv[id])) * bonusOf(S, r) * techMult(S, r);
-  if (r === 'food') v -= troopCount(S);
-  return v;
+  return (15 + prodAt(id, S.lv[id])) * bonusOf(S, r) * techMult(S, r);
 }
 
 export function blocker(S, id) {
