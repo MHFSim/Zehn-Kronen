@@ -74,6 +74,9 @@ Die Karte entsteht aus dem Seed der Partie und ist auf allen Rechnern gleich. De
 
 Der Server ist maßgeblich: Bauaufträge, Ausbildung und Ressourcen werden dort geprüft und gespeichert. Der Browser rechnet mit denselben Regeln nur zur flüssigen Anzeige mit. Alle Abläufe hängen an Zeitstempeln in der Datenbank, deshalb übersteht das Spiel auch einen Neustart des Servers.
 
+## Forschung
+In der Akademie laufen acht Forschungen (Ackerbau, Forstwirtschaft, Steinmetzkunst, Bergbau, Handel, Kriegskunst, Marschordnung, Lasten) mit je fünf Stufen. Es läuft immer nur eine; Stufe n braucht Akademie 2n−1. Sie steigern Erträge, Gold, Kampfkraft, Marschtempo und Beutekapazität. Die Stadtansicht (Holz und Pergament) hat Reiter Wirtschaft, Militär, Verwaltung, Forschung.
+
 ## Datensicherung
 
 Der Server legt beim Start und danach täglich eine Sicherung in `data/backups/` ab (die letzten 14 bleiben). Im Admin geht es auch per Knopf. Wiederherstellen: Server anhalten, eine Sicherung als `data/zehn-kronen.sqlite` kopieren, Server starten.

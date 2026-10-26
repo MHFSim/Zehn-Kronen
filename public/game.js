@@ -2,10 +2,11 @@
 // und zwischen zwei Server-Antworten mit denselben Regeln flüssig weitergerechnet.
 import {
   RES, RES_DE, B, U, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
-  maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots
+  maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
+  T, T_MAX, techLv, techReq, techCost, techTime, techBlocker
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
-import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard } from '/shared/combat.js';
+import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
 import { buildingImage } from '/public/art.js';
@@ -202,6 +203,11 @@ function unitsHTML(id) {
     : '<span class="time">wartet</span>'}</div>`).join('');
   return `<div class="block"><h3>Ausbildung</h3>${rows}${list ? `<div class="block" style="padding:10px">${list}</div>` : ''}</div>`;
 }
+function researchHTML() {
+  const r = S.research;
+  return `<div class="block"><h3>Forschung</h3>${r ? `<div class="row"><b>${T[r.id].name}</b> → Stufe ${r.target}<div class="prog"><i id="rsProg" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div><span class="time">${fmtT(real(r.left))}</span></div><div class="row"><button class="btn ghost" type="button" data-act="cancelResearch">Abbrechen (volle Erstattung)</button></div>` : '<p class="note">Im Moment wird nichts erforscht.</p>'}
+    <div class="row"><button class="btn" type="button" data-act="toTech" ${S.lv.akademie ? '' : 'disabled'}>Zur Forschung</button></div></div>`;
+}
 function troopsHTML() {
   const t = Object.keys(U).filter(u => S.troops[u]);
   return `<div class="block"><h3>Deine Truppen</h3>${t.length ? `<div class="troops">${t.map(u => `<span><b>${fmtN(S.troops[u])}</b> ${U[u].name}</span>`).join('')}</div>` : '<p class="note">Noch keine Truppen. Baue die Kaserne (ab Rathaus 2).</p>'}</div>`;
@@ -214,14 +220,15 @@ function matchHTML() {
 function signature() {
   if (msel) return mapSignature();
   if (!sel) return '';
-  return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy]);
+  return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy, S.research && S.research.id + S.research.target]);
 }
 function renderSheet() {
+  $('sheet').classList.toggle('parch', !msel);
   if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
   $('sheetInner').innerHTML = `<img class="sh-img" alt="" src="${imgOf(id)}"><div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${id === 'rathaus' || (b.units && L) ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'rathaus' ? matchHTML() : ''}`;
+    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${id === 'rathaus' || (b.units && L) ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'akademie' ? researchHTML() : ''}${id === 'rathaus' ? matchHTML() : ''}`;
   sheetSig = signature();
 }
 function updateSheet() {
@@ -230,6 +237,7 @@ function updateSheet() {
   if (signature() !== sheetSig) return renderSheet();
   const q = inQueue(S, sel);
   if (q) { const p = $('upProg'), t = $('upTime'); if (p) p.style.width = Math.max(0, 1 - q.left / q.total) * 100 + '%'; if (t) t.textContent = fmtT(real(q.left)); }
+  if (S.research) { const p = $('rsProg'); if (p) p.style.width = Math.max(0, 1 - S.research.left / S.research.total) * 100 + '%'; }
   const o = (S.train[sel] || [])[0];
   if (o) { const p = $('trProg'), t = $('trTime'); if (p) p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
 }
@@ -250,6 +258,8 @@ function setupSheet() {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
     if (act === 'close') return closeSheet();
+    if (act === 'toTech') { closeSheet(); cityCat = 'tech'; renderCity(true); $('city').scrollTop = 0; return; }
+    if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
     if (act === 'upgrade') return command({ type: 'upgrade', id });
     if (act === 'cancel') return command({ type: 'cancel', id });
@@ -264,8 +274,8 @@ function setupSheet() {
 }
 
 /* ---------- Stadt als Menü (wie bei Lords & Knights) ---------- */
-const BGROUPS = [['eco', 'Wirtschaft', ['farm', 'saege', 'stein', 'mine', 'lager'], 'farm', 'Rohstoffe und Lager'], ['mil', 'Militär', ['kaserne', 'schiess', 'stall', 'lazarett'], 'kaserne', 'Truppen und Lazarett'], ['adm', 'Verwaltung', ['akademie', 'mauer'], 'mauer', 'Forschung und Mauer']];
-let cityCat = '';
+const BGROUPS = [['eco', 'Wirtschaft', '🌾', ['farm', 'saege', 'stein', 'mine', 'lager']], ['mil', 'Militär', '⚔️', ['kaserne', 'schiess', 'stall', 'lazarett']], ['adm', 'Verwaltung', '🏛️', ['rathaus', 'akademie', 'mauer']], ['tech', 'Forschung', '📜', []]];
+let cityCat = 'eco';
 const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
 const imgCache = {}, imgReal = {};
 // Eigene Bilder (Ordner public/img/city/, z. B. farm1.jpg, rathaus2.jpg) ersetzen die gemalten, sobald sie existieren.
@@ -296,57 +306,73 @@ function cityMeta(id) {
   if (id === 'akademie') return 'Forschung folgt';
   return b.desc;
 }
-function buildingCard(id) {
-  const b = B[id], L = S.lv[id], q = inQueue(S, id), locked = L === 0 && S.lv.rathaus < b.unlock, why = locked ? '' : blocker(S, id);
-  const t = (S.train[id] || [])[0];
-  let foot;
-  if (q) foot = `<div class="bprog"><div class="prog"><i data-qprog="${id}" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" data-qtime="${id}">${fmtT(real(q.left))}</span></div>`;
-  else if (locked) foot = `<div class="bfoot"><span class="why">Rathaus Stufe ${b.unlock} nötig</span></div>`;
-  else if (id === 'rathaus' && L >= 20) foot = '<div class="bfoot"><span class="note">Höchststufe</span></div>';
-  else foot = `<div class="bfoot"><span class="costs sm">${costHTML(costOf(id, L + 1))}</span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button></div>${why ? `<div class="why one">${why}</div>` : ''}`;
-  const extra = t ? `<div class="bmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
-  return `<article class="bcard ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="bimg"><img alt="" src="${imgOf(id)}"><span class="blv">${L || '–'}</span>${q ? '<span class="btag">Im Bau</span>' : ''}</div>
-    <div class="bbody"><div class="bname">${b.name}</div><div class="bmeta">${cityMeta(id)}</div>${extra}${foot}</div></article>`;
+const locked_ = id => S.lv[id] === 0 && S.lv.rathaus < B[id].unlock;
+function plateHTML(id) {
+  const b = B[id], L = S.lv[id], q = inQueue(S, id), locked = locked_(id), why = locked ? '' : blocker(S, id), t = (S.train[id] || [])[0];
+  let act;
+  if (q) act = `<div class="bprog"><div class="prog"><i data-qprog="${id}" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" data-qtime="${id}">${fmtT(real(q.left))}</span></div>`;
+  else if (locked) act = `<span class="why">Rathaus Stufe ${b.unlock} nötig</span>`;
+  else if (id === 'rathaus' && L >= 20) act = '<span class="note">Höchststufe</span>';
+  else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}</span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
+  const extra = t ? `<div class="pmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
+  return `<article class="plate ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="pimg"><img alt="" src="${imgOf(id)}"><span class="ribbon">${L || '–'}</span>${q ? '<span class="btag">Im Bau</span>' : ''}</div>
+    <div class="ptext"><div class="pname">${b.name}</div><div class="pmeta">${cityMeta(id)}</div>${extra}</div><div class="pact">${act}</div></article>`;
+}
+function techPlateHTML(id) {
+  const t = T[id], L = techLv(S, id), run = S.research && S.research.id === id, next = L + 1, why = L >= T_MAX || run ? '' : techBlocker(S, id);
+  const pips = `<span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span>`;
+  const now = Math.round(t.per * L * 100), nx = Math.round(t.per * next * 100);
+  let act;
+  if (run) act = `<div class="bprog"><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span></div>`;
+  else if (L >= T_MAX) act = '<span class="note">Höchststufe erreicht</span>';
+  else act = `<span class="costs sm">${costHTML(techCost(id, next))}</span><button class="btn small" type="button" data-tech="${id}" ${why ? 'disabled' : ''}>Erforschen</button><div class="${why ? 'why' : 'note'} one">${why || 'Dauer ' + fmtT(real(techTime(id, next))) + ' · braucht Akademie ' + techReq(next)}</div>`;
+  return `<article class="plate tech ${L ? '' : 'empty'}"><div class="pimg"><img alt="" src="${imgOf(t.icon)}"><span class="ribbon">${L}</span></div>
+    <div class="ptext"><div class="pname">${t.name}</div>${pips}<div class="pmeta">${esc(t.desc)}.<br>Jetzt <b>+${now} %</b>${L < T_MAX ? ` → <b>+${nx} %</b>` : ''} ${esc(t.unit)}</div></div><div class="pact">${act}</div></article>`;
 }
 function citySig() {
   return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
-    Object.keys(B).map(id => (S.lv[id] === 0 && S.lv.rathaus < B[id].unlock) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name, cityCat, S.stationed, match.phase]);
+    Object.keys(B).map(id => locked_(id) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name, cityCat, S.stationed, match.phase,
+    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id))]);
 }
 let citySigV = '';
 function renderCity(force) {
   if (!S || !$('city')) return;
   const sig = citySig(); if (!force && sig === citySigV) return; citySigV = sig;
-  const L = S.lv.rathaus, q = S.queue, marches = ownMarches();
+  const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('city').scrollTop;
   const tr = []; for (const k in S.train) for (const [i, o] of S.train[k].entries()) tr.push({ k, o, first: i === 0 });
-  const queueRows = q.map(x => `<div class="qrow"><img alt="" src="${imgOf(x.id)}"><div class="qmain"><b>${B[x.id].name}</b> → Stufe ${x.target}<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div></div><span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span></div>`).join('')
-    + (q.length < maxQueues(S) ? `<div class="qrow free"><div class="qmain">Bauschleife frei – wähle unten ein Gebäude zum Ausbau.</div></div>` : '');
-  const trainRows = tr.map(({ k, o, first }) => `<div class="qrow"><img alt="" src="${imgOf(k)}"><div class="qmain"><b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}${first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : ''}</div><span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span></div>`).join('');
-  const stRow = stationTotal() ? `<div class="qrow free"><div class="qmain">Verbündete Truppen in deiner Burg: <b>${fmtN(stationTotal())}</b> (Tab Bündnis)</div></div>` : '';
-  const marchRows = stRow + marches.map(m => `<button class="qrow go" type="button" data-march="${m.id}"><div class="qmain"><b>Heer</b> · ${KIND_SHORT[m.tk] || ''}</div><span class="time" data-mtime="${m.id}">${marchLine(m)}</span></button>`).join('');
+  const row = (img, main, prog, time) => `<div class="ord"><img alt="" src="${img}"><div class="qmain">${main}${prog}</div>${time}</div>`;
+  const orders = q.map(x => row(imgOf(x.id), `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`))
+    .concat(S.research ? [row(imgOf(T[S.research.id].icon), `<b>${T[S.research.id].name}</b> → Stufe ${S.research.target} <span class="note">(Forschung)</span>`, `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div>`, `<span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span>`)] : [])
+    .concat(tr.map(({ k, o, first }) => row(imgOf(k), `<b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}`, first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : '', `<span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span>`)))
+    .concat(marches.map(m => `<button class="ord go" type="button" data-march="${m.id}"><div class="qmain"><b>Heer</b> · ${KIND_SHORT[m.tk] || ''}</div><span class="time" data-mtime="${m.id}">${marchLine(m)}</span></button>`));
+  const freeSlots = q.length < maxQueues(S) ? '<div class="ord free">Baumeister frei: wähle unten ein Gebäude.</div>' : '';
+  const stRow = stationTotal() ? `<div class="ord free">Verbündete Truppen in deiner Burg: <b>${fmtN(stationTotal())}</b> (Tab Bündnis)</div>` : '';
   const home = homeTroops(S), away = awayTroops(S), wd = woundedCount(S);
-  const grp = BGROUPS.find(g => g[0] === cityCat);
-  if (grp) {
-    $('city').innerHTML = `<div class="city-in"><button class="back" type="button" data-cat="">‹ Stadt</button><h2 class="cat-title">${grp[1]}</h2>
-      <section>${q.length ? queueRows : ''}${trainRows}</section><div class="bgrid">${grp[2].map(buildingCard).join('')}</div></div>`;
-    return;
-  }
-  const tiles = BGROUPS.map(([key, title, ids, icon, sub]) => {
-    const can = ids.filter(id => !(S.lv[id] === 0 && S.lv.rathaus < B[id].unlock) && !blocker(S, id)).length, built = ids.filter(id => S.lv[id] > 0).length;
-    return `<button class="ctile" type="button" data-cat="${key}"><img alt="" src="${imgOf(icon)}"><div class="ctile-t"><b>${title}</b><span>${sub} · ${built}/${ids.length} gebaut</span></div>${can ? `<span class="cbadge" title="Jetzt baubar">${can}</span>` : ''}</button>`;
-  }).join('');
+  const can = g => g[0] === 'tech' ? 0 : g[3].filter(id => !locked_(id) && !blocker(S, id)).length;
+  const tabs = BGROUPS.map(g => { const c = can(g); return `<button class="tab ${g[0] === cityCat ? 'on' : ''}" type="button" data-cat="${g[0]}"><span class="tico">${g[2]}</span>${g[1]}${c && g[0] !== cityCat ? `<span class="cbadge" title="Jetzt baubar">${c}</span>` : ''}</button>`; }).join('');
+  let body;
+  if (cityCat === 'tech') {
+    const A = S.lv.akademie;
+    body = (A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`)
+      + `<div class="note-box">Akademie Stufe <b>${A}</b> · Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1.${A ? '' : ''}</div>` + Object.keys(T).map(techPlateHTML).join('');
+  } else body = BGROUPS.find(g => g[0] === cityCat)[3].map(plateHTML).join('');
   $('city').innerHTML = `<div class="city-in">
-    <article class="hero" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="hero-t"><div><div class="hero-name">Burg von ${esc(me.name)}</div><div class="hero-sub">Rathaus Stufe ${L} · Partie „${esc(match.name)}“</div></div><span class="hero-lv">${L}</span></div>
-    </article>
-    <div class="stats-row"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
-    <section><h3 class="sec">Gebäude</h3><div class="ctiles">${tiles}</div></section>
-    <section><h3 class="sec">Aufträge</h3>${queueRows}${trainRows}${marchRows}</section>
+    <article class="scene" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="scene-t"><div><div class="scene-name">Burg von ${esc(me.name)}</div><div class="scene-sub">Rathaus Stufe ${L} · „${esc(match.name)}“</div></div><span class="shield">${L}</span></div></article>
+    <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
+    <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
+    <div class="tabs">${tabs}</div><div class="tabbody parch">${body}</div>
   </div>`;
+  $('city').scrollTop = keepTop;
 }
 function updateCity() {
   renderCity(false);
   for (const x of S.queue) {
-    const p = document.querySelectorAll(`[data-qprog="${x.id}"]`), t = document.querySelectorAll(`[data-qtime="${x.id}"]`);
-    p.forEach(e => { e.style.width = Math.max(0, 1 - x.left / x.total) * 100 + '%'; }); t.forEach(e => { e.textContent = fmtT(real(x.left)); });
+    document.querySelectorAll(`[data-qprog="${x.id}"]`).forEach(e => { e.style.width = Math.max(0, 1 - x.left / x.total) * 100 + '%'; });
+    document.querySelectorAll(`[data-qtime="${x.id}"]`).forEach(e => { e.textContent = fmtT(real(x.left)); });
+  }
+  if (S.research) {
+    document.querySelectorAll('[data-rprog]').forEach(e => { e.style.width = Math.max(0, 1 - S.research.left / S.research.total) * 100 + '%'; });
+    document.querySelectorAll('[data-rtime]').forEach(e => { e.textContent = fmtT(real(S.research.left)); });
   }
   for (const k in S.train) { const o = S.train[k][0]; if (!o) continue;
     document.querySelectorAll(`[data-tprog="${k}"]`).forEach(e => { e.style.width = (1 - o.left / o.per) * 100 + '%'; });
@@ -358,12 +384,15 @@ function setupCity() {
   $('city').addEventListener('click', async e => {
     const up = e.target.closest('[data-up]');
     if (up) { e.stopPropagation(); return void command({ type: 'upgrade', id: up.dataset.up }); }
+    const rs = e.target.closest('[data-tech]');
+    if (rs) { e.stopPropagation(); return void command({ type: 'research', tech: rs.dataset.tech }); }
     const mb = e.target.closest('[data-march]');
     if (mb) { await setMode('map'); if (mode === 'map') selectMap({ type: 'march', id: Number(mb.dataset.march) }, true); return; }
-    const ct = e.target.closest('[data-cat]'); if (ct) { cityCat = ct.dataset.cat; $('city').scrollTop = 0; return void renderCity(true); }
+    const ct = e.target.closest('[data-cat]'); if (ct) { cityCat = ct.dataset.cat; return void renderCity(true); }
     const c = e.target.closest('[data-b]'); if (c) openSheet(c.dataset.b);
   });
 }
+
 
 /* ---------- Partie: Phase, Schutz, Bündnis, Meldungen ---------- */
 const DAY = 86400, THRONE_HOLD = 7 * DAY;
@@ -679,7 +708,7 @@ function renderMapSheet() {
       else {
         body += pickerHTML();
         if (plan && !plan.error) {
-          const r = battle(sel_, def, mult), lost = sum(sel_) - sum(r.attLeft);
+          const r = battle(sel_, def, mult, forceOf(S)), lost = sum(sel_) - sum(r.attLeft);
           body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(lost)} von ${fmtN(sum(sel_))}` : 'Niederlage · dein Heer wird aufgerieben'}</dd></dl>`;
         }
         body += actionRow('Angreifen', plan, '', free);
@@ -725,7 +754,7 @@ function renderMapSheet() {
         body += pickerHTML();
         if (plan && !plan.error) {
           body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd>`;
-          if (!hd) { const sl = sendList(), r = battle(sl, g.troops, g.mult); body += `<dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(sum(sl) - sum(r.attLeft))} von ${fmtN(sum(sl))}` : 'Niederlage'}</dd>`; }
+          if (!hd) { const sl = sendList(), r = battle(sl, g.troops, g.mult, forceOf(S)); body += `<dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(sum(sl) - sum(r.attLeft))} von ${fmtN(sum(sl))}` : 'Niederlage'}</dd>`; }
           body += '</dl>';
         }
         body += actionRow(hd && hd.mine ? 'Besatzung verstärken' : hd ? 'Besatzung angreifen' : 'Besetzen', plan, '', free);
@@ -835,7 +864,7 @@ async function setMode(m) {
   closeSheet(); mode = m;
   document.body.classList.toggle('mode-map', m === 'map'); setNav(m);
   if (app) { if (m === 'map') app.ticker.start(); else app.ticker.stop(); }
-  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { cityCat = ''; renderCity(true); }
+  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { renderCity(true); }
 }
 function setupNav() {
   $('nav').addEventListener('click', e => {

@@ -1,8 +1,10 @@
 // Zehn Kronen – Kampfrechnung ohne Zustand: Einheiten, Konter, Rundenkampf, Lager und Wächter.
-import { U } from './rules.js';
+import { U, techMult } from './rules.js';
 
 export const sum = t => Object.values(t).reduce((a, b) => a + b, 0);
-export const capacityOf = troops => Object.keys(troops).reduce((s, u) => s + troops[u] * U[u].c, 0);
+export const capacityOf = (troops, S) => Math.floor(Object.keys(troops).reduce((s, u) => s + troops[u] * U[u].c, 0) * (S ? techMult(S, 'carry') : 1));
+// Kraft der Truppen eines Spielers (Kriegskunst) als Faktor für Angriff, Verteidigung und Leben
+export const forceOf = S => S ? techMult(S, 'force') : 1;
 export const armySpeed = troops => Math.min(...Object.keys(troops).filter(u => troops[u] > 0).map(u => U[u].s));
 export const forestCostFor = troops => (troops.leicht > 0 || troops.schwer > 0) ? 1.7 : 1.2;
 
@@ -23,8 +25,8 @@ export const countersOf = (a, d) => COUNTERS[a].includes(d);
 const KAMPF = 0.5, RUNDEN = 10;
 const grp = (t, m) => Object.keys(t).filter(u => t[u] > 0).map(u => ({ u, n: t[u], a: U[u].a * m, v: U[u].v * m, l: U[u].l * m }));
 const hp = G => G.reduce((s, g) => s + g.n * g.l, 0);
-export function battle(attT, defT, defMult = 1) {
-  const A = grp(attT, 1), D = grp(defT, defMult), rounds = [];
+export function battle(attT, defT, defMult = 1, attMult = 1) {
+  const A = grp(attT, attMult), D = grp(defT, defMult), rounds = [];
   const snap = G => { const o = {}; G.forEach(g => o[g.u] = Math.round(g.n)); return o; };
   for (let r = 0; r < RUNDEN; r++) {
     const hA = hp(A), hD = hp(D);

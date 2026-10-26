@@ -1,7 +1,7 @@
 // Zehn Kronen – Grundlagen der Welt: Zustand, Märsche, Berichte, Meldungen, Bündnis-Abfragen.
 // Wird von world.js (Ablauf), social.js (Bündnisse) und war.js (Kriege) gemeinsam benutzt.
 import { N, generateMap, findPath, pathTimes, NODE_MAX } from './mapgen.js';
-import { lazarettCap, woundedCount } from './rules.js';
+import { lazarettCap, woundedCount, techMult } from './rules.js';
 import { forestCostFor, armySpeed, capacityOf, sum } from './combat.js';
 
 /* ---------- Regeln der Welt (alle Zeiten in Spielsekunden) ---------- */
@@ -46,7 +46,7 @@ export function ensureWorld(w) {
 export function ensureState(S) {
   S.away = S.away || {}; S.wounded = S.wounded || {}; S.reports = S.reports || []; S.nextRep = S.nextRep || 1;
   S.explored = S.explored || ''; if (S.slot == null) S.slot = -1; S.pos = S.pos || [0, 0];
-  S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;
+  S.tech = S.tech || {}; S.research = S.research || null; S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;
   S.out = !!S.out; S.exAllies = S.exAllies || {}; S.feed = S.feed || []; S.nextFeed = S.nextFeed || 1; S.bonus = S.bonus || {};
   S.stats = S.stats || {}; for (const k of ['attacks', 'wins', 'conquests', 'kills', 'lost']) S.stats[k] = S.stats[k] || 0;
   return S;
@@ -90,16 +90,16 @@ export function flushBits(S) {
 }
 
 /* ---------- Wege und Märsche ---------- */
-export function planFrom(map, from, tx, ty, troops) {
+export function planFrom(map, from, tx, ty, troops, S) {
   const total = sum(troops);
   if (total < 1) return { error: 'Keine Truppen ausgewählt' };
-  const fc = forestCostFor(troops), speed = armySpeed(troops);
+  const fc = forestCostFor(troops), speed = armySpeed(troops) * (S ? techMult(S, 'speed') : 1);
   const path = findPath(map, from[0], from[1], tx, ty, fc);
   if (!path) return { error: 'Es gibt keinen Weg dorthin' };
   const arr = pathTimes(map, path, speed, fc);
-  return { path, arr, speed, fc, duration: arr[arr.length - 1], capacity: capacityOf(troops) };
+  return { path, arr, speed, fc, duration: arr[arr.length - 1], capacity: capacityOf(troops, S) };
 }
-export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, obj.y, troops);
+export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, obj.y, troops, S);
 
 export function marchPos(m, gt) {
   const L = m.path.length - 1;
@@ -130,7 +130,7 @@ export function launch(ctx, owner, troops, plan, extra) {
 export function sendHome(ctx, owner, troops, from, tk, tid) {
   const w = ctx.match.world, S = owner.state;
   if (!sum(troops)) return null;
-  const plan = planFrom(mapOf(ctx.match), from, S.pos[0], S.pos[1], troops);
+  const plan = planFrom(mapOf(ctx.match), from, S.pos[0], S.pos[1], troops, S);
   if (plan.error) { addTroops(S, troops, +1); for (const u in troops) { S.away[u] = (S.away[u] || 0) - troops[u]; if (S.away[u] <= 0) delete S.away[u]; } return null; }
   const m = { id: w.nextId++, owner: owner.id, name: owner.name, slot: S.slot, troops: { ...troops }, tk: tk || 'start', tid: tid || cityId(S), phase: 'back', mode: 'home', path: plan.path, arr: plan.arr, t0: tNow(ctx), load: {} };
   w.marches.push(m); return m;

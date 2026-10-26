@@ -27,7 +27,7 @@ export const B = {
   lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80, 0], time: 20,
               desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind.' },
   akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 150, 80], time: 40,
-              desc: 'Forschung für Wirtschaft und Militär. Kommt in einem späteren Ausbau.' },
+              desc: 'Hier erforschst du Verbesserungen für Wirtschaft und Militär. Höhere Stufen erlauben höhere Forschungsstufen.' },
   mauer:    { name: 'Mauer & Tor', x: 6, y: 11, w: 2, unlock: 3, base: [0, 100, 200, 0], time: 20,
               desc: 'Stärkt die Verteidigung deiner Burg und vergrößert die Stadtwache, die sie auch ohne Truppen beschützt.' }
 };
@@ -40,6 +40,34 @@ export const U = {
   schwer:  { name: 'Schwere Reiterei', cost: [120, 0, 0, 120], t: 90, a: 20, v: 14, l: 45, s: 9,  c: 25, req: 5 }
 };
 
+// Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.
+// per = Wirkung je Stufe, Kosten und Zeit wachsen mit der Stufe, Stufe n braucht Akademie 2n-1.
+export const T = {
+  ackerbau:    { name: 'Ackerbau',      icon: 'farm',    per: .08, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80, 0],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
+  forst:       { name: 'Forstwirtschaft', icon: 'saege', per: .08, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80, 0],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
+  steinmetz:   { name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60, 0], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
+  bergbau:     { name: 'Bergbau',        icon: 'mine',   per: .08, unit: 'Erz',       eff: 'ore',   base: [100, 100, 80, 40], time: 60, desc: 'Mehr Erz aus der Mine' },
+  handel:      { name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 100, 60], time: 70, desc: 'Mehr Steuergold' },
+  kriegskunst: { name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 100, 150], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
+  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .06, unit: 'Marschtempo', eff: 'speed', base: [150, 150, 50, 50], time: 75, desc: 'Deine Heere marschieren schneller' },
+  lasten:      { name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100, 0], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
+};
+export const T_MAX = 5;
+export const techLv = (S, id) => (S.tech && S.tech[id]) || 0;
+export const techMult = (S, eff) => { let m = 1; for (const k in T) if (T[k].eff === eff) m += T[k].per * techLv(S, k); return m; };
+export const techReq = lv => Math.max(1, 2 * lv - 1);                       // nötige Akademiestufe für Forschungsstufe lv
+export const techCost = (id, lv) => T[id].base.map(c => Math.max(0, Math.round(c * Math.pow(1.7, lv - 1) / 5) * 5));
+export const techTime = (id, lv) => T[id].time * 60 * Math.pow(1.7, lv - 1);
+export function techBlocker(S, id) {
+  const t = T[id]; if (!t) return 'Unbekannte Forschung';
+  const lv = techLv(S, id) + 1;
+  if (lv > T_MAX) return 'Höchststufe erreicht';
+  if (S.lv.akademie < techReq(lv)) return S.lv.akademie ? 'Akademie Stufe ' + techReq(lv) + ' nötig' : 'Erst die Akademie bauen';
+  if (S.research) return S.research.id === id ? 'Wird bereits erforscht' : 'Die Akademie forscht schon';
+  if (!afford(S, techCost(id, lv))) return 'Nicht genug Ressourcen';
+  return '';
+}
+
 export const MAX_TRAIN_ORDERS = 3;
 export const MAX_TRAIN_COUNT = 1000;
 
@@ -47,7 +75,7 @@ export function freshState(now) {
   const lv = {}; for (const k in B) lv[k] = 0;
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
-  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {} };
+  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null };
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);
@@ -72,9 +100,9 @@ export const unitTime = (S, u, bid) => U[u].t * Math.pow(0.95, Math.max(0, S.lv[
 // Boni (S.bonus) kommen von gehaltenen Heiligtümern und vom Thron und werden von der Welt gesetzt
 export const bonusOf = (S, r) => 1 + ((S.bonus && S.bonus[r]) || 0);
 export function rate(S, r) {
-  if (r === 'gold') return (5 + 10 * S.lv.rathaus) * bonusOf(S, 'gold');
+  if (r === 'gold') return (5 + 10 * S.lv.rathaus) * bonusOf(S, 'gold') * techMult(S, 'gold');
   const id = Object.keys(B).find(k => B[k].prod === r);
-  let v = (15 + prodAt(id, S.lv[id])) * bonusOf(S, r);
+  let v = (15 + prodAt(id, S.lv[id])) * bonusOf(S, r) * techMult(S, r);
   if (r === 'food') v -= troopCount(S);
   return v;
 }
@@ -102,6 +130,10 @@ function step(S, g) {
   for (const q of S.queue) q.left -= g;
   for (const q of S.queue.filter(q => q.left <= 0)) S.lv[q.id] = q.target;
   S.queue = S.queue.filter(q => q.left > 0);
+  if (S.research) {
+    S.research.left -= g;
+    if (S.research.left <= 0) { S.tech = S.tech || {}; S.tech[S.research.id] = S.research.target; S.research = null; }
+  }
   for (const bid of Object.keys(S.train)) {
     const list = S.train[bid]; let rem = g;
     while (list.length && rem > 0) {
@@ -142,6 +174,18 @@ export function applyCommand(S, cmd) {
     costOf(id, q.target).forEach((v, i) => S.res[RES[i]] += v);
     S.queue = S.queue.filter(x => x !== q);
     return '';
+  }
+  if (cmd.type === 'research') {
+    const why = techBlocker(S, cmd.tech); if (why) return why;
+    const lv = techLv(S, cmd.tech) + 1, tm = techTime(cmd.tech, lv);
+    techCost(cmd.tech, lv).forEach((v, i) => S.res[RES[i]] -= v);
+    S.research = { id: cmd.tech, target: lv, left: tm, total: tm };
+    return '';
+  }
+  if (cmd.type === 'cancelResearch') {
+    if (!S.research) return 'Es wird nichts erforscht';
+    techCost(S.research.id, S.research.target).forEach((v, i) => S.res[RES[i]] += v);
+    S.research = null; return '';
   }
   if (cmd.type === 'train') {
     const b = B[id], u = cmd.unit, n = Math.floor(Number(cmd.count));

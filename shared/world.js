@@ -4,7 +4,7 @@
 // abgearbeitet, egal wann ein Spieler das nächste Mal nachfragt.
 import { N, startSpot, SLOTS, NODE_RES, NODE_KINDS } from './mapgen.js';
 import { U, freshState, advanceTo, applyCommand, armySlots } from './rules.js';
-import { battle, campTroops, campMult, campLoot, sum, capacityOf } from './combat.js';
+import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from './combat.js';
 import {
   DAY, GATHER_FULL, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel,
@@ -27,7 +27,7 @@ function onArrive(ctx, m, bt, realT) {
   if (m.mode === 'occupy') return arriveHold(ctx, m, o, bt, realT, back);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
   if (NODE_KINDS.includes(o.k)) {
-    const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops), amount = Math.floor(Math.min(cap, left));
+    const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops, S), amount = Math.floor(Math.min(cap, left));
     if (amount < 50) {
       pushReport(S, { kind: 'gather', title: 'Feld erschöpft', win: false, target: info, text: 'Das Feld ist fast leer. Das Heer kehrt ohne Beute zurück.' }, realT);
       return back();
@@ -42,7 +42,7 @@ function onArrive(ctx, m, bt, realT) {
       return back();
     }
     const def = campTroops(o.lv), start = { ...m.troops };
-    const r = battle(m.troops, def, campMult(o.lv));
+    const r = battle(m.troops, def, campMult(o.lv), forceOf(S));
     const sa = settleAway(S, start, r.attLeft);
     S.stats.kills += sum(def) - sum(r.defLeft); if (r.win) S.stats.wins++;
     const rep = { kind: 'camp', title: (r.win ? 'Sieg über Banditenlager Stufe ' : 'Niederlage vor Banditenlager Stufe ') + o.lv, win: r.win, target: info,

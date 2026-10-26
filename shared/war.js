@@ -1,7 +1,7 @@
 // Zehn Kronen – Krieg zwischen den Spielern: Angriffe auf Burgen, Besatzungen, Vasallen, Ausscheiden,
 // Thron und Heiligtümer, Spähen, Punkte und Spielende. Läuft auf dem Server und in der Testversion.
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
-import { battle, guardOf, wallMult, holdGuard, sum, capacityOf } from './combat.js';
+import { battle, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf } from './combat.js';
 import {
   DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
@@ -98,7 +98,7 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   const total = merge(merge(homeStart, guard), {});
   for (const pid in SD.stationed) Object.assign(total, merge(total, SD.stationed[pid]));
   const startA = { ...m.troops };
-  const r = battle(m.troops, total, wallMult(SD));
+  const r = battle(m.troops, total, wallMult(SD) * forceOf(SD), forceOf(A.state));
   const frac = {}; for (const u in total) frac[u] = total[u] ? 1 - (r.defLeft[u] || 0) / total[u] : 0;
   const scale = t => { const lost = {}; for (const u in t) { const l = r.win ? t[u] : Math.min(t[u], Math.round(t[u] * (frac[u] || 0))); if (l > 0) lost[u] = l; } return lost; };
   const homeLost = scale(homeStart), hs = settleHome(SD, homeLost);
@@ -123,7 +123,7 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
 
   let fate = null, loot = {};
   if (r.win) {
-    loot = lootFrom(SD, capacityOf(r.attLeft)); m.load = loot;
+    loot = lootFrom(SD, capacityOf(r.attLeft, A.state)); m.load = loot;
     fate = fall(ctx, A, D, bt);
   }
   const fateText = fate === 'out' ? ' Die Burg wurde erobert, ' + D.name + ' ist ausgeschieden.' : fate === 'vassal' ? ' Die Burg wurde erobert, ' + D.name + ' ist jetzt dein Vasall.' : '';
@@ -213,7 +213,7 @@ export function arriveHold(ctx, m, o, bt, realT, back) {
     return;
   }
   const guard = holdGuard(o.k), def = hold ? sumGarr(hold) : guard.troops, mult = hold ? 1 : guard.mult, startA = { ...m.troops };
-  const r = battle(m.troops, def, mult), sa = settleAway(A.state, startA, r.attLeft);
+  const r = battle(m.troops, def, mult, forceOf(A.state)), sa = settleAway(A.state, startA, r.attLeft);
   m.troops = r.attLeft; A.state.stats.kills += sum(def) - sum(r.defLeft); if (r.win) A.state.stats.wins++;
   const defender = hold ? groupLabel(w, players, hold.group) : 'Wächter';
   if (r.win) {
