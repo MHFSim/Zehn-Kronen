@@ -674,6 +674,35 @@ function setupPanel() {
 }
 
 
+
+/* ---------- Außenposten platzieren: Karte verschieben, bis das Viereck passt ---------- */
+let placing = false, placeKey = '', placeWhy = '';
+function placeTile() {
+  const c = wm.root, s = c.scale.x;
+  return wm.tileAt((app.screen.width / 2 - c.x) / s, (app.screen.height * .42 - c.y) / s);
+}
+function placeStep() {
+  const show = mode === 'map' && view && view.ally && !msel && view.match.phase === 'running';
+  $('placeBtn').hidden = !show || placing; $('placeBar').hidden = !(show && placing);
+  if (!placing || !show) { if (placing && !show) placing = false; return; }
+  const t = placeTile(), key = t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60);
+  if (key === placeKey) return; placeKey = key;
+  const { mt, pls } = siteCtx(); placeWhy = checkSite(mt, pls, { id: me.id }, t.x, t.y, gtNow());
+  wm.setPreview({ x: t.x, y: t.y, r: OP_R, ok: !placeWhy });
+  const el = $('placeTxt'); el.className = 'pl-txt ' + (placeWhy ? 'bad' : 'ok');
+  el.textContent = placeWhy || 'Hier passt der Außenposten (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
+  $('placeGo').disabled = !!placeWhy;
+}
+function setupPlace() {
+  $('placeBtn').onclick = () => {
+    const st = view.ally.store;
+    if (OP_COST.some((c, i) => st[RES[i]] < c)) return void toast('Im Bündnislager fehlen Rohstoffe für einen Außenposten (Mehr → Revier & Lager).');
+    placing = true; placeKey = ''; placeStep();
+  };
+  $('placeCancel').onclick = () => { placing = false; wm.setPreview(null); placeStep(); };
+  $('placeGo').onclick = () => { const t = placeTile(); selectMap({ type: 'site', x: t.x, y: t.y }, false); placeStep(); };
+}
+
 /* ---------- Shop, Beutel, Beschleuniger ---------- */
 const SPEED_IDS = ['sp5', 'sp60', 'sp480'];
 let speedCtx = null;
@@ -755,6 +784,7 @@ function mapTap(sx, sy) {
   selectMap(hit, false);
 }
 function selectMap(hit, keepSend) {
+  placing = false; 
   sel = null; msel = hit; wm.select(hit);
   if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; }
   document.body.classList.add('sheet-open');
@@ -1037,12 +1067,14 @@ async function buildMap() {
     wm.root.scale.set(Math.min(.8, Math.max(.45, app.screen.width / 640)));
     focusMap(own.x + .5, own.y + .5);
     setupInput();
+    app.ticker.add(() => { placeStep(); });
     app.ticker.add(() => { if (mode !== 'map') return; const c = wm.root, s = c.scale.x, H = app.screen.height; wm.frame(app.ticker.deltaMS / 1000, s, { y0: -c.y / s, y1: (H - c.y) / s }); });
     document.body.classList.remove('mode-map');
   } catch (e) { document.body.classList.remove('mode-map'); toast(String(e.message || e)); el.hidden = true; return false; }
   el.hidden = true; return true;
 }
 async function setMode(m) {
+  placing = false;
   if (!$('reports').hidden) closeReports();
   if (panelName) closePanel();
   if (m === mode && (m === 'city' || mapReady)) return;
@@ -1084,7 +1116,7 @@ async function resync() {
 function startGame() {
   $auth.hidden = true; $('game').hidden = false; document.body.classList.add('playing');
   $('matchName').textContent = match.name;
-  setupSheet(); setupModal(); setupNav(); setupCity(); setupPanel(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
+  setupSheet(); setupModal(); setupPlace(); setupNav(); setupCity(); setupPanel(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
   connect(); afterAccept();
   setInterval(resync, 60000);
   window.zkRefresh = resync;

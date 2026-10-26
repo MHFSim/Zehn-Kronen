@@ -45,7 +45,7 @@ export const opView = (w, o) => ({ ...o, group: 'a' + o.al, owner: leaderOf(w.al
 // Städte und Außenposten einer laufenden Partie
 export function territory(match, players, gt) {
   const w = match.world, cities = [], ops = [];
-  for (const p of players) if (!p.state.out && p.state.slot >= 0) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
+  for (const p of players) if (!p.state.out && p.state.slot >= 0 && allianceOf(w, p.id)) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
   for (const id in (w.outposts || {})) { const o = w.outposts[id]; if (w.alliances[o.al]) ops.push(opView(w, o)); }
   return rectsOf(cities, ops, gt);
 }

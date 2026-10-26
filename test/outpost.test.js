@@ -22,6 +22,7 @@ const toward = (x, y, dd) => { const dx = 100 - x, dy = 100 - y, l = Math.hypot(
 const findSite = (p, from, ds) => { for (const dd of ds) for (let o = -4; o <= 4; o++) { const [x, y] = toward(from[0], from[1], dd); if (!checkSite(match, players, p, x + o, y, gt())) return [x + o, y]; } return null; };
 assert.match(checkSite(match, players, a, cx + 9, cy, 0), /Bündnis/);
 
+assert.equal(territory(match, players, 0).length, 0, 'ohne Bündnis gibt es kein Revier');
 // Bündnis a+b, Rivale c
 assert.equal(run(a, { type: 'allyCreate', name: 'Rote', tag: 'ROT' }), '');
 assert.equal(run(a, { type: 'allyInvite', name: 'P2' }), ''); assert.equal(run(b, { type: 'allyAnswer', id: viewFor(match, players, b, clock).invites[0].id, accept: true }), '');

@@ -450,7 +450,7 @@ export class WorldMap {
   rectList() {
     const v = this.view, gt = this.gtNow();
     const grp = p => p.ally ? 'a' + p.ally : 'p' + p.id;
-    const cities = v.match.players.filter(p => !p.out && p.slot >= 0).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) }));
+    const cities = v.match.players.filter(p => !p.out && p.slot >= 0 && p.ally).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) }));
     return rectsOf(cities, v.world.outposts || [], gt);
   }
   ownerColor(pid) { const p = this.view.match.players.find(x => x.id === pid); return parseInt(PLAYER_COLORS[((p && p.slot) || 0) % 10].slice(1), 16); }
