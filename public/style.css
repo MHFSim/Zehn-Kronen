@@ -18,7 +18,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-
 h1,h2{font-family:var(--f-display);font-weight:400}
 
 .r{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none;vertical-align:-1px}
-.r-food{background:var(--food)}.r-wood{background:var(--wood)}.r-stone{background:var(--stone)}.r-ore{background:var(--ore)}.r-gold{background:var(--gold);border-radius:50%}
+.r{width:auto;height:auto;border-radius:0;line-height:1;font-style:normal;vertical-align:-1px}
+.r-food::before{content:'🌾'}.r-wood::before{content:'🪵'}.r-stone::before{content:'🪨'}.r-ore::before{content:'⛏️'}.r-gold::before{content:'🪙'}
 
 .btn{background:var(--brass);color:var(--brass-ink);border:0;border-radius:8px;padding:9px 16px;font-weight:700}
 .btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
