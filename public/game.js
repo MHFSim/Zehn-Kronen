@@ -250,7 +250,9 @@ function setupSheet() {
 }
 
 /* ---------- Stadt als Menü (wie bei Lords & Knights) ---------- */
-const BGROUPS = [['Wirtschaft', ['farm', 'saege', 'stein', 'mine', 'lager']], ['Militär', ['kaserne', 'schiess', 'stall', 'lazarett']], ['Verwaltung', ['akademie', 'mauer']]];
+const BGROUPS = [['eco', 'Wirtschaft', ['farm', 'saege', 'stein', 'mine', 'lager'], 'farm', 'Rohstoffe und Lager'], ['mil', 'Militär', ['kaserne', 'schiess', 'stall', 'lazarett'], 'kaserne', 'Truppen und Lazarett'], ['adm', 'Verwaltung', ['akademie', 'mauer'], 'mauer', 'Forschung und Mauer']];
+let cityCat = '';
+const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
 const imgCache = {}, imgReal = {};
 // Eigene Bilder (Ordner public/img/city/, z. B. farm1.jpg, rathaus2.jpg) ersetzen die gemalten, sobald sie existieren.
 function imgKey(id) { return id + (id === 'rathaus' ? tierOf(S.lv.rathaus) : 1); }
@@ -294,7 +296,7 @@ function buildingCard(id) {
 }
 function citySig() {
   return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
-    Object.keys(B).map(id => (S.lv[id] === 0 && S.lv.rathaus < B[id].unlock) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name]);
+    Object.keys(B).map(id => (S.lv[id] === 0 && S.lv.rathaus < B[id].unlock) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name, cityCat]);
 }
 let citySigV = '';
 function renderCity(force) {
@@ -307,12 +309,22 @@ function renderCity(force) {
   const trainRows = tr.map(({ k, o, first }) => `<div class="qrow"><img alt="" src="${imgOf(k)}"><div class="qmain"><b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}${first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : ''}</div><span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span></div>`).join('');
   const marchRows = marches.map(m => `<button class="qrow go" type="button" data-march="${m.id}"><div class="qmain"><b>Heer</b> · ${KIND_SHORT[m.tk] || ''}</div><span class="time" data-mtime="${m.id}">${marchLine(m)}</span></button>`).join('');
   const home = homeTroops(S), away = awayTroops(S), wd = woundedCount(S);
+  const grp = BGROUPS.find(g => g[0] === cityCat);
+  if (grp) {
+    $('city').innerHTML = `<div class="city-in"><button class="back" type="button" data-cat="">‹ Stadt</button><h2 class="cat-title">${grp[1]}</h2>
+      <section>${q.length ? queueRows : ''}${trainRows}</section><div class="bgrid">${grp[2].map(buildingCard).join('')}</div></div>`;
+    return;
+  }
+  const tiles = BGROUPS.map(([key, title, ids, icon, sub]) => {
+    const can = ids.filter(id => !(S.lv[id] === 0 && S.lv.rathaus < B[id].unlock) && !blocker(S, id)).length, built = ids.filter(id => S.lv[id] > 0).length;
+    return `<button class="ctile" type="button" data-cat="${key}"><img alt="" src="${imgOf(icon)}"><div class="ctile-t"><b>${title}</b><span>${sub} · ${built}/${ids.length} gebaut</span></div>${can ? `<span class="cbadge" title="Jetzt baubar">${can}</span>` : ''}</button>`;
+  }).join('');
   $('city').innerHTML = `<div class="city-in">
     <article class="hero" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="hero-t"><div><div class="hero-name">Burg von ${esc(me.name)}</div><div class="hero-sub">Rathaus Stufe ${L} · Partie „${esc(match.name)}“</div></div><span class="hero-lv">${L}</span></div>
     </article>
     <div class="stats-row"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
+    <section><h3 class="sec">Gebäude</h3><div class="ctiles">${tiles}</div></section>
     <section><h3 class="sec">Aufträge</h3>${queueRows}${trainRows}${marchRows}</section>
-    ${BGROUPS.map(([title, ids]) => `<section><h3 class="sec">${title}</h3><div class="bgrid">${ids.map(buildingCard).join('')}</div></section>`).join('')}
   </div>`;
 }
 function updateCity() {
@@ -333,6 +345,7 @@ function setupCity() {
     if (up) { e.stopPropagation(); return void command({ type: 'upgrade', id: up.dataset.up }); }
     const mb = e.target.closest('[data-march]');
     if (mb) { await setMode('map'); if (mode === 'map') selectMap({ type: 'march', id: Number(mb.dataset.march) }, true); return; }
+    const ct = e.target.closest('[data-cat]'); if (ct) { cityCat = ct.dataset.cat; $('city').scrollTop = 0; return void renderCity(true); }
     const c = e.target.closest('[data-b]'); if (c) openSheet(c.dataset.b);
   });
 }
@@ -519,7 +532,7 @@ async function setMode(m) {
   closeSheet(); mode = m;
   document.body.classList.toggle('mode-map', m === 'map'); setNav(m);
   if (app) { if (m === 'map') app.ticker.start(); else app.ticker.stop(); }
-  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') renderCity(true);
+  $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { cityCat = ''; renderCity(true); }
 }
 function setupNav() {
   $('nav').addEventListener('click', e => {

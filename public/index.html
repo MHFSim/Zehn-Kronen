@@ -138,6 +138,17 @@ body:not(.mode-map) .hud{display:none}
 .sh-img{width:100%;height:110px;object-fit:cover;object-position:50% 72%;border-radius:10px;display:block}
 .hud{bottom:calc(var(--nav) + 10px)}
 
+.ctiles{display:grid;grid-template-columns:1fr;gap:8px}
+.ctile{position:relative;display:flex;align-items:center;gap:12px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;color:var(--ink);font-family:inherit;cursor:pointer}
+.ctile:active{border-color:var(--brass)}
+.ctile img{width:104px;height:65px;object-fit:cover;border-radius:8px}
+.ctile-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ctile-t b{font-size:18px}
+.ctile-t span{font-size:12.5px;color:var(--muted)}
+.cbadge{margin-left:auto;margin-right:6px;min-width:26px;height:26px;border-radius:13px;display:grid;place-items:center;background:var(--brass);color:var(--brass-ink);font-weight:700;font-size:13px}
+.back{align-self:flex-start;background:none;border:1px solid var(--line);border-radius:8px;color:var(--brass);padding:6px 12px;font-size:15px;font-family:inherit}
+.cat-title{margin:0;font-family:'IM Fell English SC',serif;font-size:28px;color:var(--brass)}
+
 /* Anmeldung */
 .auth{min-height:100%;display:grid;place-items:center;padding-block:32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .auth-card{width:100%;max-width:380px;display:flex;flex-direction:column;gap:14px}
