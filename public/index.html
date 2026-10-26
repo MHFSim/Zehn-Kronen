@@ -267,6 +267,44 @@ body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overs
 .modal-in{--bg:#e9dcb8;--panel:#f6edd2;--panel-2:#ecdfbb;--line:#c9b27f;--ink:#2e2012;--muted:#6d5a3b;--brass:#8a5412;background:var(--panel);color:var(--ink);border:3px solid #7a5230;box-shadow:0 0 0 2px #1d1108}
 .modal-in .block{background:var(--panel-2)}
 .modal-in .btn.ghost{color:var(--ink);border-color:var(--line)}
+
+/* ===== Menüs wie ein richtiges Spiel: Kopfzeile, Reiter, Kacheln ===== */
+.phead{display:flex;align-items:center;gap:12px;margin:-16px -14px 14px;padding:12px 14px;border-radius:11px 11px 0 0;background:linear-gradient(#5a3a1f,#3a2312);border-bottom:3px solid #a77b36;color:#f6e7bd;position:sticky;top:-4px;z-index:2}
+.phead h2{margin:0;font-size:22px;line-height:1.1;color:#f6e7bd!important;text-shadow:0 2px 0 rgba(0,0,0,.5)}
+.phead small{display:block;font-size:12px;color:#d9c595;margin-top:2px}
+.phead .tag{background:#2b190c;color:#f3d58c;border-color:#a77b36;font-size:12px;vertical-align:middle}
+.ptitle{flex:1;min-width:0}
+.pico{flex:none;width:42px;height:42px;display:grid;place-items:center;font-size:23px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f3d58c,#a8741f);border:2px solid #2b190c;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.pback{flex:none;background:#2b190c;color:#f3d58c;border:1.5px solid #a77b36;border-radius:999px;padding:7px 12px;font-weight:700;font-size:14px}
+.ptabs{display:flex;gap:6px;margin:0 0 14px;padding:4px;border-radius:12px;background:#d9c696;border:1px solid var(--line)}
+.ptab{flex:1;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;position:relative;padding:9px 6px;border:0;border-radius:9px;background:transparent;color:#6d5a3b;font-weight:700;font-size:14px}
+.ptab.on{background:linear-gradient(#a8741f,#7a4e12);color:#fff6dd;box-shadow:0 2px 4px rgba(0,0,0,.35)}
+.pbadge{display:inline-grid;flex:none;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:#b3321f;color:#fff;font-size:11px;font-weight:700}
+.block.flat{background:none;border:0;padding:0}
+.hub{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 12px;text-align:left;border-radius:12px;background:linear-gradient(#f9f1d8,#ecdfbb);border:2px solid #b79a5a;color:var(--ink);box-shadow:0 3px 0 #8d7440}
+.tile:active{transform:translateY(2px);box-shadow:0 1px 0 #8d7440}
+.tile .tico{font-size:28px;line-height:1;margin-bottom:6px}
+.tile b{font-size:16px}
+.tile small{font-size:12px;color:var(--muted)}
+.tile .pbadge{position:absolute;top:8px;right:8px;margin:0}
+.profile{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:10px 12px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line)}
+.avatar{flex:none;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-size:24px;color:#fff;border:3px solid #7a5230;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.panel .report{background:var(--panel-2);border-color:var(--line)}
+.report summary{align-items:center;justify-content:flex-start;gap:10px;list-style:none}
+.report summary::-webkit-details-marker{display:none}
+.ricon{flex:none;width:38px;height:38px;display:grid;place-items:center;font-size:20px;border-radius:50%;background:#e0cfa0;border:2px solid #b79a5a}
+.report.win .ricon{border-color:var(--good)}.report.loss .ricon{border-color:var(--bad)}
+.rt{display:flex;flex-direction:column;min-width:0}.rt small{color:var(--muted);font-size:12px}
+.panel .msg{background:#fffaf0;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin:6px 0;max-width:88%}
+.panel .msg.mine{margin-left:auto;background:#f3e2b3}
+.panel .mrow{border-color:var(--line)}
+/* Navigationsleiste mit Symbolen */
+.nav button{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.nav button i{font-style:normal;font-size:21px;line-height:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+.nav button span:not(.badge){font-size:12px}
+.nav button:not(.on) i{opacity:.75}
+.nav .badge{top:4px!important}
 </style>
 </head>
 <body>
@@ -303,11 +341,11 @@ body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overs
   <div class="modal" id="modal" hidden><div class="modal-in" id="modalIn"></div></div>
   <div class="loading" id="loading" hidden>Karte wird gemalt …</div>
   <nav class="nav" id="nav" aria-label="Ansicht">
-    <button type="button" data-nav="city" class="on">Stadt</button>
-    <button type="button" data-nav="map">Karte</button>
-    <button type="button" data-nav="ally">Bündnis<span class="badge" id="allyBadge" hidden>0</span></button>
-    <button type="button" data-nav="reports">Berichte<span class="badge" id="navBadge" hidden>0</span></button>
-    <button type="button" data-nav="more">Mehr<span class="badge" id="moreBadge" hidden>0</span></button>
+    <button type="button" data-nav="city" class="on"><i aria-hidden="true">🏰</i><span>Stadt</span></button>
+    <button type="button" data-nav="map"><i aria-hidden="true">🗺️</i><span>Karte</span></button>
+    <button type="button" data-nav="ally"><i aria-hidden="true">🛡️</i><span>Bündnis</span><span class="badge" id="allyBadge" hidden>0</span></button>
+    <button type="button" data-nav="reports"><i aria-hidden="true">📜</i><span>Berichte</span><span class="badge" id="navBadge" hidden>0</span></button>
+    <button type="button" data-nav="more"><i aria-hidden="true">☰</i><span>Mehr</span><span class="badge" id="moreBadge" hidden>0</span></button>
   </nav>
 </div>
 

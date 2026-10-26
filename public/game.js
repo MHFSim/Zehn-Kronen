@@ -442,21 +442,28 @@ function checkFeed() {
   }
 }
 
+/* ---------- gemeinsame Bausteine der Menüs ---------- */
+const phead = (ico, title, sub, right) => `<header class="phead"><span class="pico">${ico}</span><div class="ptitle"><h2>${title}</h2>${sub ? `<small>${sub}</small>` : ''}</div>${right || ''}</header>`;
+const ptabs = (items, cur, act) => `<div class="ptabs" role="tablist">${items.map(([id, label, n]) => `<button type="button" role="tab" class="ptab ${id === cur ? 'on' : ''}" data-act="${act}" data-t="${id}">${label}${n ? `<span class="pbadge">${n}</span>` : ''}</button>`).join('')}</div>`;
+let allyTab = '', moreSub = '', repTab = 'all';
+
 /* ---------- Bündnis ---------- */
 function allyHTML() {
-  const cap = match.cap, a = view.ally, running = match.phase === 'running' || match.phase === 'lobby' || match.phase === 'paused';
-  const intro = `<p class="note">Ein Bündnis darf höchstens <b>${cap}</b> Mitglieder haben (Hälfte der Spieler plus eins). Verbündete können sich nicht angreifen, gewinnen gemeinsam und dürfen Truppen in die Burg des anderen legen. Jeder darf jederzeit austreten, ein neues Bündnis gründen oder allein in einem sein. Nach dem Austritt sind Angriffe auf die früheren Verbündeten 24 Stunden gesperrt.</p>`;
+  const cap = match.cap, a = view.ally;
+  const intro = `<p class="note">Ein Bündnis darf höchstens <b>${cap}</b> Mitglieder haben (Hälfte der Spieler plus eins). Verbündete können sich nicht angreifen, gewinnen gemeinsam und dürfen Truppen in die Burg des anderen legen. Jeder darf jederzeit austreten. Nach dem Austritt sind Angriffe auf die früheren Verbündeten 24 Stunden gesperrt.</p>`;
   if (!a) {
-    const inv = (view.invites || []).map(i => `<div class="mrow"><div><b>${esc(i.name)}</b> <span class="tag">${esc(i.tag)}</span><div class="note">Einladung von ${esc(i.by)}</div></div><div class="acts"><button class="btn small" data-act="allyAnswer" data-id="${i.id}" data-yes="1" type="button">Annehmen</button><button class="btn ghost small" data-act="allyAnswer" data-id="${i.id}" type="button">Ablehnen</button></div></div>`).join('');
-    const list = match.alliances.map(x => `<div class="mrow"><div><b>${esc(x.name)}</b> <span class="tag">${esc(x.tag)}</span><div class="note">${x.members.length} von ${cap} · ${x.members.map(id => esc(pname(id))).join(', ')}</div></div>${x.members.length >= cap ? '<span class="note">voll</span>' : (view.requests || []).some(r => r.al === x.id) ? '<span class="note">angefragt</span>' : `<button class="btn small" data-act="allyRequest" data-al="${x.id}" type="button">Anfragen</button>`}</div>`).join('') || '<p class="note">Noch kein Bündnis gegründet.</p>';
-    return `<div class="sh-head"><h2>Bündnis</h2><span class="lvl">kein Bündnis</span></div>${intro}
-      ${inv ? `<div class="block"><h3>Einladungen</h3>${inv}</div>` : ''}
-      <div class="block"><h3>Bündnis gründen</h3><div class="field"><label for="alName">Name</label><input id="alName" maxlength="20" placeholder="z. B. Rote Garde"></div>
+    const invs = view.invites || [], tab = ['inv', 'list', 'found'].includes(allyTab) ? allyTab : invs.length ? 'inv' : 'list';
+    const inv = invs.map(i => `<div class="mrow"><div><b>${esc(i.name)}</b> <span class="tag">${esc(i.tag)}</span><div class="note">Einladung von ${esc(i.by)}</div></div><div class="acts"><button class="btn small" data-act="allyAnswer" data-id="${i.id}" data-yes="1" type="button">Annehmen</button><button class="btn ghost small" data-act="allyAnswer" data-id="${i.id}" type="button">Ablehnen</button></div></div>`).join('') || '<p class="note">Im Moment hat dich niemand eingeladen.</p>';
+    const list = match.alliances.map(x => `<div class="mrow"><div><b>${esc(x.name)}</b> <span class="tag">${esc(x.tag)}</span><div class="note">${x.members.length} von ${cap} · ${x.members.map(id => esc(pname(id))).join(', ')}</div></div>${x.members.length >= cap ? '<span class="note">voll</span>' : (view.requests || []).some(r => r.al === x.id) ? '<span class="note">angefragt</span>' : `<button class="btn small" data-act="allyRequest" data-al="${x.id}" type="button">Anfragen</button>`}</div>`).join('') || '<p class="note">Noch kein Bündnis gegründet. Gründe das erste!</p>';
+    const body = tab === 'inv' ? `<div class="block"><h3>Einladungen</h3>${inv}</div>`
+      : tab === 'list' ? `<div class="block"><h3>Bestehende Bündnisse</h3>${list}</div>`
+      : `${intro}<div class="block"><h3>Bündnis gründen</h3><div class="field"><label for="alName">Name</label><input id="alName" maxlength="20" placeholder="z. B. Rote Garde"></div>
         <div class="field"><label for="alTag">Kürzel (2 bis 4 Zeichen)</label><input id="alTag" maxlength="4" placeholder="z. B. ROT"></div>
-        <div class="row"><button class="btn" data-act="allyCreate" type="button">Gründen</button></div></div>
-      <div class="block"><h3>Bestehende Bündnisse</h3>${list}</div>`;
+        <div class="row"><button class="btn" data-act="allyCreate" type="button">Gründen</button></div></div>`;
+    return phead('🛡️', 'Bündnis', 'Du bist in keinem Bündnis') + ptabs([['inv', 'Einladungen', invs.length], ['list', 'Bündnisse'], ['found', 'Gründen']], tab, 'atab') + body;
   }
-  const lead = a.leader === me.id;
+  const lead = a.leader === me.id, reqN = (a.requests || []).length;
+  const tab = ['ov', 'chat', 'adm'].includes(allyTab) ? allyTab : 'ov';
   const members = a.members.map(id => {
     const p = match.players.find(x => x.id === id) || {};
     const st = p.out ? 'ausgeschieden' : p.vassalOf ? 'Vasall' : p.protUntil > gtNow() ? 'geschützt' : '';
@@ -469,15 +476,16 @@ function allyHTML() {
   const invForm = a.members.length >= cap ? `<p class="note">Das Bündnis ist voll.</p>` : free.length ? `<div class="chatform"><select id="alInv">${free.map(p => `<option>${esc(p.name)}</option>`).join('')}</select><button class="btn small" data-act="allyInvite" type="button">Einladen</button></div>` : '<p class="note">Alle anderen Spieler sind schon in einem Bündnis oder ausgeschieden.</p>';
   const stat = Object.keys(S.stationed || {}).map(pid => `<div class="mrow"><div><b>${esc(pname(Number(pid)))}</b><div class="note">${troopsLine(S.stationed[pid])}</div></div><button class="btn ghost small" data-act="stationDismiss" data-pid="${pid}" type="button">Zurückschicken</button></div>`).join('');
   const mine = (view.myStations || []).map(x => `<div class="mrow"><div><b>${esc(x.name)}</b><div class="note">${troopsLine(x.troops)}</div></div><button class="btn ghost small" data-act="stationRecall" data-pid="${x.host}" type="button">Zurückrufen</button></div>`).join('');
-  const chat = (a.chat || []).map(c => `<div class="msg"><b>${esc(c.name)}</b><small>${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<p class="note">Noch keine Nachrichten.</p>';
-  return `<div class="sh-head"><h2>${esc(a.name)} <span class="tag">${esc(a.tag)}</span></h2><span class="lvl">${a.members.length} von ${cap}</span></div>${intro}
-    <div class="block"><h3>Mitglieder</h3>${members}</div>
-    ${reqs ? `<div class="block"><h3>Beitrittsanfragen</h3>${reqs}</div>` : ''}
-    <div class="block"><h3>Einladen</h3>${invd}${invForm}</div>
-    <div class="block"><h3>Verstärkung</h3><p class="note">In deiner Burg: ${fmtN(stationTotal())} von ${fmtN(60 * S.lv.rathaus)} fremden Truppen (Platz wächst mit dem Rathaus). Sie helfen bei der Verteidigung. Neue schickst du über die Karte: Burg des Verbündeten antippen, Stationieren.</p>${stat || '<p class="note">Im Moment liegen keine fremden Truppen bei dir.</p>'}
-      <h3 style="margin-top:12px">Deine Truppen bei Verbündeten</h3>${mine || '<p class="note">Keine.</p>'}</div>
-    <div class="block"><h3>Chat</h3><div class="msgs" id="chatBox">${chat}</div><div class="chatform"><input id="alMsg" maxlength="300" placeholder="Nachricht an das Bündnis" autocomplete="off"><button class="btn small" data-act="allyChat" type="button">Senden</button></div></div>
-    <div class="block"><button class="btn ${armedKey === 'leave' ? 'danger' : 'ghost'}" data-act="allyLeave" type="button">${armedKey === 'leave' ? 'Wirklich austreten' : 'Bündnis verlassen'}</button>${lead ? '<p class="note">Als Anführer kannst du die Führung vorher übergeben. Verlässt du es, übernimmt das nächste Mitglied.</p>' : ''}</div>`;
+  const chat = (a.chat || []).map(c => `<div class="msg ${c.name === me.name ? 'mine' : ''}"><b>${esc(c.name)}</b><small>${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<p class="note">Noch keine Nachrichten. Schreib die erste!</p>';
+  const body = tab === 'ov' ? `<div class="block"><h3>Mitglieder</h3>${members}</div>
+      <div class="block"><h3>Verstärkung</h3><p class="note">In deiner Burg: ${fmtN(stationTotal())} von ${fmtN(60 * S.lv.rathaus)} fremden Truppen (Platz wächst mit dem Rathaus). Sie helfen bei der Verteidigung. Neue schickst du über die Karte: Burg des Verbündeten antippen, Stationieren.</p>${stat || '<p class="note">Im Moment liegen keine fremden Truppen bei dir.</p>'}
+      <h3 style="margin-top:12px">Deine Truppen bei Verbündeten</h3>${mine || '<p class="note">Keine.</p>'}</div>`
+    : tab === 'chat' ? `<div class="block"><div class="msgs" id="chatBox">${chat}</div><div class="chatform"><input id="alMsg" maxlength="300" placeholder="Nachricht an das Bündnis" autocomplete="off"><button class="btn small" data-act="allyChat" type="button">Senden</button></div></div>`
+    : `${reqs ? `<div class="block"><h3>Beitrittsanfragen</h3>${reqs}</div>` : ''}
+      <div class="block"><h3>Spieler einladen</h3>${invd}${invForm}</div>
+      <div class="block"><h3>Regeln</h3>${intro}</div>
+      <div class="block"><button class="btn ${armedKey === 'leave' ? 'danger' : 'ghost'}" data-act="allyLeave" type="button">${armedKey === 'leave' ? 'Wirklich austreten' : 'Bündnis verlassen'}</button>${lead ? '<p class="note">Als Anführer kannst du die Führung vorher übergeben. Verlässt du es, übernimmt das nächste Mitglied.</p>' : ''}</div>`;
+  return phead('🛡️', `${esc(a.name)} <span class="tag">${esc(a.tag)}</span>`, `${a.members.length} von ${cap} Mitgliedern`) + ptabs([['ov', 'Übersicht'], ['chat', 'Chat'], ['adm', lead ? 'Verwaltung' : 'Einladen', reqN]], tab, 'atab') + body;
 }
 
 /* ---------- Mehr: Partie, Rangliste, Chronik, Erste Schritte, Einstellungen ---------- */
@@ -531,7 +539,7 @@ function moreHTML() {
   const days = m.phase === 'lobby' ? `${m.weeks} Wochen geplant` : m.phase === 'ended' ? '' : `Tag ${dayOf(gt)} von ${m.weeks * 7} · Ende in ${fmtT(real(m.endGt - gt))}`;
   const th = (m.holds || []).find(h => h.id === 'throne1');
   const info = `<dl class="stats"><dt>Partie</dt><dd>${esc(m.name)} · ${state}</dd>${days ? `<dt>Zeit</dt><dd>${days}</dd>` : ''}<dt>Thron</dt><dd>${th ? esc(th.label) + ' (noch ' + fmtT(real(th.since + THRONE_HOLD - gt)) + ')' : 'frei, von Wächtern bewacht'}</dd>
-    <dt>Bündnisgröße</dt><dd>höchstens ${m.cap}</dd><dt>Tempo</dt><dd>×${m.speed}</dd></dl>`;
+    <dt>Bündnisgröße</dt><dd>höchstens ${m.cap}</dd><dt>Tempo</dt><dd>×${m.speed}</dd></dl>${m.result ? `<div class="row"><button class="btn" data-act="showEnd" type="button">Ergebnis ansehen</button></div>` : ''}`;
   const rank = `<table class="rank"><thead><tr><th>#</th><th>Spieler</th><th>Punkte</th><th></th></tr></thead><tbody>${rk.players.map((r, i) => `<tr class="${r.id === me.id ? 'me' : ''}"><td>${i + 1}</td><td>${r.tag ? '<span class="tag">' + esc(r.tag) + '</span> ' : ''}${esc(r.name)}</td><td>${fmtN(r.score)}</td><td>${r.out ? '✖' : r.vassalOf ? 'Vasall' : ''}</td></tr>`).join('')}</tbody></table>
     ${rk.groups.some(g => g.members.length > 1) ? `<h3 style="margin-top:12px">Gruppen</h3><table class="rank"><tbody>${rk.groups.map((g, i) => `<tr><td>${i + 1}</td><td>${esc(g.label)}</td><td>${fmtN(g.score)}</td></tr>`).join('')}</tbody></table>` : ''}
     <p class="note">Punkte: Gebäudestufen, Truppen, eroberte Burgen und besiegte Einheiten.</p>`;
@@ -540,47 +548,48 @@ function moreHTML() {
   const feed = S.feed.map(f => `<div class="mrow"><div>${FEED_ICON[f.kind] || '•'} <b>${esc(f.title)}</b>${f.id > uf ? ' <span class="tag">neu</span>' : ''}<div class="note">${esc(f.body)} · ${ago(f.t)}</div></div></div>`).join('') || '<p class="note">Keine Meldungen.</p>';
   const ps = pushOn === 'unsupported' ? '<p class="note">Dein Browser unterstützt keine Benachrichtigungen. Auf dem iPhone: Seite zum Home-Bildschirm hinzufügen und von dort öffnen.</p>'
     : `<div class="row">${pushOn === 'on' ? '<button class="btn ghost" data-act="pushOff" type="button">Benachrichtigungen ausschalten</button>' : '<button class="btn" data-act="pushOn" type="button">Benachrichtigungen einschalten</button>'}</div><p class="note">${pushMsg || 'Du bekommst eine Meldung, wenn dich jemand angreift, ein Heer zurückkehrt oder das Bündnis dich braucht. Auf dem iPhone: zuerst zum Home-Bildschirm hinzufügen.'}</p>`;
-  return `<div class="sh-head"><h2>Mehr</h2></div>
-    <details class="acc" open><summary>Partie</summary><div class="acc-in">${info}${m.result ? `<div class="row"><button class="btn" data-act="showEnd" type="button">Ergebnis ansehen</button></div>` : ''}</div></details>
-    <details class="acc"><summary>Rangliste</summary><div class="acc-in">${rank}</div></details>
-    <details class="acc"><summary>Chronik der Welt</summary><div class="acc-in">${chron}</div></details>
-    <details class="acc" ${unreadFeed() ? 'open' : ''}><summary>Meldungen${unreadFeed() ? ' (' + unreadFeed() + ' neu)' : ''}</summary><div class="acc-in">${feed}</div></details>
-    <details class="acc"><summary>Erste Schritte</summary><div class="acc-in">${tutorialHTML()}</div></details>
-    <details class="acc"><summary>Spielregeln</summary><div class="acc-in">${rulesHTML()}</div></details>
-    <details class="acc"><summary>Einstellungen</summary><div class="acc-in">${ps}
-      <h3 style="margin-top:14px">Passwort ändern</h3><div class="field"><label for="pwOld">Altes Passwort</label><input id="pwOld" type="password" autocomplete="current-password"></div>
+  const settings = `<div class="block"><h3>Benachrichtigungen</h3>${ps}</div>
+    <div class="block"><h3>Passwort ändern</h3><div class="field"><label for="pwOld">Altes Passwort</label><input id="pwOld" type="password" autocomplete="current-password"></div>
       <div class="field"><label for="pwNew">Neues Passwort (mindestens 6 Zeichen)</label><input id="pwNew" type="password" autocomplete="new-password"></div>
       <div class="row"><button class="btn ghost" data-act="pwChange" type="button">Passwort ändern</button><span class="note" id="pwMsg"></span></div>
-      <p class="note">Pro Person ist ein Konto vorgesehen. Mehrfachkonten fallen dem Admin auf und können entfernt werden.</p>
-      <div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
-      <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div></details>`;
+      <p class="note">Pro Person ist ein Konto vorgesehen. Mehrfachkonten fallen dem Admin auf und können entfernt werden.</p></div>
+    <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
+      <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
+  const tasks = tutorialHTML(), taskDone = (tasks.match(/class="chk done"/g) || []).length, taskAll = (tasks.match(/class="chk/g) || []).length;
+  const SUBS = {
+    game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
+    feed: ['🔔', 'Meldungen', feed], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+  };
+  if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
+  const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
+  const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
+  return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
+    + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
+    + `<div class="hub">${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Panels (Bündnis, Mehr) ---------- */
 let panelName = '', panelSig = '';
 function panelSignature() {
-  if (panelName === 'ally') return JSON.stringify([view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
-  return JSON.stringify([match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
+  if (panelName === 'ally') return JSON.stringify([allyTab, view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
+  return JSON.stringify([moreSub, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
   const sig = panelSignature(); if (!force && sig === panelSig) return; panelSig = sig;
-  const el = $('sidePanelInner'), keep = {}, open = [];
+  const el = $('sidePanelInner'), keep = {};
   el.querySelectorAll('input,select').forEach(i => { if (i.id) keep[i.id] = [i.value, document.activeElement === i]; });
-  el.querySelectorAll('details.acc').forEach((d, i) => { if (d.open) open.push(i); });
   const top = $('sidePanel').scrollTop, box = $('chatBox'), atEnd = !box || box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
   el.innerHTML = panelName === 'ally' ? allyHTML() : moreHTML();
-  if (panelName === 'more' && open.length) el.querySelectorAll('details.acc').forEach((d, i) => { d.open = open.includes(i); });
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
 }
 function openPanel(name) {
   if (!$('reports').hidden) closeReports();
-  closeSheet(); panelName = name; panelSig = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
+  closeSheet(); panelName = name; panelSig = ''; if (name === 'more') moreSub = ''; if (name === 'ally') allyTab = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
   if (name === 'more') {
     pushStatus().then(() => renderPanel(true));
-    if (unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } });
   }
 }
 function closePanel() { panelName = ''; $('sidePanel').hidden = true; document.body.classList.remove('reports-open'); setNav(mode); }
@@ -588,6 +597,10 @@ function setupPanel() {
   $('sidePanelInner').addEventListener('click', async e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, d = el.dataset, val = id => (document.getElementById(id) || {}).value || '';
+    const go = () => { $('sidePanel').scrollTop = 0; renderPanel(true); };
+    if (act === 'atab') { allyTab = d.t; return go(); }
+    if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
+    if (act === 'back') { moreSub = ''; return go(); }
     if (act === 'allyCreate') return void command({ type: 'allyCreate', name: val('alName'), tag: val('alTag') });
     if (act === 'allyRequest') return void command({ type: 'allyRequest', al: Number(d.al) });
     if (act === 'allyAnswer') return void command({ type: 'allyAnswer', id: Number(d.id), accept: !!d.yes });
@@ -818,11 +831,15 @@ function reportHTML(r) {
   }
   if (r.text) d += `<p class="desc">${esc(r.text)}</p>`;
   if (r.loot && Object.keys(r.loot).length) d += `<div class="costs">${lootHTML(r.loot)}</div>`;
-  return `<details class="report ${r.read ? '' : 'new'} ${r.win ? 'win' : 'loss'}"><summary><b>${esc(r.title)}</b><span class="time">${ago(r.t)}</span></summary>${d}</details>`;
+  return `<details class="report ${r.read ? '' : 'new'} ${r.win ? 'win' : 'loss'}"><summary><span class="ricon">${REP_ICON[r.kind] || '📜'}</span><span class="rt"><b>${esc(r.title)}</b><small>${ago(r.t)}${r.kind === 'camp' || r.kind === 'pvp' ? (r.win ? ' · Sieg' : ' · Niederlage') : ''}</small></span></summary>${d}</details>`;
 }
+const REP_ICON = { pvp: '⚔️', camp: '🏕️', spy: '🔍', gather: '🌾', return: '🏠' };
+const REP_TABS = [['all', 'Alle', () => true], ['fight', 'Kämpfe', r => r.kind === 'pvp' || r.kind === 'camp'], ['spy', 'Späher', r => r.kind === 'spy'], ['march', 'Märsche', r => r.kind === 'gather' || r.kind === 'return']];
 function renderReports() {
-  const list = S.reports.map(reportHTML).join('') || '<p class="note">Noch keine Berichte. Schicke ein Heer zu einem Feld oder Banditenlager.</p>';
-  $('reportsInner').innerHTML = `<div class="sh-head"><h2>Berichte</h2><button class="close" type="button" data-act="rclose">Schließen</button></div>${list}`;
+  const f = (REP_TABS.find(x => x[0] === repTab) || REP_TABS[0])[2], un = S.reports.filter(r => !r.read).length;
+  const list = S.reports.filter(f).map(reportHTML).join('') || '<p class="note">Hier ist noch nichts. Schicke ein Heer zu einem Feld, einem Banditenlager oder spähe einen Gegner aus.</p>';
+  $('reportsInner').innerHTML = phead('📜', 'Berichte', un ? un + ' ungelesen' : S.reports.length + ' Berichte', '<button class="pback" type="button" data-act="rclose">Schließen</button>')
+    + ptabs(REP_TABS.map(([id, l, fn]) => [id, l, id === 'all' ? 0 : S.reports.filter(fn).length]), repTab, 'rtab') + list;
 }
 function openReports() {
   if (panelName) closePanel();
@@ -832,7 +849,7 @@ function openReports() {
 function closeReports() { $('reports').hidden = true; if (!panelName) document.body.classList.remove('reports-open'); setNav(panelName || mode); }
 function renderNav() {
   const n = S ? unread() : 0, b = $('navBadge'); if (b) { b.textContent = n; b.hidden = !n; }
-  const f = S ? unreadFeed() : 0, mb = $('moreBadge'); if (mb) { mb.textContent = f; mb.hidden = !f || panelName === 'more'; }
+  const f = S ? unreadFeed() : 0, mb = $('moreBadge'); if (mb) { mb.textContent = f; mb.hidden = !f; }
   const a = view ? (view.invites || []).length + (view.ally ? (view.ally.requests || []).length : 0) : 0, ab = $('allyBadge'); if (ab) { ab.textContent = a; ab.hidden = !a; }
 }
 function setNav(m) { document.querySelectorAll('.nav button[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === m)); }
@@ -873,7 +890,7 @@ function setupNav() {
     if (b.dataset.nav === 'ally' || b.dataset.nav === 'more') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
     setMode(b.dataset.nav);
   });
-  $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); });
+  $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); const t = e.target.closest('[data-act=rtab]'); if (t) { repTab = t.dataset.t; renderReports(); } });
   $('hud').addEventListener('click', async e => {
     const c = e.target.closest('[data-march]'); if (!c) return;
     await setMode('map'); if (mode === 'map') selectMap({ type: 'march', id: Number(c.dataset.march) }, true);
