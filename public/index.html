@@ -250,6 +250,23 @@ body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overs
 .sheet.parch .stepper button{background:var(--panel);color:var(--ink)}
 .sheet.parch .btn.ghost{color:var(--ink);border-color:var(--line)}
 .sheet.parch h2{color:var(--ink)}
+
+/* ===== Alle Menüs: Holz und Pergament ===== */
+.panel{background:repeating-linear-gradient(90deg,rgba(0,0,0,.22) 0 2px,transparent 2px 92px),linear-gradient(#3b2415,#26160b)!important}
+.panel>.sheet-inner{--bg:#e9dcb8;--panel:#f6edd2;--panel-2:#ecdfbb;--line:#c9b27f;--ink:#2e2012;--muted:#6d5a3b;--brass:#8a5412;--good:#3d6b2b;--bad:#a5321e;color:var(--ink);background:var(--panel);border:3px solid #7a5230;border-radius:14px;box-shadow:0 0 0 2px #1d1108,0 12px 26px rgba(0,0,0,.55);padding:16px 14px 18px;margin-top:calc(env(safe-area-inset-top,0px) + 4px)}
+.panel h2,.panel h3,.modal-in h2{font-family:var(--f-display);font-weight:400;letter-spacing:.03em;color:var(--brass)}
+.panel .block,.panel details.acc{background:var(--panel-2);border-color:var(--line)}
+.panel .btn:not(.ghost):not(.danger),.modal-in .btn:not(.ghost):not(.danger){color:#fff6dd}
+.panel .btn.ghost,.panel .seg button{color:var(--ink);border-color:var(--line)}
+.panel .seg button{background:var(--panel-2)}
+.panel .seg button.on,.panel .seg button[aria-pressed=true]{background:#8a5412;color:#fff6dd}
+.panel .tag{background:#e0cfa0;color:#6b430f;border-color:#b79a5a}
+.panel table.rank tr.me td{color:#8a5412}
+.panel input,.panel textarea,.panel select{background:#fffaf0;color:var(--ink);border-color:var(--line)}
+.panel .muted,.panel .note{color:var(--muted)}
+.modal-in{--bg:#e9dcb8;--panel:#f6edd2;--panel-2:#ecdfbb;--line:#c9b27f;--ink:#2e2012;--muted:#6d5a3b;--brass:#8a5412;background:var(--panel);color:var(--ink);border:3px solid #7a5230;box-shadow:0 0 0 2px #1d1108}
+.modal-in .block{background:var(--panel-2)}
+.modal-in .btn.ghost{color:var(--ink);border-color:var(--line)}
 </style>
 </head>
 <body>

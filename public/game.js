@@ -223,7 +223,7 @@ function signature() {
   return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy, S.research && S.research.id + S.research.target]);
 }
 function renderSheet() {
-  $('sheet').classList.toggle('parch', !msel);
+  $('sheet').classList.add('parch');
   if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
