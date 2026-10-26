@@ -396,7 +396,7 @@ export class CityView {
     });
     el.addEventListener('pointermove', e => {
       if (!ptr.has(e.pointerId)) return; ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (ptr.size >= 2 && pinch) { const [a, b] = [...ptr.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(b.y - a.y, b.x - a.x); this.cam.dist = pinch.dist * pinch.d / Math.max(30, d); this.cam.yaw = pinch.yaw - (ang - pinch.a); clampCam(); this.updateCamera(); return; }
+      if (ptr.size >= 2 && pinch) { const [a, b] = [...ptr.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(b.y - a.y, b.x - a.x); this.cam.dist = pinch.dist * pinch.d / Math.max(30, d); clampCam(); this.updateCamera(); return; }
       if (drag) {
         moved = Math.max(moved, Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy));
         if (moved > 6 && drag.g) { const g = this.groundAt(e.clientX, e.clientY); if (g) { this.cam.x += drag.g.x - g.x; this.cam.z += drag.g.z - g.z; clampCam(); this.updateCamera(); } }
@@ -411,7 +411,7 @@ export class CityView {
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
     el.addEventListener('wheel', e => {
       e.preventDefault();
-      if (e.shiftKey || e.ctrlKey) this.cam.yaw += e.deltaY * .004; else this.cam.dist *= Math.exp(e.deltaY * .0012);
+      this.cam.dist *= Math.exp(e.deltaY * .0012);
       clampCam(); this.updateCamera();
     }, { passive: false });
   }

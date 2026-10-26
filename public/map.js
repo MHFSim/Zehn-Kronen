@@ -371,7 +371,7 @@ export class WorldMap {
     r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
     this.dom = r.domElement; host.appendChild(this.dom);
     this.scene = new T.Scene(); const sky = 0x9cc3de; this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(sky, 70, 260);
-    this.camera = new T.PerspectiveCamera(34, 1, 2, 700);
+    this.camera = new T.PerspectiveCamera(34, 1, 2, 1800);
     this.hemi = new T.HemisphereLight(0xcfe3ff, 0x7d7448, .95); this.scene.add(this.hemi);
     this.sun = new T.DirectionalLight(0xfff1d6, 1.15); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera; sc.left = -42; sc.right = 42; sc.top = 42; sc.bottom = -42; sc.near = 1; sc.far = 220; this.sun.shadow.bias = -.0006; this.sun.shadow.normalBias = .05;
@@ -891,7 +891,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 
   /* ---------- Kamera ---------- */
   updateCamera() {
-    const c = this.cam; c.x = clamp(c.x, 3, N - 3); c.z = clamp(c.z, 3, N - 3); c.dist = clamp(c.dist, 12, 150);
+    const c = this.cam; c.x = clamp(c.x, 3, N - 3); c.z = clamp(c.z, 3, N - 3); c.dist = clamp(c.dist, 12, 340); if (this.scene.fog) { this.scene.fog.near = Math.max(70, c.dist * 1.1); this.scene.fog.far = Math.max(260, c.dist * 3.4); }
     const ty = Math.max(0, this.yAt(c.x, c.z)), cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
     this.camera.position.set(c.x + Math.sin(c.yaw) * cp * c.dist, ty + sp * c.dist, c.z + Math.cos(c.yaw) * cp * c.dist);
     this.camera.lookAt(c.x, ty, c.z); this.camera.updateMatrixWorld();
