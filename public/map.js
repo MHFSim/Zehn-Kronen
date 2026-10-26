@@ -942,7 +942,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   frame(dt) {
     this.ema = (this.ema || .016) * .97 + Math.min(dt, .2) * .03;
     if (this.time > 3 && !this.perf1 && this.ema > .045) { this.perf1 = 1; this.sun.castShadow = false; this.renderer.shadowMap.enabled = false; this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
-    if (this.time > 6 && this.perf1 === 1 && this.ema > .055) { this.perf1 = 2; this.renderer.setPixelRatio(1); this.renderer.setSize(this.W, this.H); }
+    if (this.time > 6 && this.perf1 === 1 && this.ema > .055) { this.perf1 = 2; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); this.renderer.setSize(this.W, this.H); }
     dt = Math.min(dt, .1); this.time += dt; const t = this.time; this.waterMat.uniforms.uTime.value = t;
     if (this.anim) { const a = this.anim; a.t = Math.min(1, a.t + dt / .38); const u = 1 - Math.pow(1 - a.t, 3); this.cam.x = a.sx + (a.ex - a.sx) * u; this.cam.z = a.sz + (a.ez - a.sz) * u; if (a.t >= 1) this.anim = null; }
     this.stepFx(dt); this.updateCamera();
