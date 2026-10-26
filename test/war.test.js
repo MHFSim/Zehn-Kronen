@@ -108,7 +108,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   // Thron besetzen (braucht Revier: ohne Außenposten geht es nicht)
   give(a, { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 });
   assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /Revier/);
-  match.world.outposts.opT = { id: 'opT', al: Object.values(match.world.alliances)[0].id, by: a.id, x: 97, y: 97, done: 0, garr: {} };
+  match.world.outposts.opT = { id: 'opT', al: Object.values(match.world.alliances)[0].id, by: a.id, x: 137, y: 137, done: 0, garr: {} };
   assert.equal(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 } }), '');
   adv(match, players, 3 * DAY);
   assert.ok(match.world.holds.throne1, 'Thron gehalten');

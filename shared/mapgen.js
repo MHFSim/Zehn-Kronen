@@ -3,7 +3,7 @@
 // Wichtig: Nur +, -, *, /, sqrt, floor und Math.imul verwenden. Math.sin/cos/pow können je nach
 // Browser minimal abweichen und würden Server und Client auseinanderlaufen lassen.
 
-export const N = 200;           // Kartengröße in Feldern
+export const N = 280;           // Kartengröße in Feldern
 export const SUB = 3;           // Höhenraster pro Feld
 export const G = N * SUB + 1;   // Gitterpunkte je Seite
 export const SEA = 0.30;        // Wasserstand
@@ -50,7 +50,7 @@ const RING = [
 ];
 const AXES = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const C = N / 2;
-export const START_R = 72, SANCT_R = 38;
+export const START_R = 101, SANCT_R = 53;
 export const startSpot = i => [Math.floor(C + RING[i][0] * START_R), Math.floor(C + RING[i][1] * START_R)];
 const sanctSpot = i => [Math.floor(C + AXES[i][0] * SANCT_R), Math.floor(C + AXES[i][1] * SANCT_R)];
 
@@ -192,7 +192,7 @@ export function generateMap(seed) {
   // Rest der Karte
   const scatter = (kind, count, minD, lvf, r0 = 6) => { for (let i = 0; i < count; i++) tryPlace(kind, C, C, r0, C * 0.9, minD, lvf, 80); };
   // Ressourcen: deutlich weniger und nie in Thronnähe
-  scatter('farm', 14, 6, nodeLv, 26); scatter('wood', 14, 6, nodeLv, 26); scatter('stone', 11, 6, nodeLv, 26); scatter('ore', 11, 6, nodeLv, 26);
+  scatter('farm', 14, 6, nodeLv, 36); scatter('wood', 14, 6, nodeLv, 36); scatter('stone', 11, 6, nodeLv, 36); scatter('ore', 11, 6, nodeLv, 36);
   scatter('camp', 14, 7, campLv);
 
   const map = { seed, N, H, F, pass, reach, objects, starts, byId: Object.fromEntries(objects.map(o => [o.id, o])) };

@@ -17,7 +17,7 @@ export const OP_BUILD = 2 * 3600;                         // Bauzeit in Spielsek
 export const OP_MIN_TROOPS = 50;                          // so viele Truppen braucht ein Bautrupp (er bleibt als Besatzung)
 export const OP_COST = [400, 1000, 1200, 200];            // Nahrung, Holz, Stein, Erz – aus dem Bündnislager
 export const CLAN_SHARE = 0.25;                           // Anteil, der beim Farmen im Bündnisgebiet zusätzlich ins Bündnislager geht
-export const maxOutposts = al => 3 + 2 * (al ? al.members.length : 0);
+export const maxOutposts = () => Infinity;   // kein Limit
 export const cityR = rathaus => 3 + Math.ceil(rathaus / 3);
 export const opGuard = () => ({ troops: { speer: 30, bogen: 20 }, mult: 1.3 });   // Wachen ohne Besatzung
 export const storeOf = al => al ? (al.store = al.store || { food: 0, wood: 0, stone: 0, ore: 0 }) : { food: 0, wood: 0, stone: 0, ore: 0 };
@@ -90,7 +90,6 @@ export function checkSite(match, players, me, x, y, gt) {
     if (r.k === 'op' && Math.abs(r.x - x) <= 1 && Math.abs(r.y - y) <= 1) return 'Hier steht schon ein Außenposten.';
   }
   if (!rects.some(r => r.ready && r.group === group && overlaps(nr, r, 1))) return 'Ein Außenposten muss das Revier deines Bündnisses berühren.';
-  if (Object.values(w.outposts || {}).filter(o => o.al === al.id).length >= maxOutposts(al)) return 'Euer Bündnis kann höchstens ' + maxOutposts(al) + ' Außenposten halten (wächst mit den Mitgliedern).';
   return '';
 }
 export function checkBuild(match, players, me, x, y, troops, gt) {

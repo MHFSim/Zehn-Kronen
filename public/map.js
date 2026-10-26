@@ -481,7 +481,10 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const { pre, nz3, ao, col, C, pads, map } = this.tv, x = (i % G) / SUB, y = Math.floor(i / G) / SUB, n3 = nz3[i];
     let c = [pre[i * 3], pre[i * 3 + 1], pre[i * 3 + 2]];
     if (rw > 0) c = mixc(c, mixc(C.dirt, [132, 104, 70], n3), rw * .78);
-    for (const o of map.objects) {
+    const bk = this.tv.bk || (this.tv.bk = (() => { const m = new Map(); for (const o of map.objects) { if (!pads[o.k]) continue; const key = (o.x >> 3) * 1000 + (o.y >> 3); (m.get(key) || m.set(key, []).get(key)).push(o); } return m; })());
+    const near = [], bx = Math.floor(x / 8), by = Math.floor(y / 8);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const l = bk.get((bx + dx) * 1000 + by + dy); if (l) for (const o of l) near.push(o); }
+    for (const o of near) {
       const pd = pads[o.k]; if (!pd) continue;
       const d = Math.hypot(x - o.x - .5, y - o.y - .5); if (d > pd[1]) continue;
       c = mixc(c, mixc(pd[0], [pd[0][0] * .9, pd[0][1] * .9, pd[0][2] * .9], n3), (1 - smooth(pd[1] * .5, pd[1], d)) * pd[2]);
@@ -656,7 +659,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   }
   // Burg an einen neuen Ort setzen (Teleporter)
   moveStart(h, x, y) {
-    const o = h.o; o.x = x; o.y = y; h.grp.position.set(x + .5, this.baseY(x + .5, y + .5, 2), y + .5); this.clearTrees(x + .5, y + .5, 4.6);
+    const o = h.o; o.x = x; o.y = y; this.tv.bk = null; h.grp.position.set(x + .5, this.baseY(x + .5, y + .5, 2), y + .5); this.clearTrees(x + .5, y + .5, 4.6);
     if (h.lab) { h.lab.el.style.display = 'none'; }
     this.terrDirty = true; this.dirtyLabels = true;
   }
