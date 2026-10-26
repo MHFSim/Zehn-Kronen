@@ -15,7 +15,7 @@ const vnoise = (x, z, s = 0) => {
 };
 const PAD = [150, 138, 114], PATH = [176, 164, 140], TIMBER = [118, 84, 52];
 
-const CELL = {};   // Gebäude-ID → Mittelpunkt im Raster (aus rules.js B übergeben)
+let B_LAYOUT = {};   // Gebäude-ID → Mittelpunkt im Raster (aus rules.js B übergeben)
 
 /* ---------- Gebäudemodelle (Ursprung = Mitte des Bauplatzes, y = 0 Boden) ---------- */
 function pad(b, s) { b.box(s, .06, s, 0, 0, 0, mul(PAD, .86)); b.box(s - .22, .05, s - .22, 0, .05, 0, PAD); }
@@ -135,8 +135,8 @@ const MODELS = {
 };
 
 /* ---------- Szene: Mauer, Tore, Wege, Landschaft ---------- */
-function wallRing(pc, lvM) {
-  const b = new MB(), h = 1.7 + Math.min(lvM, 20) * .035, wd = .62, ST = [176, 168, 150], STD = mul(ST, .88), roof = pc;
+function wallRing(pc, lvM, roofCol) {
+  const b = new MB(), h = 1.7 + Math.min(lvM, 20) * .035, wd = .62, ST = [176, 168, 150], STD = mul(ST, .88), roof = roofCol || pc;
   const V = [[-(W - CUT), -W], [W - CUT, -W], [W, -(W - CUT)], [W, W - CUT], [W - CUT, W], [-(W - CUT), W], [-W, W - CUT], [-W, -(W - CUT)]];
   const flags = [], g = 1.25;                                                              // g = halbe Torbreite
   const seg = (a, c, col) => { wallSeg(b, a[0], a[1], c[0], c[1], 0, h, wd, col); crenels(b, a[0], a[1], c[0], c[1], h, col, .5); };
@@ -160,28 +160,49 @@ function wallRing(pc, lvM) {
   b.box(g * 2 + .2, 1.0, 1.1, 0, h + .05, gz, mul(ST, 1.1)); b.box(g * 2 + .3, .1, 1.2, 0, h + .05, gz, mul(ST, 1.2)); crenels(b, -g, gz + .5, g, gz + .5, h + 1.05, ST, .4);
   b.box(g * 2, h + .05, 1.0, 0, 0, gz, DARK);
   for (let i = -3; i <= 3; i++) b.box(.04, h * .92, .04, i * g * .3, .06, gz + .5, [64, 58, 54]); for (let k = 0; k < 4; k++) b.box(g * 2, .04, .04, 0, .3 + k * .35, gz + .5, [64, 58, 54]);
-  b.box(g * 1.2, .06, 2.4, 0, -.02, gz + 1.4, [136, 100, 64], 0, -.0);
+  for (let i = 0; i < 28; i++) b.box(g * 1.7, .06, .17, 0, .0, gz + .4 + i * .16, mul([138, 100, 64], .86 + hash(i, 2, 8) * .3), 0);
+  for (const sx of [-1, 1]) { b.box(.1, .08, 4.6, sx * g * .86, .0, gz + 2.6, WOOD_D); for (let i = 0; i < 5; i++) { b.cyl(.04, .04, .6, 5, sx * g * .86, .0, gz + .8 + i * 1.0, WOOD); } b.box(.06, .06, 4.2, sx * g * .86, .55, gz + 2.7, WOOD); for (let i = 0; i < 3; i++) b.cyl(.09, .1, 1.1, 6, sx * g * .7, -1.0, gz + 1.4 + i * 1.3, WOOD_D); }
+  for (const sx of [-1, 1]) { b.cyl(.012, .012, 1.6, 3, sx * g * .5, h * .55, gz + .7, [60, 56, 52], 0); }
   b.box(.7, .5, .04, -g * .55, h + .15, gz + .55, mul(pc, .9)); b.box(.7, .5, .04, g * .55, h + .15, gz + .55, mul(pc, .9)); b.box(.2, .25, .05, 0, h + .6, gz + .56, GOLD);
   b.gable(g * 2 + .4, 1.1, .6, 0, h + 1.15, gz, mul(roof, .9), Math.PI);
   for (const s of [-1, 1]) { b.cyl(.03, .03, .7, 5, s * (g + .1), .0, gz + 1.0, WOOD_D); b.cone(.1, .2, 6, s * (g + .1), .7, gz + 1.0, LIGHT); }
   return { geo: b.build(), flags, wallH: h };
 }
+const SEGS = [[4, 4, 9, 4], [4, 9, 9, 9], [4, 4, 4, 9], [9, 4, 9, 9], [4, 4, 2, 2], [9, 4, 11, 2], [4, 9, 2, 11], [9, 9, 11, 11],
+  [4, 5, 3, 5], [4, 8, 3, 8], [9, 5, 10, 5], [9, 8, 10, 8], [5, 4, 5, 3], [8, 4, 8, 3]];
+const segWorld = () => SEGS.map(([a, b, c, d]) => [gw(a), gw(b), gw(c), gw(d)]).concat([[0, gw(9), 0, W + 4.6]]);
+const distSeg = (px, pz, [ax, az, bx, bz]) => { const dx = bx - ax, dz = bz - az, t = clamp(((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1), 0, 1); return Math.hypot(px - ax - dx * t, pz - az - dz * t); };
+function cobble(b, ax, az, bx, bz, w, y = 0) {
+  const len = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / len, dz = (bz - az) / len, nx = -dz, nz = dx, ry = Math.atan2(-(bz - az), bx - ax), mx = (ax + bx) / 2, mz = (az + bz) / 2;
+  b.box(len + .34, .03, w + .34, mx, y, mz, [92, 78, 58], ry);
+  const rows = Math.max(2, Math.round(w / .2)), cols = Math.max(2, Math.round(len / .25));
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const k = i * 31 + j * 7 + Math.round(ax * 13 + bz * 5), u = ((i + .5) / cols - .5) * len + ((j & 1) ? .07 : 0), v = ((j + .5) / rows - .5) * w, edge = j === 0 || j === rows - 1;
+    const c = edge ? mul([150, 142, 126], .84 + hash(k, 1, 5) * .24) : mul(hash(k, 2, 5) > .86 ? [160, 150, 128] : PATH, .8 + hash(k, 3, 5) * .3);
+    b.box(len / cols * .88, edge ? .075 : .055, w / rows * .86, mx + dx * u + nx * v, y + .02, mz + dz * u + nz * v, c, ry + (hash(k, 4, 5) - .5) * .22, 0, 0);
+  }
+}
 function pathGeo() {
-  const b = new MB(), seg = (x0, y0, x1, y1, w = .95) => {
-    const ax = gw(x0), az = gw(y0), bx = gw(x1), bz = gw(y1), len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(-(bz - az), bx - ax);
-    b.box(len + w * .5, .035, w + .22, (ax + bx) / 2, 0, (az + bz) / 2, mul(PATH, .74), ry); b.box(len + w * .3, .05, w, (ax + bx) / 2, .02, (az + bz) / 2, PATH, ry);
-  };
-  seg(4, 4, 9, 4); seg(4, 9, 9, 9); seg(4, 4, 4, 9); seg(9, 4, 9, 9);
-  seg(4, 4, 2, 2); seg(9, 4, 11, 2); seg(4, 9, 2, 11); seg(9, 9, 11, 11);
-  seg(4, 5, 3, 5); seg(4, 8, 3, 8); seg(9, 5, 10, 5); seg(9, 8, 10, 8); seg(5, 4, 5, 3); seg(8, 4, 8, 3);
-  b.box(1.4, .035, W - gw(9) + 1.2, 0, 0, (gw(9) + W + 1.2) / 2, mul(PATH, .74)); b.box(1.2, .05, W - gw(9) + 1.2, 0, .02, (gw(9) + W + 1.2) / 2, PATH);
-  // Kreisplatz mit Denkmal
+  const b = new MB();
+  for (const [ax, az, bx, bz] of segWorld()) cobble(b, ax, az, bx, bz, ax === bx && ax === 0 ? 1.5 : .95);
+  // Kreisplatz mit Brunnen und Denkmal
   const pz = gw(10.6);
-  b.cyl(1.6, 1.7, .05, 18, 0, 0, pz, mul(PATH, .74)); b.cyl(1.45, 1.5, .06, 18, 0, .0, pz, PATH);
-  b.cyl(.85, .9, .22, 14, 0, .05, pz, STONE); b.cyl(.7, .75, .14, 14, 0, .26, pz, mul(STONE, 1.08)); b.cyl(.62, .62, .03, 14, 0, .39, pz, [64, 120, 150]);
-  b.box(.34, .3, .34, 0, .27, pz, STONE_D); b.box(.26, 1.1, .26, 0, .55, pz, [214, 208, 192]); b.box(.2, .9, .2, 0, 1.3, pz, [224, 218, 202]); b.cone(.16, .28, 4, 0, 2.15, pz, GOLD);
-  b.box(.34, .08, .34, 0, .58, pz, mul(STONE, 1.1)); b.sph(.07, 0, 2.45, pz, GOLD, 6);
-  for (let i = 0; i < 4; i++) { const a = i * 1.5708 + .78; b.box(.1, .26, .1, Math.cos(a) * .52, .5, pz + Math.sin(a) * .52, [214, 208, 192]); }
+  b.cyl(1.9, 1.95, .05, 24, 0, 0, pz, [92, 78, 58]);
+  for (let r = 0; r < 5; r++) { const rad = .95 + r * .2, n = Math.round(rad * 6.28 / .24); for (let i = 0; i < n; i++) { const a = i / n * 6.283 + r * .3; b.box(.2, .05, .17, Math.cos(a) * rad, .02, pz + Math.sin(a) * rad, mul(PATH, .8 + hash(i, r, 7) * .3), -a); } }
+  b.cyl(.88, .94, .26, 18, 0, .04, pz, STONE); b.cyl(.76, .8, .16, 18, 0, .3, pz, mul(STONE, 1.08)); b.cyl(.68, .68, .03, 18, 0, .45, pz, [58, 124, 156]);
+  b.cyl(.2, .26, .36, 10, 0, .3, pz, STONE_D); b.cyl(.12, .16, .5, 10, 0, .62, pz, mul(STONE, 1.1)); b.cyl(.3, .12, .1, 10, 0, 1.0, pz, mul(STONE, 1.12)); b.cyl(.26, .26, .03, 10, 0, 1.1, pz, [66, 130, 164]);
+  b.box(.3, .26, .3, 0, 1.12, pz, [224, 218, 202]); b.box(.2, .8, .2, 0, 1.38, pz, [232, 226, 210]); b.cone(.15, .3, 4, 0, 2.18, pz, GOLD); b.sph(.07, 0, 2.52, pz, GOLD, 6);
+  for (let i = 0; i < 4; i++) { const a = i * 1.5708 + .78; b.box(.1, .3, .1, Math.cos(a) * .6, .45, pz + Math.sin(a) * .6, [214, 208, 192]); b.sph(.06, Math.cos(a) * .6, .78, pz + Math.sin(a) * .6, LIGHT, 6); }
+  // Marktstände neben dem Platz
+  const stand = (x, z, ry, c1) => {
+    b.box(.9, .06, .52, x, .3, z, WOOD, ry); b.box(.84, .3, .46, x, 0, z, WOOD_D, ry);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const ox = Math.cos(ry) * sx * .42 + Math.sin(ry) * sz * .24, oz = -Math.sin(ry) * sx * .42 + Math.cos(ry) * sz * .24; b.cyl(.02, .02, .9, 4, x + ox, 0, z + oz, WOOD_D); }
+    for (let i = 0; i < 8; i++) { const u = (i / 8 - .44) * .98; b.box(.115, .035, .66, x + Math.cos(ry) * u, .92 + (i % 2 ? .0 : .0), z - Math.sin(ry) * u, i % 2 ? [236, 232, 220] : c1, ry, 0, .0); }
+    for (let i = 0; i < 4; i++) b.sph(.07, x + Math.cos(ry) * (i - 1.5) * .2, .4, z - Math.sin(ry) * (i - 1.5) * .2, [[210, 70, 50], [230, 190, 70], [110, 160, 70], [200, 120, 60]][i], 6);
+  };
+  stand(-2.75, pz + .3, Math.PI / 2, [190, 60, 50]); stand(2.75, pz + .3, Math.PI / 2, [60, 100, 170]);
+  // Laternen am Ring
+  for (const [gx, gy] of [[4, 4], [9, 4], [4, 9], [9, 9]]) { const x = gw(gx) + .6, z = gw(gy) + .6; b.cyl(.025, .03, 1.1, 5, x, 0, z, [60, 54, 50]); b.box(.14, .18, .14, x, 1.05, z, LIGHT); b.cone(.12, .12, 4, x, 1.22, z, [60, 54, 50]); }
   return b.build();
 }
 function groundMesh(THREE) {
@@ -198,21 +219,71 @@ function groundMesh(THREE) {
   return g;
 }
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const dOct = (x, z) => Math.max(Math.max(Math.abs(x), Math.abs(z)) - W, (Math.abs(x) + Math.abs(z) - (2 * W - CUT)) / 1.4142);
+const MOAT0 = 1.5, MOAT1 = 4.4;
 const hOut = (x, z) => {
-  const d = Math.max(Math.max(Math.abs(x), Math.abs(z)) - W, 0), r = Math.hypot(x, z);
-  if (d < 3.4) return -.05 * smooth(0, 3.4, d) - .0;
-  const t = smooth(3.4, 40, d), n = vnoise(x * .06, z * .06, 11) * 5 + vnoise(x * .17, z * .17, 12) * 1.4;
+  const d = Math.max(dOct(x, z), 0), r = Math.hypot(x, z);
+  if (d < MOAT0) return -.05;
+  if (d < MOAT1) { const t = (d - MOAT0) / (MOAT1 - MOAT0); return -.95 * Math.pow(Math.sin(t * Math.PI), .55) - .05; }
+  const t = smooth(MOAT1, 44, d), n = vnoise(x * .06, z * .06, 11) * 5 + vnoise(x * .17, z * .17, 12) * 1.4;
   return t * (n * .9 + 2) - .05 + smooth(55, 120, r) * 14;
 };
 function outerGround() {
-  const S = 360, n = 120, g = new T.PlaneGeometry(S, S, n, n); g.rotateX(-Math.PI / 2);
+  const S = 300, n = 300, g = new T.PlaneGeometry(S, S, n, n); g.rotateX(-Math.PI / 2);
   const P = g.attributes.position, col = new Float32Array(P.count * 3);
   for (let i = 0; i < P.count; i++) {
-    const x = P.getX(i), z = P.getZ(i), y = hOut(x, z), d = Math.max(Math.max(Math.abs(x), Math.abs(z)) - W, 0), a = vnoise(x * .09, z * .09, 4), b = vnoise(x * .5, z * .5, 6);
-    let c = mixc([76, 128, 52], [112, 156, 66], a); c = mixc(c, [150, 126, 86], (1 - smooth(0, 6, d)) * .5 * (.5 + b)); c = mixc(c, [128, 120, 106], smooth(8, 20, y)); c = mixc(c, [236, 240, 246], smooth(15, 22, y));
+    const x = P.getX(i), z = P.getZ(i), y = hOut(x, z), d = Math.max(dOct(x, z), 0), a = vnoise(x * .09, z * .09, 4), b = vnoise(x * .5, z * .5, 6);
+    let c = mixc([76, 128, 52], [116, 160, 66], a); c = mixc(c, [150, 126, 86], (1 - smooth(MOAT1, MOAT1 + 6, d)) * .5 * (.5 + b)); c = mixc(c, [128, 120, 106], smooth(8, 20, y)); c = mixc(c, [236, 240, 246], smooth(15, 22, y));
+    if (d > MOAT0 - .3 && d < MOAT1 + .3) c = mixc(c, [92, 84, 64], smooth(-.1, -.7, y) * .9);
     const k = .86 + b * .22; col[i * 3] = LIN(c[0] * k); col[i * 3 + 1] = LIN(c[1] * k); col[i * 3 + 2] = LIN(c[2] * k); P.setY(i, y);
   }
   g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
+}
+// Material mit feiner Körnung (Stein, Holz) und Grashalmen auf grünen Flächen
+function detailMat() {
+  const m = new T.MeshLambertMaterial({ vertexColors: true });
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvec4 wq = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\nwq = instanceMatrix * wq;\n#endif\nvWP = (modelMatrix * wq).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vWP;
+float zh(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(zh(i),zh(i+vec2(1.,0.)),f.x), mix(zh(i+vec2(0.,1.)),zh(i+vec2(1.,1.)),f.x), f.y); }`).replace('#include <color_fragment>', `#include <color_fragment>
+{ vec3 q = vWP; float a = (zn(q.xz*3.1)+zn(q.xy*3.1+7.)+zn(q.zy*3.1+13.))/3.0; float b = (zn(q.xz*14.)+zn(q.xy*14.+3.)+zn(q.zy*14.+9.))/3.0;
+  float g = clamp(diffuseColor.g*2.2 - diffuseColor.r*1.2 - diffuseColor.b*.6, 0.0, 1.0);
+  float bl = zn(vec2(q.x*46.0, q.z*8.0)) * zn(vec2(q.x*6.0, q.z*50.0));
+  diffuseColor.rgb *= .84 + a*.2 + b*.12 + g*(bl-.25)*.3; diffuseColor.rg += vec2(.012,.024)*g*a; }`);
+  };
+  return m;
+}
+const WATER_V = `varying vec3 vW;
+#include <fog_pars_vertex>
+void main(){ vec4 wp = modelMatrix*vec4(position,1.0); vW = wp.xyz; vec4 mvPosition = viewMatrix*wp; gl_Position = projectionMatrix*mvPosition;
+#include <fog_vertex>
+}`;
+const WATER_F = `uniform float uTime; varying vec3 vW;
+#include <fog_pars_fragment>
+float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x), mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)),f.x), f.y); }
+void main(){
+  vec2 p = vW.xz*.9; float t = uTime;
+  float n = vn(p*1.3+vec2(t*.25,t*.12))*.55 + vn(p*3.1-vec2(t*.2,-t*.3))*.45;
+  vec3 col = mix(vec3(.10,.40,.50), vec3(.05,.24,.38), n);
+  float w = sin(vW.x*3.2+t*1.6+n*5.0)*sin(vW.z*2.8-t*1.2+n*4.0); col += vec3(.05,.08,.09)*w;
+  float sp = pow(max(0.0, sin((vW.x*1.3+vW.z)*4.0+t*2.6+n*9.0)), 36.0)*vn(p*3.0+t*.5); col += vec3(.75,.85,.85)*sp;
+  gl_FragColor = vec4(col, .9);
+#include <fog_fragment>
+}`;
+function villager(tunic, hat) {
+  const body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150];
+  body.box(.14, .22, .1, 0, .2, 0, tunic); body.box(.15, .04, .105, 0, .2, 0, [90, 70, 50]); body.sph(.052, 0, .5, 0, SK, 7);
+  body.cone(.075, .09, 7, 0, .52, 0, hat); body.box(.04, .15, .05, -.095, .26, 0, mul(tunic, .9)); body.box(.04, .15, .05, .095, .26, 0, mul(tunic, .9));
+  la.box(.05, .18, .055, -.04, -.18, 0, [86, 68, 50]); lb.box(.05, .18, .055, .04, -.18, 0, [86, 68, 50]);
+  return { body: body.build(), la: la.build(), lb: lb.build(), hip: .18 };
+}
+function shadowTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 4, 32, 32, 31);
+  g.addColorStop(0, 'rgba(0,0,0,.7)'); g.addColorStop(.6, 'rgba(0,0,0,.28)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const t = new T.CanvasTexture(c); return t;
 }
 
 export class CityView {
@@ -222,15 +293,17 @@ export class CityView {
     const r = this.renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); r.outputEncoding = T.sRGBEncoding; r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
     this.dom = r.domElement; this.dom.style.touchAction = 'none'; host.appendChild(this.dom);
-    const sky = 0xa9cde6; this.scene = new T.Scene(); this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(sky, 60, 190);
-    this.camera = new T.PerspectiveCamera(36, 1, 1, 500);
-    this.scene.add(new T.HemisphereLight(0xdcecff, 0x86804e, .95));
-    this.sun = new T.DirectionalLight(0xfff0d2, 1.2); this.sun.position.set(-16, 26, 14); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
+    const sky = 0xb4d4ea; this.scene = new T.Scene(); this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(0xc4dcec, 70, 230);
+    this.camera = new T.PerspectiveCamera(32, 1, 1, 600);
+    r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 1.28;
+    this.scene.add(new T.HemisphereLight(0xd6e8ff, 0x7e7648, .8));
+    const fill = new T.DirectionalLight(0xa9c2ff, .35); fill.position.set(18, 10, -14); this.scene.add(fill);
+    this.sun = new T.DirectionalLight(0xffe9c2, 1.55); this.sun.position.set(-16, 26, 14); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera; sc.left = -19; sc.right = 19; sc.top = 19; sc.bottom = -19; sc.near = 4; sc.far = 80; this.sun.shadow.bias = -.0006; this.sun.shadow.normalBias = .05;
     this.scene.add(this.sun, this.sun.target);
-    this.matVC = new T.MeshLambertMaterial({ vertexColors: true });
+    this.matVC = detailMat();
     this.labelsEl = document.createElement('div'); this.labelsEl.className = 'clabels'; host.appendChild(this.labelsEl);
-    this.cam = { x: 0, z: 1.5, yaw: .42, pitch: .95, dist: 34 }; this.tgt = { yaw: .42, dist: 34 };
+    this.cam = { x: 0, z: 1.5, yaw: .42, pitch: .86, dist: 34 }; this.tgt = { yaw: .42, dist: 34 };
     this.time = 0; this.units = []; this.flagMeshes = []; this.bld = {}; this.pick = []; this.smokeList = []; this.bump = {};
     this.build(); this.setupInput(); this.resize(); window.addEventListener('resize', () => this.resize());
     this.updateCamera();
@@ -265,12 +338,12 @@ export class CityView {
     const GREEN = { pine: [[36, 84, 48], [44, 98, 56]], oak: [[84, 140, 52], [100, 152, 58]], bush: [[76, 120, 56], [92, 134, 60]], rock: [[146, 140, 128], [128, 122, 112]], blossom: [[240, 160, 184], [226, 130, 168]] };
     const lists = { pine: [], oak: [], bush: [], rock: [], blossom: [] };
     for (let i = 0; i < 900 && lists.pine.length + lists.oak.length < 230; i++) {
-      const x = (hash(i, 1, 21) - .5) * 150, z = (hash(i, 2, 21) - .5) * 150, d = Math.max(Math.max(Math.abs(x), Math.abs(z)) - W, 0);
-      if (d < 3 || Math.abs(x) > 74 || Math.abs(z) > 74) continue; const dens = vnoise(x * .05, z * .05, 22); if (dens < .42 && d < 20) continue;
+      const x = (hash(i, 1, 21) - .5) * 150, z = (hash(i, 2, 21) - .5) * 150, d = Math.max(dOct(x, z), 0);
+      if (d < 6 || Math.abs(x) > 74 || Math.abs(z) > 74) continue; const dens = vnoise(x * .05, z * .05, 22); if (dens < .42 && d < 20) continue;
       const k = hash(i, 3, 21); lists[k > .45 ? 'pine' : 'oak'].push([x, hOut(x, z), z, 1.5 + hash(i, 4, 21) * 1.2, hash(i, 5, 21) * 6.28, hash(i, 6, 21)]);
       if (k > .8) lists.bush.push([x + 1, hOut(x + 1, z), z, 1.6, 0, hash(i, 7, 21)]);
     }
-    for (let i = 0; i < 60; i++) { const x = (hash(i, 31, 21) - .5) * 100, z = (hash(i, 32, 21) - .5) * 100, d = Math.max(Math.max(Math.abs(x), Math.abs(z)) - W, 0); if (d < 4) continue; lists.rock.push([x, hOut(x, z), z, 1.4 + hash(i, 5, 24) * 2, hash(i, 6, 24) * 6, hash(i, 7, 24)]); }
+    for (let i = 0; i < 60; i++) { const x = (hash(i, 31, 21) - .5) * 100, z = (hash(i, 32, 21) - .5) * 100, d = Math.max(dOct(x, z), 0); if (d < 6) continue; lists.rock.push([x, hOut(x, z), z, 1.4 + hash(i, 5, 24) * 2, hash(i, 6, 24) * 6, hash(i, 7, 24)]); }
     // Kirschbäume und Büsche im Innenhof (Randstreifen)
     const inn = [[-9.0, -6.2], [-9.0, 6.6], [9.0, -6.2], [9.0, 6.6], [-6.0, -9.1], [6.0, -9.1], [-8.9, 0.2], [8.9, 0.2], [-3.2, 8.6], [3.4, 8.7], [-9.0, 3.6], [9.0, -2.8]];
     inn.forEach(([x, z], i) => lists[i % 3 === 0 ? 'blossom' : i % 3 === 1 ? 'oak' : 'bush'].push([x, .02, z, i % 3 === 2 ? 1.6 : 1.9, i, hash(i, 2, 33)]));
@@ -286,11 +359,80 @@ export class CityView {
     }
   }
 
+
+  decor() {
+    const sc = this.scene, mat = this.matVC;
+    // Wassergraben
+    const wg = new T.PlaneGeometry(W * 2 + 30, W * 2 + 30, 1, 1); wg.rotateX(-Math.PI / 2);
+    this.waterMat = new T.ShaderMaterial({ vertexShader: WATER_V, fragmentShader: WATER_F, transparent: true, fog: true, uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uTime: { value: 0 } }]) });
+    const wm = new T.Mesh(wg, this.waterMat); wm.position.y = -.2; wm.renderOrder = 1; sc.add(wm);
+    // Gras, Blumen
+    const segs = segWorld(), plots = Object.keys(this.layout || {});
+    const tg = new MB(); for (let k = 0; k < 4; k++) tg.push(new T.ConeGeometry(.035, .3 + k % 2 * .08, 4), [255, 255, 255], Math.cos(k * 1.6) * .05, .15, Math.sin(k * 1.6) * .05, k, 1, 1, 1, Math.sin(k * 2.1) * .35, Math.cos(k * 1.3) * .35, 0);
+    const tufts = [], flowers = [];
+    const free = (x, z) => {
+      if (dOct(x, z) > -1.2) return false;
+      for (const sg of segs) if (distSeg(x, z, sg) < .78) return false;
+      if (Math.hypot(x, z - gw(10.6)) < 2.3) return false;
+      for (const id in B_LAYOUT) { const [lx, ly, lw] = B_LAYOUT[id], cx = gw(lx + lw / 2), cz = gw(ly + lw / 2), hh = id === 'rathaus' ? 2.5 : 1.45; if (Math.abs(x - cx) < hh && Math.abs(z - cz) < hh) return false; }
+      return true;
+    };
+    for (let i = 0; i < 9000 && tufts.length < 2600; i++) { const x = (hash(i, 1, 51) - .5) * W * 2.1, z = (hash(i, 2, 51) - .5) * W * 2.1; if (free(x, z)) tufts.push([x, z, .5 + hash(i, 3, 51) * .6, hash(i, 4, 51) * 6.28, hash(i, 5, 51)]); }
+    for (let i = 0; i < 4000 && flowers.length < 260; i++) { const x = (hash(i, 6, 52) - .5) * W * 2.1, z = (hash(i, 7, 52) - .5) * W * 2.1; if (free(x, z)) flowers.push([x, z, hash(i, 8, 52)]); }
+    const fb = new MB(); fb.cyl(.01, .012, .17, 4, 0, 0, 0, [70, 130, 50]); fb.ico(.05, 0, .2, 0, [255, 255, 255], .7, 1, 0, 0); fb.ico(.03, 0, .22, 0, [255, 220, 120], 1, 1, 0, 0);
+    const tm = new T.Matrix4(), tc = new T.Color(), tq = new T.Quaternion(), te = new T.Euler();
+    const GR = [[88, 148, 54], [112, 164, 60], [70, 128, 48], [138, 172, 66]], FL = [[240, 120, 150], [250, 220, 90], [250, 250, 250], [170, 130, 230], [240, 150, 60]];
+    const tim = new T.InstancedMesh(tg.build(), mat, tufts.length), fim = new T.InstancedMesh(fb.build(), mat, flowers.length);
+    tufts.forEach(([x, z, k, r, v], i) => { tq.setFromEuler(te.set(0, r, 0)); tm.compose(new T.Vector3(x, .02, z), tq, new T.Vector3(k, k, k)); tim.setMatrixAt(i, tm); const g = GR[Math.floor(v * 3.99)]; tc.setRGB(LIN(g[0]), LIN(g[1]), LIN(g[2])); tim.setColorAt(i, tc); });
+    flowers.forEach(([x, z, v], i) => { tq.setFromEuler(te.set(0, v * 6, 0)); tm.compose(new T.Vector3(x, .02, z), tq, new T.Vector3(1, 1, 1)); fim.setMatrixAt(i, tm); const g = FL[Math.floor(v * 4.99)]; tc.setRGB(LIN(g[0]), LIN(g[1]), LIN(g[2])); fim.setColorAt(i, tc); });
+    tim.frustumCulled = false; fim.frustumCulled = false; sc.add(tim, fim);
+    // Landschaft vor den Mauern: Felder, Häuser, Weg, Windmühle, Schafe
+    const ob = new MB(), rows = (x0, z0, w, d, ry, k) => {
+      for (let i = 0; i < 12; i++) { const u = (i + .5) / 12 - .5, cx = x0 + Math.cos(ry) * 0, cz = z0 + u * d; const y = hOut(x0, cz);
+        ob.box(w, .1, d / 12 * .78, x0, y, cz, k === 0 ? mul([200, 164, 66], .8 + (i % 2) * .3) : k === 1 ? mul([110, 150, 60], .8 + (i % 2) * .3) : mul([116, 86, 56], .8 + (i % 2) * .26));
+        if (k < 2) for (let j = 0; j < 5; j++) ob.cone(.04, .2, 4, x0 - w / 2 + (j + .5) * w / 5, y + .1, cz, k === 0 ? [226, 190, 80] : [90, 160, 70]); }
+      ob.box(w + .3, .06, d + .3, x0, hOut(x0, z0) - .02, z0, [96, 78, 52]);
+    };
+    rows(-W - 8.5, -6, 4.6, 6.4, 0, 0); rows(-W - 8.5, 3, 4.6, 5.6, 0, 1); rows(W + 8.6, -8, 4.6, 6, 0, 2); rows(W + 9, 1, 4.6, 6.4, 0, 0); rows(W + 8.4, 9.5, 4.6, 5.4, 0, 1);
+    const hs = [[11, W + 10.5, .3], [16.5, W + 8, -.2], [-12, W + 11, .1], [-17, W + 7.5, -.3], [7, W + 15.5, .2]];
+    hs.forEach(([x, z, ry], i) => { const y = hOut(x, z); ob.box(1.6, 2.4, 1.6, x, y - 2.2, z, [120, 108, 84]); house(ob, x, z, y, .9 + hash(i, 1, 9) * .4, 1.0 + hash(i, 2, 9) * .3, .62 + hash(i, 3, 9) * .2, [[170, 62, 48], [60, 100, 170], [150, 100, 54], [60, 130, 80], [140, 70, 100]][i], ry); for (let k = 0; k < 5; k++) ob.cyl(.02, .025, .3, 4, x - .9 + k * .45, y, z + .9, WOOD); ob.box(1.9, .03, .03, x, y + .22, z + .9, WOOD_D); });
+    // Landstraße
+    const pts = [[0, W + 4.6], [1.8, W + 8], [5.2, W + 11], [10, W + 13.4], [17, W + 15], [25, W + 15.5]];
+    for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], len = Math.hypot(bx - ax, bz - az), ry = Math.atan2(-(bz - az), bx - ax), y = Math.max(hOut(ax, az), hOut(bx, bz)) + .03; ob.box(len + .5, .07, 1.7, (ax + bx) / 2, y, (az + bz) / 2, mul([156, 130, 90], .9 + hash(i, 1, 6) * .2), ry); for (let k = 0; k < 8; k++) ob.ico(.07, ax + (bx - ax) * k / 8 + (hash(k, i, 1) - .5), y + .05, az + (bz - az) * k / 8 + (hash(k, i, 2) - .5), [150, 144, 130], .5); }
+    // Schafe
+    for (let i = 0; i < 12; i++) { const x = -W - 6 - hash(i, 1, 31) * 7, z = W - 4 + hash(i, 2, 31) * 9 - 3, y = hOut(x, z); if (dOct(x, z) < 5) continue; ob.ico(.2, x, y + .25, z, [244, 240, 228], .8, 1.2, hash(i, 3, 31) * 3, 1); ob.sph(.09, x + .2, y + .3, z, [60, 54, 50], 6); for (const [ox, oz] of [[-.1, -.08], [.1, -.08], [-.1, .08], [.1, .08]]) ob.cyl(.018, .018, .14, 4, x + ox, y, z + oz, [60, 54, 50]); }
+    const om = new T.Mesh(ob.build(), mat); om.castShadow = true; om.receiveShadow = true; sc.add(om);
+    // Windmühle mit drehenden Flügeln
+    const mx = -W - 15, mz = W - 3, my = hOut(mx, mz), mb = new MB();
+    mb.cyl(1.7, 1.9, 1.6, 12, 0, -1.4, 0, [140, 134, 120]); mb.cyl(.95, 1.4, 3.6, 12, 0, .2, 0, [226, 216, 190]); mb.cyl(1.05, 1.05, .12, 12, 0, 1.8, 0, WOOD_D); mb.cone(1.3, 1.5, 12, 0, 3.8, 0, [138, 84, 58]); mb.sph(.1, 0, 5.4, 0, GOLD, 6);
+    mb.box(.5, .8, .08, 0, .2, 1.38, WOOD_D); for (let k = 0; k < 3; k++) mb.box(.18, .3, .06, 0, 1.4 + k * .8, 1.2 - k * .08, DARK);
+    const mill = this.mesh(mb.build()); mill.position.set(mx, my, mz); sc.add(mill);
+    const sb = new MB(); for (let k = 0; k < 4; k++) { const a = k * 1.5708; sb.box(.09, 3.6, .08, 0, 0, 0, WOOD_D, 0, 0, a); sb.box(.55, 1.5, .03, Math.cos(a + 1.5708) * .0 - Math.sin(a) * 1.5, Math.cos(a) * 1.6, .04, [236, 230, 214], 0, 0, a); } sb.cyl(.14, .14, .3, 8, 0, -.15, 0, IRON);
+    const sails = this.mesh(sb.build()), spin = new T.Group(); spin.add(sails); spin.position.set(mx, my + 3.3, mz + 1.55); sc.add(spin); this.sails = spin;
+    // Dorfbewohner
+    this.villagers = []; const vg = [], TUN = [[170, 80, 60], [70, 100, 160], [90, 140, 80], [180, 150, 70], [130, 90, 140], [200, 190, 170]], HAT = [[110, 80, 50], [150, 60, 50], [60, 90, 70], [190, 170, 100]];
+    const loop = [[4, 4], [9, 4], [9, 9], [4, 9]].map(([a, b]) => [gw(a), gw(b)]); let perim = 0; const lens = loop.map((p, i) => { const q = loop[(i + 1) % 4], l = Math.hypot(q[0] - p[0], q[1] - p[1]); perim += l; return l; });
+    this.loop = { pts: loop, lens, perim };
+    for (let i = 0; i < 16; i++) {
+      const ug = villager(TUN[i % 6], HAT[i % 4]), g = new T.Group(), body = new T.Mesh(ug.body, mat), la = new T.Mesh(ug.la, mat), lb = new T.Mesh(ug.lb, mat);
+      la.position.y = ug.hip; lb.position.y = ug.hip; body.castShadow = true; g.add(body, la, lb); g.scale.setScalar(1.45); sc.add(g);
+      this.villagers.push({ g, la, lb, t: hash(i, 1, 60) * perim, dir: i % 3 === 0 ? -1 : 1, spd: .5 + hash(i, 2, 60) * .35, off: (hash(i, 3, 60) - .5) * .5, ph: i * 1.7, gate: i >= 12 });
+    }
+    // weiche Standschatten
+    this.shadowTex = shadowTex(); this.shadowMat = new T.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false, opacity: .8 });
+    this.shadowGeo = new T.PlaneGeometry(1, 1); this.shadowGeo.rotateX(-Math.PI / 2); this.shadows = [];
+    const addSh = (x, z, size, op = 1) => { const m = new T.Mesh(this.shadowGeo, this.shadowMat); m.position.set(x, .06, z); m.scale.set(size, 1, size); m.renderOrder = 2; sc.add(m); return m; };
+    this.addSh = addSh;
+    const V = [[-(W - CUT), -W], [W - CUT, -W], [W, -(W - CUT)], [W, W - CUT], [W - CUT, W], [-(W - CUT), W], [-W, W - CUT], [-W, -(W - CUT)]];
+    for (const [x, z] of V) addSh(x, z, 4.8);
+  }
+
   /* ---------- Zustand vom Spiel ---------- */
   // cfg: { color, lv: {id: Stufe}, layout: {id: [rasterX, rasterY, w]}, rathausLv, slot }
   configure(cfg) {
-    this.layout = cfg.layout; this.color = cfg.color; this.slot = cfg.slot || 0;
+    this.layout = cfg.layout; B_LAYOUT = cfg.layout; this.color = cfg.color; this.slot = cfg.slot || 0;
     this.pc = hexRGB(cfg.color);
+    if (!this.decorDone) { this.decorDone = true; this.decor(); }
   }
   update(infos) {
     this.infos = infos;
@@ -300,7 +442,7 @@ export class CityView {
       this.wallKey = lvM + ':' + this.color;
       for (const c of [...this.wallGroup.children]) { this.wallGroup.remove(c); c.geometry.dispose(); }
       this.flagMeshes = this.flagMeshes.filter(f => f.userData.grp !== 'wall');
-      const w = wallRing(pc, lvM), m = this.mesh(w.geo, { bid: 'mauer' }); this.wallGroup.add(m);
+      const w = wallRing(pc, lvM, mixc(pc, [64, 86, 130], .75)), m = this.mesh(w.geo, { bid: 'mauer' }); this.wallGroup.add(m);
       this.wallFlags = w.flags;
       for (const p of w.flags) this.addFlag(this.wallGroup, p, 'wall');
       this.pickables();
@@ -316,7 +458,7 @@ export class CityView {
       const css = `cb ${inf.st}${inf.locked ? ' lock' : ''}`; if (el.className !== css) el.className = css;
       const sig = inf.st + '|' + inf.txt + '|' + lv + '|' + inf.name; if (h.sig !== sig) {
         h.sig = sig; const ic = { up: '⬆', build: '🔨', train: '⚔', research: '📜', new: '＋', lock: '🔒', none: '' }[inf.st] || '';
-        el.innerHTML = `${ic ? `<div class="bub" data-b="${id}"><span>${ic}</span></div>` : ''}${inf.txt ? `<div class="tim">${inf.txt}</div>` : ''}<div class="plate" data-b="${id}">${inf.name}${lv ? ` <b>${lv}</b>` : ''}</div>`;
+        el.innerHTML = `${ic ? `<div class="bub" data-b="${id}"><span>${ic}</span></div>` : ''}${inf.txt ? `<div class="tim">${inf.txt}</div>` : ''}<div class="lbl" data-b="${id}">${lv ? `<b>${lv}</b>` : ''}<span class="nm">${inf.name}</span></div>`;
       }
     }
   }
@@ -333,6 +475,7 @@ export class CityView {
     g.position.set(cx, 0, cz); h.cx = cx; h.cz = cz; h.smoke = [];
     const own = new T.Group(); g.add(own); h.own = own;
     const padS = id === 'rathaus' ? 4.4 : 2.5;
+    if (h.sh) this.scene.remove(h.sh); if (this.addSh) h.sh = this.addSh(cx, cz, padS * 1.5);
     if (lv <= 0) {
       const b = new MB(); plotMark(b, padS); own.add(this.mesh(b.geo || b.build(), { bid: id })); h.top = .6;
     } else if (id === 'rathaus') {
@@ -347,7 +490,7 @@ export class CityView {
       const ctx = { flags: [] }, mdl = MODELS[id](lv, pc, ctx), b = new MB();
       if (!mdl.noPad) pad(b, mdl.padS || 2.5); else if (id === 'akademie' || id === 'farm') b.box(mdl.padS || 2.5, .05, mdl.padS || 2.5, 0, 0, 0, id === 'farm' ? [128, 102, 60] : mul(PAD, .86));
       const pm = this.mesh(b.build()); pm.castShadow = false; own.add(pm);
-      const sc = (mdl.s || 1) * (.9 + Math.min(lv, 20) * .011), m = this.mesh(mdl.geo, { bid: id }); m.userData.shared = false; m.scale.setScalar(sc); own.add(m);
+      const sc = (mdl.s || 1) * 1.08 * (.9 + Math.min(lv, 20) * .011), m = this.mesh(mdl.geo, { bid: id }); m.userData.shared = false; m.scale.setScalar(sc); own.add(m);
       h.top = (mdl.h || 1.6) * sc;
       for (const f of ctx.flags) this.addFlag(own, [f[0] * sc, f[1] * sc, f[2] * sc], id);
       for (const s of mdl.smoke || []) h.smoke.push([s[0], s[1], s[2]]);
@@ -421,7 +564,7 @@ export class CityView {
     for (const h of hits) { const id = h.object.userData.bid; if (id) { this.bump[id] = this.time; if (this.opts.onPick) this.opts.onPick(id); return; } }
     if (this.opts.onPick) this.opts.onPick(null);
   }
-  home() { this.touched = false; Object.assign(this.cam, { x: 0, z: 1.5, yaw: .42, pitch: .95, dist: this.fitDist() }); this.updateCamera(); }
+  home() { this.touched = false; Object.assign(this.cam, { x: 0, z: 1.5, yaw: .42, pitch: .86, dist: this.fitDist() }); this.updateCamera(); }
 
   /* ---------- Bildaufbau ---------- */
   waveFlags(t) {
@@ -459,6 +602,17 @@ export class CityView {
   frame(dt) {
     this.time += dt; const t = this.time;
     this.waveFlags(t); this.stepSmoke(t);
+    if (this.waterMat) this.waterMat.uniforms.uTime.value = t;
+    if (this.sails) this.sails.rotation.z = -t * .5;
+    this.labelsEl.classList.toggle('near', this.cam.dist < 30);
+    if (this.villagers) for (const v of this.villagers) {
+      const L = this.loop; let d = ((v.t + v.dir * v.spd * t) % L.perim + L.perim) % L.perim, k = 0;
+      while (d > L.lens[k]) { d -= L.lens[k]; k++; }
+      const a = L.pts[k], b = L.pts[(k + 1) % 4], f = d / L.lens[k], dx = (b[0] - a[0]) / L.lens[k], dz = (b[1] - a[1]) / L.lens[k];
+      const x = a[0] + (b[0] - a[0]) * f - dz * v.off, z = a[1] + (b[1] - a[1]) * f + dx * v.off;
+      v.g.position.set(x, .06 + Math.abs(Math.sin(t * 7 + v.ph)) * .02, z); v.g.rotation.y = Math.atan2(dx * v.dir, dz * v.dir);
+      const sw = Math.sin(t * 7 + v.ph) * .6; v.la.rotation.x = sw; v.lb.rotation.x = -sw;
+    }
     for (const u of this.units) {
       const a = t * (u.cav ? .55 : .7) + u.ph, px = u.cx + Math.cos(a) * u.rad, pz = u.cz + Math.sin(a * 1.2) * u.rad * .55;
       u.g.position.set(px, .06, pz); const vx = -Math.sin(a), vz = Math.cos(a * 1.2) * 1.2 * .55; u.g.rotation.y = Math.atan2(vx, vz);

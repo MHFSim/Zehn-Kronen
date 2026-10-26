@@ -251,8 +251,9 @@ body:not(.city3d) .city .cdhead{display:none}
 .cb.research .bub{background:radial-gradient(circle at 35% 30%,#f0e0ff,#b184e6 55%,#6a3fa8)}
 .cb.lock .bub{background:radial-gradient(circle at 35% 30%,#eee,#a8a8a8 55%,#666);animation:none;border-color:#ddd}
 .cb .tim{font-size:11px;font-weight:700;color:#fff;background:rgba(20,14,8,.8);border-radius:9px;padding:1px 7px;font-variant-numeric:tabular-nums}
-.cb .plate{pointer-events:auto;cursor:pointer;font-size:10px;color:#f6e7bd;background:rgba(24,16,8,.74);border:1px solid rgba(232,195,106,.55);border-radius:10px;padding:1px 8px;white-space:nowrap}
-.cb .plate b{color:#ffd86a;margin-left:3px}
+.cb .lbl{pointer-events:auto;cursor:pointer;font-size:10px;color:#f6e7bd;background:rgba(24,16,8,.74);border:1px solid rgba(232,195,106,.55);border-radius:10px;padding:1px 8px;white-space:nowrap}
+.cb .lbl b{color:#2a1a08;background:linear-gradient(#ffe9a0,#d9a53a);border-radius:9px;min-width:17px;padding:0 4px;text-align:center;display:inline-block;margin-right:4px}
+.cb .lbl .nm{display:none}.clabels.near .lbl .nm{display:inline}.cb .lbl{padding:1px 4px}.clabels.near .cb .lbl{padding:1px 8px 1px 4px}
 .cb.lock .plate{opacity:.6}
 @keyframes cbob{50%{transform:translateY(-4px)}}
 .cbtns{position:fixed;z-index:4;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--nav) + 16px);display:flex;flex-direction:column;gap:10px}
