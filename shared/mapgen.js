@@ -194,7 +194,6 @@ export function generateMap(seed) {
   // Ressourcen: deutlich weniger und nie in Thronnähe
   scatter('farm', 14, 6, nodeLv, 26); scatter('wood', 14, 6, nodeLv, 26); scatter('stone', 11, 6, nodeLv, 26); scatter('ore', 11, 6, nodeLv, 26);
   scatter('camp', 14, 7, campLv);
-  scatter('ruin', 35, 3.4, (x, y) => 1 + Math.floor(rand() * 3));
 
   const map = { seed, N, H, F, pass, reach, objects, starts, byId: Object.fromEntries(objects.map(o => [o.id, o])) };
   if (cache.size > 3) cache.clear();
