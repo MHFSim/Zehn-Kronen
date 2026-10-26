@@ -10,7 +10,7 @@ import {
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel,
   settleAway, fmtDur
 } from './core.js';
-import * as W from './war.js';
+import { afterLaunch, applyBonuses, arriveCity, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
@@ -23,8 +23,8 @@ function onArrive(ctx, m, bt, realT) {
   const S = p.state;
   advanceTo(S, realT, match.speed);
   const back = () => { m.phase = 'back'; m.t0 = bt; reversed(m); };
-  if (m.mode === 'attack' || m.mode === 'station') return W.arriveCity(ctx, m, o, bt, realT, back);
-  if (m.mode === 'occupy') return W.arriveHold(ctx, m, o, bt, realT, back);
+  if (m.mode === 'attack' || m.mode === 'station') return arriveCity(ctx, m, o, bt, realT, back);
+  if (m.mode === 'occupy') return arriveHold(ctx, m, o, bt, realT, back);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
   if (NODE_KINDS.includes(o.k)) {
     const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops), amount = Math.floor(Math.min(cap, left));
@@ -116,14 +116,14 @@ export function syncMatch(match, players, now) {
     else onHome(ctx, best, bt, realT);
     events++;
     if (best.dead) w.marches = w.marches.filter(m => m !== best);
-    if (W.checkEnd(ctx, bt)) { w.gt = bt; w.at = realT; ctx.bt = null; return { events }; }
+    if (checkEnd(ctx, bt)) { w.gt = bt; w.at = realT; ctx.bt = null; return { events }; }
   }
   ctx.bt = null; ctx.realT = now;
   const dt = Math.max(0, target - w.gt);
   w.gt = target; w.at = now;
-  W.applyBonuses(ctx);
+  applyBonuses(ctx);
   for (const p of players) { advanceTo(p.state, now, speed); }
-  W.vassalStep(ctx, dt, w.gt);
+  vassalStep(ctx, dt, w.gt);
   for (const p of players) {   // Schutz läuft bald aus: einmal Bescheid geben
     const S = p.state;
     if (S.protKind === 'new' && !S.protWarn && S.protUntil > w.gt && S.protUntil - w.gt <= 12 * 3600 && S.slot >= 0 && !S.out) {
@@ -138,7 +138,7 @@ export function syncMatch(match, players, now) {
     reveal(p.state, pos.x, pos.y, VIEW_ARMY);
   }
   for (const p of players) flushBits(p.state);
-  if (W.checkEnd(ctx, w.gt)) events++;
+  if (checkEnd(ctx, w.gt)) events++;
   return { events };
 }
 
@@ -151,7 +151,7 @@ export function addPlayer(match, players, id, name, now) {
   let slot = -1; for (let i = 0; i < SLOTS; i++) if (!used.has(i)) { slot = i; break; }
   if (slot < 0) return null;
   const S = ensureState(freshState(now)); S.slot = slot; S.pos = startSpot(slot);
-  if (w.phase !== 'lobby') W.protectNew(S, w.gt);
+  if (w.phase !== 'lobby') protectNew(S, w.gt);
   reveal(S, S.pos[0] + .5, S.pos[1] + .5, VIEW_CITY); flushBits(S);
   chron(mkCtx(match, players, now), name + ' ist der Partie beigetreten.');
   return S;
@@ -166,7 +166,7 @@ export function startMatch(match, players, now) {
   syncMatch(match, players, now); const w = match.world, ctx = mkCtx(match, players, now);
   if (w.phase !== 'lobby') return 'Die Partie läuft schon.';
   w.phase = 'running'; w.startGt = w.gt; w.endGt = w.gt + w.weeks * 7 * DAY; w.at = now;
-  for (const p of players) { p.state.at = now; W.protectNew(p.state, w.gt); }
+  for (const p of players) { p.state.at = now; protectNew(p.state, w.gt); }
   chron(ctx, 'Die Partie beginnt.');
   for (const p of players) note(ctx, p.id, 'start', 'Die Partie beginnt', 'Dein Schutz vor Angriffen dauert ' + fmtDur(4 * DAY / match.speed) + '.');
   return '';
@@ -183,13 +183,12 @@ export function resumeMatch(match, players, now) {
 export function endMatch(match, players, now) {
   syncMatch(match, players, now); const ctx = mkCtx(match, players, now);
   if (match.world.phase !== 'running' && match.world.phase !== 'paused') return 'Die Partie ist nicht aktiv.';
-  match.world.phase = 'running'; W.checkEnd(ctx, match.world.gt, true); return '';
+  match.world.phase = 'running'; checkEnd(ctx, match.world.gt, true); return '';
 }
 // Spieler (Admin) aus der Partie nehmen: Verbündete bekommen ihre Truppen zurück
 export function removePlayer(match, players, pid, now) {
-  syncMatch(match, players, now); W.purge(mkCtx(match, players, now), pid);
+  syncMatch(match, players, now); purge(mkCtx(match, players, now), pid);
 }
-export { takeNotes } from './core.js';
 
 /* ---------- Befehle ---------- */
 export function command(match, players, player, cmd, now) {
@@ -224,14 +223,14 @@ export function command(match, players, player, cmd, now) {
       if (NODE_KINDS.includes(o.k) && nodeLeft(w, o, w.gt) < 50) return 'Dieses Feld ist erschöpft';
     } else {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
-      const c = W.checkLaunch(ctx, player, o, mode, troops); if (typeof c === 'string') return c;
+      const c = checkLaunch(ctx, player, o, mode, troops); if (typeof c === 'string') return c;
       target = c.target || null;
     }
     const plan = planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
     for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : { tk: o.k, tid: o.id, mode });
-    if (mode !== 'normal') W.afterLaunch(ctx, player, m, target, mode);
+    if (mode !== 'normal') afterLaunch(ctx, player, m, target, mode);
     syncMatch(match, players, now);
     return '';
   }
@@ -253,10 +252,10 @@ export function command(match, players, player, cmd, now) {
     }
     return '';
   }
-  if (cmd.type === 'spy') return W.spy(ctx, player, Number(cmd.target));
-  if (cmd.type === 'stationRecall') return W.recallStation(ctx, player, Number(cmd.host));
-  if (cmd.type === 'stationDismiss') return W.dismissStation(ctx, player, Number(cmd.owner));
-  if (cmd.type === 'holdRecall') return W.holdRecall(ctx, player, String(cmd.id));
+  if (cmd.type === 'spy') return spy(ctx, player, Number(cmd.target));
+  if (cmd.type === 'stationRecall') return recallStation(ctx, player, Number(cmd.host));
+  if (cmd.type === 'stationDismiss') return dismissStation(ctx, player, Number(cmd.owner));
+  if (cmd.type === 'holdRecall') return holdRecall(ctx, player, String(cmd.id));
   return applyCommand(S, cmd);
 }
 
@@ -290,6 +289,7 @@ export function viewFor(match, players, me, now) {
   const ally = myAl ? { id: myAl.id, name: myAl.name, tag: myAl.tag, leader: myAl.leader, members: myAl.members, chat: myAl.chat.slice(-60),
     requests: w.pending.filter(x => x.al === myAl.id && x.kind === 'request').map(x => ({ id: x.id, pid: x.pid, name: nameOf(x.pid) })),
     invites: w.pending.filter(x => x.al === myAl.id && x.kind === 'invite').map(x => ({ id: x.id, pid: x.pid, name: nameOf(x.pid) })) } : null;
+  const myStations = players.filter(p => p.id !== me.id && p.state.stationed && p.state.stationed[me.id]).map(p => ({ host: p.id, name: p.name, troops: p.state.stationed[me.id] }));
   const mineInv = w.pending.filter(x => x.pid === me.id && x.kind === 'invite' && w.alliances[x.al]).map(x => ({ id: x.id, al: x.al, name: w.alliances[x.al].name, tag: w.alliances[x.al].tag, by: nameOf(x.by) }));
   const myReq = w.pending.filter(x => x.pid === me.id && x.kind === 'request').map(x => ({ id: x.id, al: x.al }));
   return {
@@ -299,9 +299,9 @@ export function viewFor(match, players, me, now) {
       players: players.map(p => ({ id: p.id, name: p.name, slot: p.state.slot, pos: p.state.pos, rathaus: p.state.lv.rathaus, out: !!p.state.out, vassalOf: p.state.vassalOf || 0,
         protUntil: p.state.protUntil || 0, ally: (allianceOf(w, p.id) || {}).id || 0 })),
       alliances: Object.values(w.alliances).map(a => ({ id: a.id, name: a.name, tag: a.tag, leader: a.leader, members: a.members })),
-      holds, chron: w.chron.slice(0, 40), result: w.result, ranking: W.rankingOf(match, players)
+      holds, chron: w.chron.slice(0, 40), result: w.result, ranking: rankingOf(match, players)
     },
-    ally, invites: mineInv, requests: myReq, incoming,
+    ally, invites: mineInv, requests: myReq, incoming, myStations,
     state: S,
     world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches }
   };

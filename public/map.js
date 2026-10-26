@@ -337,12 +337,23 @@ export class WorldMap {
     const RES_COL = { farm: 0xb58a22, wood: 0x7b5630, stone: 0x6b6f75, ore: 0x3f6b94 }, T = { farm: 'Nahrung', wood: 'Holz', stone: 'Stein', ore: 'Erz' };
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, y = -46;
-      if (o.k === 'start' && h.player) { txt = h.player.name; col = parseInt(PLAYER_COLORS[h.player.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1]; if (h.player.id === this.myId) txt = '★ ' + txt; }
+      if (o.k === 'start' && h.player) {
+        const pl = h.player, al = pl.ally && (view.match.alliances || []).find(a => a.id === pl.ally), gt = this.gtNow();
+        txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); y = -[100, 135, 170][(h.tier || 1) - 1];
+        if (pl.id === this.myId) txt = '★ ' + txt;
+        if (pl.out) { txt = '✖ ' + txt; col = 0x4a4036; }
+        else if (pl.vassalOf) txt += ' (Vasall)';
+        else if (pl.protUntil > gt) txt = '🛡 ' + txt;
+        h.main.alpha = pl.out ? .45 : 1;
+      }
       else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = String(o.lv); col = RES_COL[o.k]; y = -30; }
       else if (o.k === 'camp') { txt = h.isDead ? 'Lager zerstört' : 'Banditen ' + o.lv; col = h.isDead ? 0x4a4036 : 0x8a2b24; y = h.isDead ? -26 : -58; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; y = -58; }
-      else if (o.k === 'sanct') { txt = 'Heiligtum'; col = 0x2f6f8f; y = -86; }
-      else if (o.k === 'throne') { txt = 'Der Thron'; col = 0x9c7420; y = -130; }
+      else if (o.k === 'sanct' || o.k === 'throne') {
+        const hd = (view.match.holds || []).find(x => x.id === id);
+        txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
+        col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; y = o.k === 'sanct' ? -86 : -130;
+      }
       if (txt === null) { if (h.lab) h.lab.visible = false; continue; }
       let lab = h.lab;
       if (!lab || h.labTxt !== txt || h.labCol !== col) {
@@ -377,8 +388,8 @@ export class WorldMap {
       }
       s.m = m; const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
       s.tint.tint = col; s.flag.tint = col;
-      const n = m.own ? Object.values(m.troops).reduce((a, b) => a + b, 0) : (m.troops.n || 0);
-      s.lab.t.text = (m.own ? '' : m.name + ' · ') + n; s.lab.g.clear(); const w = s.lab.t.width + 14; s.lab.g.lineStyle(2, col, 1).beginFill(0x15110c, .88).drawRoundedRect(-w / 2, -10, w, 20, 10).endFill();
+      const n = m.troops.n != null ? m.troops.n : Object.values(m.troops).reduce((a, b) => a + b, 0);
+      s.lab.t.text = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : '') + n; s.lab.g.clear(); const w = s.lab.t.width + 14; s.lab.g.lineStyle(2, col, 1).beginFill(0x15110c, .88).drawRoundedRect(-w / 2, -10, w, 20, 10).endFill();
     }
     for (const id in this.marchSprites) if (!keep.has(Number(id))) { const s = this.marchSprites[id]; s.lab.destroy({ children: true }); s.destroy({ children: true }); delete this.marchSprites[id]; }
   }

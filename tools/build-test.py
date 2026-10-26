@@ -67,9 +67,10 @@ a_js = a_js.replace("\nload();\nsetInterval", "\nwindow.zkAdminLoad = load;\nloa
 
 # --- Spiel-Seite (index.html): Stil und Auth-Block ---
 idx = rd('public/index.html')
-g_css = re.search(r'<style>(.*?)</style>', idx, re.S).group(1)
+g_css = '\n'.join(re.findall(r'<style>(.*?)</style>', idx, re.S))
 auth_html = re.search(r'(<main class="auth".*?</main>)', idx, re.S).group(1)
 auth_html = must_rep('<p class="note" id="authNote">', '<p class="note" id="simNote">Testversion im Chat: Der Server wird in deinem Browser nachgebildet. Mit „Admin“ unten rechts erstellst du Partien und lädst weitere Spieler ein.</p>\n    <p class="note" id="authNote">', auth_html)
+auth_html = re.sub(r'<p class="note legal">.*?</p>\n\s*', '', auth_html, flags=re.S)
 game_html = re.search(r'(<div id="game" hidden>.*?</nav>\n</div>)', idx, re.S).group(1)
 
 base_css = rd('public/style.css')

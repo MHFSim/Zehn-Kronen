@@ -205,6 +205,55 @@ body:not(.mode-map) .hud{display:none}
 .auth-card form{display:flex;flex-direction:column;gap:12px}
 .linkish{background:none;border:0;color:var(--brass);padding:0;text-decoration:underline;font-size:14px;align-self:flex-start}
 </style>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/public/img/icon-180.png">
+<meta name="theme-color" content="#1b1712">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+/* Bündnis, Banner, Mehr, Ergebnis */
+.nav{grid-template-columns:repeat(5,1fr)!important}
+.nav button{font-size:13px!important;padding:0 2px}
+#banner{display:flex;flex-direction:column;gap:3px;padding:0 max(10px,env(safe-area-inset-left,0px))}
+#banner:empty{display:none}
+.bn{font-size:13px;font-weight:700;border-radius:6px;padding:4px 9px;border:1px solid transparent;line-height:1.3}
+.bn.bad{background:#5a1d17;color:#ffd9d2;border-color:#a33a2e}
+.bn.warn{background:#4d3a14;color:#f4dfa8;border-color:#8a6a24}
+.bn.good{background:#1d3b25;color:#cdeed2;border-color:#3f7d4c}
+.bn.info{background:#262a33;color:#d8dde8;border-color:#465066}
+.toast.info{background:#3b3320;color:#f4e6bd;border:1px solid #8a6a24}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.mrow:first-of-type{border-top:0}
+.mrow>div{min-width:0}
+.mrow .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:5px;background:#3a3020;color:#e2b86a;border:1px solid #6b5420;vertical-align:middle}
+.msgs{max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
+.msg{font-size:14px;line-height:1.35;word-break:break-word}
+.msg b{color:#e2b86a}.msg small{color:var(--muted);margin-left:6px}
+.chatform{display:flex;gap:8px}.chatform input{flex:1;min-width:0}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.seg button{flex:1;min-width:84px}
+details.acc{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;background:#00000022}
+details.acc>summary{cursor:pointer;padding:12px 14px;font-weight:700;font-size:16px;list-style:none;display:flex;justify-content:space-between;gap:8px}
+details.acc>summary::-webkit-details-marker{display:none}
+details.acc>summary::after{content:'▾';color:var(--muted)}
+details.acc[open]>summary::after{content:'▴'}
+details.acc>.acc-in{padding:0 14px 14px}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:15px;line-height:1.35}
+.chk i{flex:0 0 22px;height:22px;border-radius:50%;border:2px solid #6b5420;display:grid;place-items:center;font-style:normal;font-size:13px;color:#1b1712;margin-top:1px}
+.chk.done i{background:#d9b25c}.chk.done span{color:var(--muted);text-decoration:line-through}
+table.rank{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+table.rank th,table.rank td{text-align:left;padding:5px 6px;border-top:1px solid var(--line)}
+table.rank th{border-top:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+table.rank tr.me td{color:#e2b86a;font-weight:700}
+.modal{position:fixed;z-index:20;inset:0;background:#000b;display:grid;place-items:center;padding:16px}
+.modal[hidden]{display:none}
+.modal-in{background:var(--bg);border:2px solid #8a6a24;border-radius:14px;max-width:460px;width:100%;max-height:86vh;overflow-y:auto;padding:20px}
+.modal-in h2{margin:0 0 6px;font-size:26px;color:var(--brass)}
+.crown{font-size:44px;text-align:center}
+.links{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin-top:6px}
+.links a{color:#d9b25c}
+.btn.danger{background:#8a2b24;color:#fff}
+</style>
 </head>
 <body>
 <main class="auth" id="auth" hidden>
@@ -217,6 +266,7 @@ body:not(.mode-map) .hud{display:none}
       <p class="err" id="authErr" role="alert"></p>
       <button class="btn" id="authBtn" type="submit">Anmelden</button>
     </form>
+    <p class="note legal"><a href="/impressum" target="_blank" rel="noopener">Impressum</a> · <a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></p>
     <p class="note" id="authNote">Neu hier? Du brauchst einen Einladungslink vom Admin deiner Partie.</p>
   </div>
 </main>
@@ -230,15 +280,20 @@ body:not(.mode-map) .hud{display:none}
       <span class="speed" id="speed">Tempo <b>×1</b></span>
     </div>
     <div class="res" id="res"></div>
+    <div id="banner"></div>
   </header>
   <div class="hud" id="hud"></div>
   <section class="sheet" id="sheet" aria-live="polite"><div class="sheet-inner" id="sheetInner"></div></section>
   <section class="panel" id="reports" hidden aria-live="polite"><div class="sheet-inner" id="reportsInner"></div></section>
+  <section class="panel" id="sidePanel" hidden><div class="sheet-inner" id="sidePanelInner"></div></section>
+  <div class="modal" id="modal" hidden><div class="modal-in" id="modalIn"></div></div>
   <div class="loading" id="loading" hidden>Karte wird gemalt …</div>
   <nav class="nav" id="nav" aria-label="Ansicht">
     <button type="button" data-nav="city" class="on">Stadt</button>
     <button type="button" data-nav="map">Karte</button>
+    <button type="button" data-nav="ally">Bündnis<span class="badge" id="allyBadge" hidden>0</span></button>
     <button type="button" data-nav="reports">Berichte<span class="badge" id="navBadge" hidden>0</span></button>
+    <button type="button" data-nav="more">Mehr<span class="badge" id="moreBadge" hidden>0</span></button>
   </nav>
 </div>
 
