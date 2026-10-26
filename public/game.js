@@ -212,7 +212,7 @@ function signature() {
   return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy, S.research && S.research.id + S.research.target]);
 }
 function renderSheet() {
-  $('sheet').classList.add('parch');
+  $('sheet').classList.add('parch'); $('sheet').classList.toggle('popup', !!msel);
   if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
@@ -979,6 +979,10 @@ function renderMapSheet() {
     }
     h = `<div class="sh-head"><h2>${title}</h2>${lv}<button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
   }
+  const MI = { farm: '🌾', wood: '🪵', stone: '🪨', ore: '⛏️', camp: '⚔️', ruin: '🏛️', sanct: '✨', throne: '👑', start: '🏰' };
+  const ico = msel.type === 'march' ? '🚩' : msel.type === 'site' ? '🏗️' : msel.type === 'op' ? '🗼' : MI[(wm.map.byId[msel.id] || {}).k] || '📍';
+  h = h.replace('<div class="sh-head">', `<div class="sh-head"><span class="sh-ico">${ico}</span>`).replace('data-act="close">Schließen</button>', 'data-act="close" aria-label="Schließen">✕</button>');
+  $('sheet').classList.add('popup');
   $('sheetInner').innerHTML = h; sheetSig = mapSignature();
 }
 function actionRow(label, plan, why, free, cls = '', act = 'march', minT = 0) {

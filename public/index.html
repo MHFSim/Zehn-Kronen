@@ -295,6 +295,16 @@ body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overs
 .sheet.parch .stepper button{background:var(--panel);color:var(--ink)}
 .sheet.parch .btn.ghost{color:var(--ink);border-color:var(--line)}
 .sheet.parch h2{color:var(--ink)}
+.sheet.popup{left:50%;right:auto;width:min(94vw,520px);bottom:calc(var(--nav) + 12px);max-height:min(66%,calc(100% - var(--nav) - 120px));padding:0;border:1px solid #e0b86688;border-radius:22px;background:linear-gradient(180deg,#f9f1d8,#efe1b9);box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 2px #7a5230,inset 0 1px 0 #fff9;transform:translate(-50%,36px) scale(.95);opacity:0;pointer-events:none;transition:transform .24s cubic-bezier(.2,.9,.3,1.15),opacity .18s;overscroll-behavior:contain}
+body.sheet-open .sheet.popup{transform:translate(-50%,0) scale(1);opacity:1;pointer-events:auto}
+.popup .sheet-inner{padding:0 16px 16px;gap:12px}
+.popup .sh-head{position:sticky;top:0;z-index:2;margin:0 -16px 2px;padding:13px 14px 12px 16px;background:linear-gradient(180deg,#6a4627,#432d19);border-radius:21px 21px 0 0;border-bottom:2px solid #c99a3d;gap:12px}
+.popup .sh-head h2{color:#f8ebc4;font-size:21px;text-shadow:0 1px 2px #0006}
+.popup .lvl{background:linear-gradient(#e6bd62,#c99a3d);color:#2b1a0b;border:0;font-weight:700;box-shadow:0 1px 3px #0005}
+.popup .close{width:34px;height:34px;padding:0;display:grid;place-items:center;border-radius:50%;border:1px solid #e0b866;color:#f8ebc4;background:#ffffff18;font-size:16px;line-height:1}
+.sh-ico{flex:none;width:42px;height:42px;display:grid;place-items:center;font-size:23px;border-radius:13px;background:#ffffff1c;border:1px solid #e0b86677;box-shadow:inset 0 1px 0 #fff3}
+@media (prefers-reduced-motion:reduce){.sheet.popup{transition:none}}
+
 
 /* ===== Alle Menüs: Holz und Pergament ===== */
 .panel{background:repeating-linear-gradient(90deg,rgba(0,0,0,.22) 0 2px,transparent 2px 92px),linear-gradient(#3b2415,#26160b)!important}
