@@ -188,7 +188,7 @@ export function generateMap(seed) {
   });
   // Rest der Karte
   const scatter = (kind, count, minD, lvf) => { for (let i = 0; i < count; i++) tryPlace(kind, C, C, 6, C * 0.9, minD, lvf, 80); };
-  scatter('farm', 62, 3.2, nodeLv); scatter('wood', 62, 3.2, nodeLv); scatter('stone', 48, 3.2, nodeLv); scatter('ore', 48, 3.2, nodeLv);
+  scatter('farm', 32, 4.2, nodeLv); scatter('wood', 32, 4.2, nodeLv); scatter('stone', 24, 4.2, nodeLv); scatter('ore', 24, 4.2, nodeLv);
   scatter('camp', 62, 4.5, campLv);
   scatter('ruin', 35, 3.4, (x, y) => 1 + Math.floor(rand() * 3));
 

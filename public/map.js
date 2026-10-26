@@ -348,14 +348,14 @@ export class WorldMap {
         h.main.alpha = pl.out ? .45 : 1;
       }
       else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = String(o.lv); col = RES_COL[o.k]; y = -30; }
-      else if (o.k === 'camp') { txt = h.isDead ? 'Lager zerstört' : 'Banditen ' + o.lv; col = h.isDead ? 0x4a4036 : 0x8a2b24; y = h.isDead ? -26 : -58; }
+      else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = h.isDead ? 0x4a4036 : 0x8a2b24; y = h.isDead ? -26 : -58; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; y = -58; }
       else if (o.k === 'sanct' || o.k === 'throne') {
         const hd = (view.match.holds || []).find(x => x.id === id);
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
         col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; y = o.k === 'sanct' ? -86 : -130;
       }
-      if (txt !== null && !SHOW_NAMES && !['farm', 'wood', 'stone', 'ore'].includes(o.k)) txt = null;   // Textbeschriftungen aus; nur Stufenzahlen bleiben
+      if (txt !== null && !SHOW_NAMES && !/^\d+$/.test(txt)) txt = null;   // Textbeschriftungen aus; nur Stufenzahlen bleiben
       if (txt === null) { if (h.lab) h.lab.visible = false; continue; }
       let lab = h.lab;
       if (!lab || h.labTxt !== txt || h.labCol !== col) {
