@@ -137,7 +137,7 @@ function renderTop() {
   const c = cap(S);
   $('res').innerHTML = [...RES, 'gold'].map(r => {
     const v = S.res[r], rt = rate(S, r), pct = r === 'gold' ? 0 : Math.min(100, v / c * 100);
-    return `<div class="res-cell" title="${RES_DE[r]}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtN(v)}</div>
+    return `<div class="res-cell" title="${r === 'food' ? 'Nahrung: Produktion ' + fmtN(rt + troopCount(S)) + '/h, Truppen essen ' + fmtN(troopCount(S)) + '/h' : RES_DE[r]}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtN(v)}</div>
       <div class="res-rate ${rt < 0 ? 'neg' : ''}">${rt >= 0 ? '+' : ''}${fmtN(rt)}/h</div>
       <div class="res-bar">${r === 'gold' ? '' : `<i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i>`}</div></div>`;
   }).join('');
@@ -156,6 +156,7 @@ function statsHTML(id) {
   const L = S.lv[id], b = B[id], n = L + 1, rows = [];
   const nx = (a, bb) => a + (L < 20 ? ` <span class="up">→ ${bb}</span>` : '');
   if (b.prod) rows.push(['Produktion', nx(fmtN(prodAt(id, L)) + '/h', fmtN(prodAt(id, n)) + '/h')]);
+  if (id === 'farm') { const eat = troopCount(S), net = rate(S, 'food'); rows.push(['Truppen essen', '−' + fmtN(eat) + '/h'], ['Bilanz Nahrung', `<span class="${net < 0 ? 'bad' : ''}">${net >= 0 ? '+' : ''}${fmtN(net)}/h</span>`]); if (net < 0) rows.push(['Achtung', 'Mehr Nahrung nötig: Farm ausbauen oder weniger Truppen']); }
   if (id === 'rathaus') rows.push(['Gebäude bis Stufe', nx(L, n)], ['Bauschleifen', maxQueues(S)], ['Steuergold', fmtN(rate(S, 'gold')) + '/h'], ['Truppenunterhalt', fmtN(troopCount(S)) + ' Nahrung/h']);
   if (id === 'lager') rows.push(['Lagerplatz', nx(fmtN(cap(S)), fmtN(capFor(n)))], ['Plünderschutz', protectedPct(S) + ' %']);
   if (id === 'mauer') rows.push(['Haltbarkeit', nx(fmtN(1000 * L), fmtN(1000 * n))], ['Verteidigung', nx('+' + 5 * L + ' %', '+' + 5 * n + ' %')]);
