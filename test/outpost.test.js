@@ -110,7 +110,8 @@ a.state.res.food = a.state.res.wood = a.state.res.stone = a.state.res.ore = 9999
 assert.equal(run(a, { type: 'upgrade', id: 'rathaus' }), '');
 const left0 = a.state.queue[0].left;
 assert.match(run(a, { type: 'useSpeed', item: 'sp5', kind: 'build', ref: 'rathaus' }), /keinen/);
-assert.equal(run(a, { type: 'buy', item: 'sp5', n: 2 }), '');
+assert.match(run(a, { type: 'buy', item: 'sp5', n: 2 }), /nicht kaufen/);
+a.state.items.sp5 = 2;
 assert.equal(run(a, { type: 'useSpeed', item: 'sp5', kind: 'build', ref: 'rathaus' }), ''); assert.ok(a.state.queue.length === 0 || a.state.queue[0].left < left0);
 assert.equal(a.state.items.sp5, 1);
 

@@ -13,7 +13,7 @@ import {
 import { afterLaunch, applyBonuses, arriveCity, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, storeOf } from './outpost.js';
-import { RES } from './rules.js';
+import { RES, gatherFinds, findsText } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
 
@@ -76,6 +76,7 @@ function onGatherEnd(ctx, m, bt, realT) {
   w.nodes[o.id] = { left: Math.max(0, n.left - m.amount), t: bt };
   m.load = { [m.res]: m.amount };
   clanGather(ctx, m, o, bt);
+  const found = gatherFinds(p.state, m.id, m.tEnd - m.tStart); if (Object.keys(found).length) note(ctx, p.id, 'gather', 'Beschleuniger gefunden', 'Beim Sammeln hat dein Heer ' + findsText(found) + ' gefunden.');
   m.phase = 'back'; m.t0 = bt; reversed(m);
 }
 function onHome(ctx, m, bt, realT) {
@@ -262,6 +263,7 @@ export function command(match, players, player, cmd, now) {
       const amount = Math.floor(m.amount * frac), n = w.nodes[o.id] || { left: nodeLeft(w, o, w.gt), t: w.gt };
       w.nodes[o.id] = { left: Math.max(0, n.left - amount), t: w.gt };
       m.load = amount > 0 ? { [m.res]: amount } : {};
+      gatherFinds(player.state, m.id, (w.gt - m.tStart));
       m.phase = 'back'; m.t0 = w.gt; reversed(m);
     } else {
       const el = Math.max(0, w.gt - m.t0); let i = 0; while (i < m.path.length - 1 && m.arr[i + 1] <= el) i++;

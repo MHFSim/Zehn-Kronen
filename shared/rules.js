@@ -128,9 +128,9 @@ export function blocker(S, id) {
 // Shop: Gegenstände werden mit Gold gekauft und liegen im Beutel (S.items)
 export const ITEMS = {
   teleport: { name: 'Teleporter', icon: '🌀', price: 800, desc: 'Versetzt deine Burg an einen freien Ort in eurem Bündnisgebiet. Danach 12 Stunden Pause.' },
-  sp5:   { name: 'Beschleuniger 5 Min.', icon: '⚡', price: 15, sec: 300, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 5 Minuten.' },
-  sp60:  { name: 'Beschleuniger 1 Std.', icon: '⚡', price: 150, sec: 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Stunde.' },
-  sp480: { name: 'Beschleuniger 8 Std.', icon: '⚡', price: 1000, sec: 8 * 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 8 Stunden.' }
+  // Beschleuniger kann man nicht kaufen: Sie werden beim Ressourcensammeln gefunden (in 2 Stunden Sammeln im Schnitt je einer)
+  sp5:   { name: 'Beschleuniger 5 Min.', icon: '⚡', sec: 300, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 5 Minuten.' },
+  sp15:  { name: 'Beschleuniger 15 Min.', icon: '⚡', sec: 900, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 15 Minuten.' }
 };
 export const TELEPORT_COOLDOWN = 12 * 3600;
 // Zeit eines laufenden Auftrags (Bau, Ausbildung, Forschung) um sec Spielsekunden kürzen
@@ -219,6 +219,7 @@ export function applyCommand(S, cmd) {
   }
   if (cmd.type === 'buy') {
     const it = ITEMS[cmd.item], n = Math.floor(Number(cmd.n) || 1); if (!it) return 'Diesen Gegenstand gibt es nicht';
+    if (!it.price) return 'Beschleuniger kannst du nicht kaufen. Du findest sie beim Ressourcensammeln.';
     if (!(n >= 1 && n <= 99)) return 'Ungültige Anzahl';
     if (S.res.gold < it.price * n) return 'Nicht genug Gold';
     S.res.gold -= it.price * n; S.items = S.items || {}; S.items[cmd.item] = (S.items[cmd.item] || 0) + n; return '';
@@ -275,3 +276,13 @@ export function applyCommand(S, cmd) {
   }
   return 'Unbekannter Befehl';
 }
+
+// Fund von Beschleunigern beim Sammeln: je 2 Stunden Sammelzeit im Schnitt ein 15-Min.- und ein 5-Min.-Beschleuniger (zufällig, aber reproduzierbar).
+export const FIND_EVERY = 2 * 3600;
+const rnd01 = k => { const x = Math.sin(k * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+export function gatherFinds(S, seed, gameSec) {
+  const exp = Math.max(0, gameSec) / FIND_EVERY, got = {};
+  ['sp15', 'sp5'].forEach((id, i) => { const n = Math.floor(exp) + (rnd01(seed * 7 + i * 131 + Math.floor(gameSec)) < exp - Math.floor(exp) ? 1 : 0); if (n > 0) { got[id] = n; S.items = S.items || {}; S.items[id] = (S.items[id] || 0) + n; } });
+  return got;
+}
+export const findsText = g => Object.keys(g).map(id => g[id] + '× ' + ITEMS[id].name).join(' und ');

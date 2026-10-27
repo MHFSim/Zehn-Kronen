@@ -15,7 +15,7 @@ assert.equal(cheat(match, players, { kind: 'levels', player: a.id, level: 6 }, T
 a.state.res.food = a.state.res.wood = a.state.res.stone = a.state.res.ore = 9999;
 assert.equal(command(match, players, a, { type: 'upgrade', id: 'rathaus' }, T0), ''); assert.equal(a.state.queue.length, 1);
 assert.equal(cheat(match, players, { kind: 'finish', player: a.id }, T0), ''); assert.equal(a.state.queue.length, 0); assert.equal(a.state.lv.rathaus, 7);
-assert.equal(cheat(match, players, { kind: 'items', player: a.id, teleport: 2, sp60: 3 }, T0), ''); assert.equal(a.state.items.teleport, 2);
+assert.equal(cheat(match, players, { kind: 'items', player: a.id, teleport: 2, sp15: 3 }, T0), ''); assert.equal(a.state.items.teleport, 2);
 assert.equal(cheat(match, players, { kind: 'protection', player: 'all', on: false }, T0), ''); assert.equal(a.state.protUntil, 0);
 const gt0 = match.world.gt; assert.equal(cheat(match, players, { kind: 'time', hours: 10 }, T0), ''); assert.ok(match.world.gt - gt0 > 9.9 * 3600, 'Zeit vorgespult: ' + (match.world.gt - gt0));
 assert.match(cheat(match, players, { kind: 'nix' }, T0), /Unbekannt/);

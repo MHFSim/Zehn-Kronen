@@ -111,4 +111,9 @@ assert.equal(va.world.marches.filter(x => x.own).length, 2);
 const gt0 = match.world.gt; setSpeed(match, players, 10, t + 1000);
 assert.ok(match.world.gt > gt0);
 
+// Beschleuniger werden beim Sammeln gefunden: bei 2 Stunden je einer, im Schnitt über viele Märsche
+{ const { gatherFinds } = await import('../shared/rules.js'), S = { items: {} };
+  const g = gatherFinds(S, 1, 2 * 3600); assert.equal(g.sp15, 1); assert.equal(g.sp5, 1, 'bei genau 2 Stunden je einer');
+  let n15 = 0, n5 = 0; for (let i = 1; i <= 400; i++) { const r = gatherFinds({ items: {} }, i, 3600); n15 += r.sp15 || 0; n5 += r.sp5 || 0; }
+  assert.ok(n15 > 140 && n15 < 260 && n5 > 140 && n5 < 260, 'bei 1 Stunde ungefähr die Hälfte: ' + n15 + '/' + n5); }
 console.log('Alle Weltentests bestanden.');

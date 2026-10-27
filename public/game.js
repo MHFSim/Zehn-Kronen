@@ -611,7 +611,7 @@ function moreHTML() {
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter, Beschleuniger', itemN('teleport') + SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter, Beschleuniger (gefunden)', itemN('teleport') + SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -776,7 +776,7 @@ function setupPlace() {
 }
 
 /* ---------- Shop, Beutel, Beschleuniger ---------- */
-const SPEED_IDS = ['sp5', 'sp60', 'sp480'];
+const SPEED_IDS = ['sp5', 'sp15'];
 let speedCtx = null;
 const itemN = id => (S.items || {})[id] || 0;
 function speedTarget(kind, ref) {
@@ -789,8 +789,8 @@ function speedHTML() {
   if (!t) return `<h2>⚡ Beschleunigen</h2><p class="note">Dieser Auftrag ist fertig.</p><div class="row"><button class="btn" type="button" data-act="mClose">Schließen</button></div>`;
   return `<h2>⚡ Beschleunigen</h2><p class="desc"><b>${esc(t.name)}</b><br>Noch ${fmtT(real(t.left))}</p>
     ${SPEED_IDS.map(id => { const it = ITEMS[id], n = itemN(id); return `<div class="mrow"><div><b>${it.icon} ${it.name}</b><div class="note">Im Beutel: ${n}</div></div>
-      <div class="row">${n ? `<button class="btn small" type="button" data-act="mUse" data-i="${id}">Benutzen</button>` : ''}<button class="btn ghost small" type="button" data-act="mBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>Kaufen · ${it.price} 🪙</button></div></div>`; }).join('')}
-    <p class="note">Gold: ${fmtN(Math.floor(S.res.gold))} 🪙. Gekaufte Beschleuniger kannst du auch später benutzen.</p>
+      <div class="row">${n ? `<button class="btn small" type="button" data-act="mUse" data-i="${id}">Benutzen</button>` : '<span class="note">keiner</span>'}</div></div>`; }).join('')}
+    <p class="note">Beschleuniger kann man nicht kaufen: Dein Heer findet sie beim Ressourcensammeln (alle 2 Stunden Sammeln im Schnitt einen 15-Minuten- und einen 5-Minuten-Beschleuniger).</p>
     <div class="row"><button class="btn ghost" type="button" data-act="mClose">Schließen</button></div>`;
 }
 function openSpeed(kind, ref) { speedCtx = { kind, ref }; $('modalIn').innerHTML = speedHTML(); $('modal').hidden = false; }
@@ -808,10 +808,10 @@ function setupModal() {
 function shopHTML() {
   const tp = ITEMS.teleport, cd = Math.max(0, TELEPORT_COOLDOWN - (gtNow() - S.tpAt));
   const card = (id) => { const it = ITEMS[id]; return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div><div class="note">Im Beutel: <b>${itemN(id)}</b></div></div>
-    <button class="btn small" type="button" data-act="shopBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>${it.price} 🪙</button></div>`; };
+    ${it.price ? `<button class="btn small" type="button" data-act="shopBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>${it.price} 🪙</button>` : ''}</div>`; };
   return `<p class="note">Du hast <b>${fmtN(Math.floor(S.res.gold))} 🪙 Gold</b>. Gold bekommst du aus Heiligtümern, Lagern und Beute.</p>
     <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte den Button „Teleportieren“ nutzen.'}</p>` : ''}</div>
-    <div class="block"><h3>Beschleuniger</h3>${SPEED_IDS.map(card).join('')}<p class="note">Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
+    <div class="block"><h3>Beschleuniger (nur gefunden)</h3>${SPEED_IDS.map(card).join('')}<p class="note">Nicht käuflich: Dein Heer findet sie beim Ressourcensammeln, im Schnitt je einen 15- und 5-Minuten-Beschleuniger pro 2 Stunden Sammelzeit. Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
 }
 
 /* ---------- Ergebnis ---------- */
