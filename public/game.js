@@ -178,7 +178,8 @@ function renderHud() {
   if (!S.queue.length) parts.push(`<div class="chip hint">Bauschleife frei (${maxQueues(S)})</div>`);
   const tq = queuedTroops(S);
   parts.push(`<div class="chip">Truppen ${fmtN(troopCount(S))}${tq ? ' · ' + fmtN(tq) + ' in Ausbildung' : ''}</div>`);
-  for (const m of ownMarches()) parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}</button>`);
+  for (const m of ownMarches()) { const st = marchState(m); parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}${st.moving ? `<span class="mini"><i style="width:${Math.round(st.pct * 100)}%"></i></span>` : ''}</button>`); }
+  if (ownMarches().filter(m => m.phase !== 'back').length >= 2) parts.push('<button class="chip go" type="button" data-recallall="1">⌂ Alle heimrufen</button>');
   $('hud').innerHTML = parts.join('');
 }
 function statsHTML(id) {
@@ -254,13 +255,20 @@ function updateSheet() {
   if (o) { const p = $('trProg'), t = $('trTime'); if (p) p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
 }
 function openSheet(id) { msel = null; sel = id; document.body.classList.add('sheet-open'); renderSheet(); }
+// Hinweisleiste, solange ein Heer ein neues Ziel bekommt (wie in Rise of Kingdoms: Ziel antippen, das Heer zieht sofort los)
+function syncMoveBar() {
+  let el = $('moveBar');
+  if (!sendFrom) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span>➜ Ziel antippen – das Heer zieht sofort los</span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
+  el.hidden = false;
+}
 function closeSheet() { sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
 
 async function command(cmd) {
   if (busy) return false; busy = true;
   const moved = sendFrom && cmd.type === 'march'; if (moved) cmd = { ...cmd, from: sendFrom };
   const r = await api('/api/cmd', cmd).catch(() => ({ ok: false, data: { error: 'Keine Verbindung zum Server.' } }));
-  busy = false; if (moved) sendFrom = 0;
+  busy = false; if (moved) { sendFrom = 0; syncMoveBar(); }
   if (r.data && r.data.state) accept(r.data);
   if (!r.ok) toast(r.data.error || 'Das hat nicht geklappt.');
   renderSheet(); renderTop(); renderHud(); renderNav(); renderCity(true); renderBanner(); renderPanel(true);
@@ -270,7 +278,7 @@ function setupSheet() {
   $('sheetInner').addEventListener('click', async e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
-    if (act === 'close') { sendFrom = 0; return closeSheet(); }
+    if (act === 'close') { sendFrom = 0; syncMoveBar(); return closeSheet(); }
     if (act === 'toTech') { closeSheet(); return openPanel('tech'); }
     if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
@@ -432,6 +440,7 @@ function setupCity() {
     if (up) { e.stopPropagation(); return void command({ type: 'upgrade', id: up.dataset.up }); }
     const rs = e.target.closest('[data-tech]');
     if (rs) { e.stopPropagation(); return void command({ type: 'research', tech: rs.dataset.tech }); }
+    if (e.target.closest('[data-recallall]')) { for (const m of ownMarches().filter(x => x.phase !== 'back')) await command({ type: 'recall', id: m.id }); return; }
     const mb = e.target.closest('[data-march]');
     if (mb) { await setMode('map'); if (mode === 'map') selectMap({ type: 'march', id: Number(mb.dataset.march) }, true); return; }
     const ct = e.target.closest('[data-cat]'); if (ct) { cityCat = ct.dataset.cat; return void renderCity(true); }
@@ -900,6 +909,12 @@ const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', f
 const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
 const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
 function marchRemain(m) { const L = m.arr[m.arr.length - 1], g = gtNow(); return m.phase === 'gather' ? m.tEnd - g : m.t0 + L - g; }
+function marchState(m) {
+  const L = m.arr[m.arr.length - 1], g = gtNow();
+  if (m.phase === 'gather') return { moving: false, pct: Math.max(0, Math.min(1, (g - m.tStart) / ((m.tEnd - m.tStart) || 1))) };
+  if (m.phase === 'post') return { moving: false, pct: 1 };
+  return { moving: true, pct: Math.max(0, Math.min(1, (g - m.t0) / (L || 1))) };
+}
 function marchLine(m) {
   const ph = m.phase === 'out' ? (m.mode === 'attack' ? 'Angriff' : m.mode === 'station' ? 'Verstärkung' : m.mode === 'occupy' ? 'Besetzung' : m.mode === 'build' ? 'Bautrupp' : m.mode === 'raid' ? 'Angriff' : m.mode === 'garrison' ? 'Verstärkung' : 'Marsch') : m.phase === 'gather' ? 'Sammelt' : 'Rückweg';
   return `${ph} · ${KIND_SHORT[m.tk] || ''} · ${fmtT(real(Math.max(0, marchRemain(m))))}`;
@@ -1049,14 +1064,26 @@ function renderMapSheet() {
   if (msel.type === 'march') {
     const m = w.marches.find(x => x.id === msel.id);
     if (!m) { closeSheet(); return; }
-    const tgt = wm.map.byId[m.tid] || null, ph = m.phase === 'out' ? 'auf dem Weg zum Ziel' : m.phase === 'gather' ? 'sammelt' : m.phase === 'post' ? 'steht auf dem Feld' : 'auf dem Rückweg';
-    h = `<div class="sh-head"><h2>${m.own ? 'Dein Heer' : 'Heer von ' + esc(m.name)}</h2><span class="lvl">${ph}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-      <dl class="stats"><dt>Ziel</dt><dd>${m.tk === 'site' ? 'Bauplatz' : m.tk === 'outpost' ? 'Außenposten' : tgt ? (tgt.k === 'start' ? 'Burg von ' + esc((view.match.players.find(p => p.slot === tgt.slot) || {}).name || '?') : OBJ_NAME[tgt.k] + (tgt.lv ? ' ' + tgt.lv : '')) : '—'}</dd><dt>Noch</dt><dd id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</dd>
-      <dt>Truppen</dt><dd>${m.troops.n != null ? fmtN(m.troops.n) + ' Einheiten' : troopsLine(m.troops)}</dd>${m.own && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
-      ${m.phase === 'gather' && m.own ? `<dt>Sammelt</dt><dd class="costs">${lootHTML({ [m.res]: Math.floor(m.amount * Math.max(0, Math.min(1, (gtNow() - m.tStart) / (m.tEnd - m.tStart || 1)))) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
-      ${!m.own && m.phase === 'post' ? `${pickerHTML()}<div class="row"><button class="btn ${armedKey === 'patk' + m.id ? 'danger' : ''}" type="button" data-act="patk" ${!sum(sendList()) || ownMarches().length >= armySlots(S) ? 'disabled' : ''}>${armedKey === 'patk' + m.id ? 'Jetzt wirklich angreifen' : 'Heer angreifen'}</button></div>` : ''}
-      ${m.own && (m.phase === 'post' || (m.phase === 'out' && m.mode !== 'build')) ? `<div class="row"><button class="btn" type="button" data-act="sfStart">Weiterschicken</button>${m.phase === 'out' ? '<button class="btn ghost" type="button" data-act="halt">Anhalten</button>' : ''}</div>` : ''}
-      ${m.own && m.phase !== 'back' ? `<div class="row"><button class="btn ghost" type="button" data-act="recall">${m.phase === 'gather' ? 'Heimrufen (Beute bis jetzt)' : 'Zurückrufen'}</button></div>` : ''}`;
+    const tgt = wm.map.byId[m.tid] || null, mine = m.own, st = marchState(m);
+    const modeName = m.phase === 'post' ? 'Aufgestellt' : m.phase === 'gather' ? 'Sammelt' : m.phase === 'back' ? 'Rückmarsch' : ({ attack: 'Angriff', station: 'Verstärkung', occupy: 'Besetzung', build: 'Bautrupp', raid: 'Überfall', garrison: 'Verstärkung' }[m.mode] || 'Marsch');
+    const goal = m.phase === 'back' ? 'Zur Burg' : m.tk === 'site' ? 'Bauplatz' : m.tk === 'outpost' ? 'Außenposten' : m.tk === 'post' ? (m.phase === 'post' ? 'Hier' : 'Feld auf der Karte') : tgt ? (tgt.k === 'start' ? 'Burg von ' + esc((view.match.players.find(p => p.slot === tgt.slot) || {}).name || '?') : OBJ_NAME[tgt.k] + (tgt.lv ? ' ' + tgt.lv : '')) : '—';
+    const trp = m.troops.n != null ? `<span class="tp"><b>${fmtN(m.troops.n)}</b> Einheiten</span>` : Object.keys(m.troops).filter(u => m.troops[u] > 0 && U[u]).map(u => `<span class="tp"><b>${fmtN(m.troops[u])}</b> ${U[u].name}</span>`).join('');
+    const eta = st.moving ? Date.now() + offset + real(Math.max(0, marchRemain(m))) * 1000 : 0;
+    const btn = (act, label, cls = '') => `<button class="btn ${cls}" type="button" data-act="${act}">${label}</button>`;
+    const acts = mine ? [
+      (m.phase === 'post' || (m.phase === 'out' && m.mode !== 'build')) ? btn('sfStart', '➜ Weiterschicken') : '',
+      m.phase === 'out' && m.mode !== 'build' ? btn('halt', '✋ Anhalten', 'ghost') : '',
+      m.phase !== 'back' ? btn('recall', m.phase === 'gather' ? '⌂ Heimrufen (mit Beute)' : '⌂ Heimrufen', 'ghost') : ''
+    ].filter(Boolean).join('') : '';
+    h = `<div class="sh-head"><h2>${mine ? 'Dein Heer' : 'Heer von ' + esc(m.name)}</h2><span class="lvl">${modeName}</span><button class="close" type="button" data-act="close">Schließen</button></div>
+      ${st.moving || m.phase === 'gather' ? `<div class="mprog"><div class="prog"><i id="mProg" style="width:${Math.round(st.pct * 100)}%"></i></div><span class="mtime" id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</span></div>` : ''}
+      <dl class="stats"><dt>Ziel</dt><dd>${goal}</dd>${eta ? `<dt>Ankunft</dt><dd>${new Date(eta).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} Uhr</dd>` : ''}
+      <dt>Truppen</dt><dd><span class="trps">${trp}</span></dd>
+      ${mine && m.troops.n == null ? `<dt>Tragkraft</dt><dd>${fmtN(capacityOf(m.troops, S))}</dd>` : ''}
+      ${mine && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
+      ${m.phase === 'gather' && mine ? `<dt>Sammelt</dt><dd class="costs" id="mGather">${lootHTML({ [m.res]: Math.floor(m.amount * st.pct) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
+      ${acts ? `<div class="row acts">${acts}</div>` : ''}
+      ${!mine && m.phase === 'post' ? `${pickerHTML()}<div class="row"><button class="btn ${armedKey === 'patk' + m.id ? 'danger' : ''}" type="button" data-act="patk" ${!sum(sendList()) || ownMarches().length >= armySlots(S) ? 'disabled' : ''}>${armedKey === 'patk' + m.id ? 'Jetzt wirklich angreifen' : '⚔ Heer angreifen'}</button></div>` : ''}`;
   } else if (msel.type === 'site' || msel.type === 'op') {
     h = msel.type === 'site' ? siteSheet(w) : opSheet(w);
     if (!h) { closeSheet(); return; }
@@ -1156,7 +1183,7 @@ function actionRow(label, plan, why, free, cls = '', act = 'march', minT = 0) {
 function updateMapSheet() {
   if (!msel) return;
   if (mapSignature() !== sheetSig) return renderSheet();
-  if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
+  if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) { t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); const pr = $('mProg'), st = marchState(m); if (pr) pr.style.width = Math.round(st.pct * 100) + '%'; const gl = $('mGather'); if (gl && m.own) gl.innerHTML = lootHTML({ [m.res]: Math.floor(m.amount * st.pct) }) + ` <span class="note">von ${fmtN(m.amount)}</span>`; } }
 }
 function mapAct(act, el) {
   if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt'].includes(act)) return false;
@@ -1176,9 +1203,9 @@ function mapAct(act, el) {
   else if (act === 'fattack') { if (!twice('fattack' + msel.id)) { renderSheet(); return true; } command({ type: 'march', target: msel.id, mode: 'attack', troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Überfall.', 'info'); closeSheet(); } }); }
   else if (act === 'post') command({ type: 'march', mode: 'post', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Aufstellen.', 'info'); closeSheet(); } });
   else if (act === 'patk') { const m = view.world.marches.find(x => x.id === msel.id); if (!m) return true; if (!twice('patk' + m.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'attack', target: m.tid, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff.', 'info'); closeSheet(); } }); }
-  else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); toast('Tippe auf die Karte: das Heer zieht sofort dorthin.', 'info'); }
+  else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); syncMoveBar(); }
   else if (act === 'halt') command({ type: 'halt', id: msel.id }).then(ok => ok && toast('Das Heer bleibt stehen.', 'info'));
-  else if (act === 'sfCancel') { sendFrom = 0; closeSheet(); }
+  else if (act === 'sfCancel') { sendFrom = 0; closeSheet(); syncMoveBar(); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
   else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
@@ -1257,6 +1284,7 @@ async function buildMap() {
   el.hidden = true; return true;
 }
 async function setMode(m) {
+  if (m !== 'map' && sendFrom) { sendFrom = 0; syncMoveBar(); }
   placing = false;
   if (!$('reports').hidden) closeReports();
   if (panelName) closePanel();

@@ -904,6 +904,14 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 
   /* ---------- Heere ---------- */
   unitGeo(type, col) { const k = type + col; return this.unitGeos[k] || (this.unitGeos[k] = buildUnit(type, hexRGB(col))); }
+  // Beschriftung über dem Heer: Zahl der Einheiten und – wie in Rise of Kingdoms – die Restzeit bzw. der Sammelfortschritt
+  badgeTxt(s, gt) {
+    const m = s.m, sp = this.view.match.speed || 1; let x = '';
+    const f = sec => { sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), mi = Math.floor(sec % 3600 / 60), se = sec % 60; return h ? h + ':' + String(mi).padStart(2, '0') + ':' + String(se).padStart(2, '0') : mi + ':' + String(se).padStart(2, '0'); };
+    if (m.phase === 'out' || m.phase === 'back') x = ' · ' + f((m.t0 + m.arr[m.arr.length - 1] - gt) / sp);
+    else if (m.phase === 'gather' && m.tEnd > m.tStart) x = ' · ' + Math.round(Math.max(0, Math.min(1, (gt - m.tStart) / (m.tEnd - m.tStart))) * 100) + ' %';
+    return s.pre + x;
+  }
   syncMarches(view) {
     const keep = new Set();
     for (const m of view.world.marches) {
@@ -938,8 +946,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         }));
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
-      const txt = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : '') + n;
-      this.setBadge(s.lab, txt, 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
+      s.pre = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
+      this.setBadge(s.lab, this.badgeTxt(s, this.gtNow()), 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
     }
     for (const id in this.marchObjs) if (!keep.has(Number(id))) { const s = this.marchObjs[id]; this.scene.remove(s.grp); s.lab.el.remove(); delete this.marchObjs[id]; }
   }
@@ -1131,6 +1139,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.s * sw * 1.1; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
       });
       this.waveFlags([s.flag], t);
+      if (t - (s.lt || 0) > .5) { s.lt = t; const bt = this.badgeTxt(s, gt); if (bt !== s.bt) { s.bt = bt; this.setBadge(s.lab, bt, 0x2a2f38); } }
       if (m.own || (this.sel && this.sel.type === 'march' && this.sel.id === m.id)) {
         const pts = [[p.x, p.y]]; for (let i = p.i + 1; i < m.path.length; i++) { const [x, yy] = cellXY(m.path[i]); pts.push([x + .5, yy + .5]); }
         routes.push({ pts, col: s.col });
