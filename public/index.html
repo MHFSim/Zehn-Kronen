@@ -199,8 +199,8 @@ body:not(.mode-map) .hud{display:none}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
 /* Bündnis, Banner, Mehr, Ergebnis */
-.nav{grid-template-columns:repeat(6,1fr)!important}
-.nav button{font-size:13px!important;padding:0 2px}
+.nav{grid-template-columns:repeat(7,1fr)!important}
+.nav button{font-size:11px!important;padding:0 1px}
 #banner{display:flex;flex-direction:column;gap:3px;padding:0 max(10px,env(safe-area-inset-left,0px))}
 #banner:empty{display:none}
 .bn{font-size:13px;font-weight:700;border-radius:6px;padding:4px 9px;border:1px solid transparent;line-height:1.3}
@@ -461,6 +461,7 @@ body.sheet-open .sheet.popup{transform:translate(-50%,0) scale(1);opacity:1;poin
   <div class="loading" id="loading" hidden>Karte wird gemalt …</div>
   <nav class="nav" id="nav" aria-label="Ansicht">
     <button type="button" data-nav="city" class="on"><i aria-hidden="true">🏰</i><span>Stadt</span></button>
+    <button type="button" data-nav="tech"><i aria-hidden="true">🎓</i><span>Akademie</span></button>
     <button type="button" data-nav="map"><i aria-hidden="true">🗺️</i><span>Karte</span></button>
     <button type="button" data-nav="train"><i aria-hidden="true">⚔️</i><span>Ausbilden</span></button>
     <button type="button" data-nav="ally"><i aria-hidden="true">🛡️</i><span>Bündnis</span><span class="badge" id="allyBadge" hidden>0</span></button>

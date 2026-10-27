@@ -219,7 +219,7 @@ function unitsHTML(id) {
 function researchHTML() {
   const r = S.research;
   return `<div class="block"><h3>Forschung</h3>${r ? `<div class="row"><b>${T[r.id].name}</b> → Stufe ${r.target}<div class="prog"><i id="rsProg" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div><span class="time">${fmtT(real(r.left))}</span></div><div class="row"><button class="btn" type="button" data-speed="research:1">⚡ Beschleunigen</button><button class="btn ghost" type="button" data-act="cancelResearch">Abbrechen (volle Erstattung)</button></div>` : '<p class="note">Im Moment wird nichts erforscht.</p>'}
-    <div class="row"><button class="btn" type="button" data-act="toTech" ${S.lv.akademie ? '' : 'disabled'}>Zur Forschung</button></div></div>`;
+    <div class="row"><button class="btn" type="button" data-act="toTech" ${S.lv.akademie ? '' : 'disabled'}>Zur Akademie</button></div></div>`;
 }
 function troopsHTML() {
   const t = Object.keys(U).filter(u => S.troops[u]);
@@ -367,7 +367,6 @@ function renderCity(force) {
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
     <div class="tabbody parch">${body}</div>
-    <button type="button" class="burg techcard" data-act="openTech"><b>📜 Forschung</b><span>${A ? 'Akademie Stufe ' + A + ' · ' + (S.research ? T[S.research.id].name + ' → Stufe ' + S.research.target + ' (' + fmtT(real(S.research.left)) + ')' : 'nichts in Arbeit') : 'Akademie fehlt noch'} · Öffnen ›</span></button>
   </div>`;
   $('city').scrollTop = keepTop;
 }
@@ -422,7 +421,6 @@ function city3d() {
 function setupCity() {
   $('city').addEventListener('click', async e => {
     const act = e.target.closest('[data-act]');
-    if (act && act.dataset.act === 'openTech') return openPanel('tech');
     if (act && act.dataset.act === 'cdrawer') { $('cityDrawer').classList.toggle('open'); return; }
     if (act && act.dataset.act === 'chome') { if (cv) cv.home(); return; }
     const up = e.target.closest('[data-up]');
@@ -714,7 +712,7 @@ function techHTML() {
   const strip = `<div class="strip"><div><b>${A}</b><span>Akademie</span></div><div><b>${Object.keys(T).reduce((a, id) => a + techLv(S, id), 0)}</b><span>Stufen erforscht</span></div><div><b>${Object.keys(T).length * T_MAX}</b><span>Stufen gesamt</span></div></div>`;
   const note = A ? `<div class="note-box">Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1, die Akademie wird im Stadtmenü ausgebaut.${r ? ' Gerade in Arbeit: <b>' + T[r.id].name + '</b> → Stufe ' + r.target + '.' : ''}</div>`
     : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`;
-  return phead('📜', 'Forschung', A ? 'Akademie Stufe ' + A : 'Akademie fehlt') + strip + note + Object.keys(T).map(techCardHTML).join('');
+  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Forschung' : 'Noch nicht gebaut') + strip + note + Object.keys(T).map(techCardHTML).join('');
 }
 
 /* ---------- Panels (Bündnis, Mehr) ---------- */
@@ -1243,7 +1241,7 @@ function setupNav() {
   $('nav').addEventListener('click', e => {
     const b = e.target.closest('button[data-nav]'); if (!b) return;
     if (b.dataset.nav === 'reports') { if (panelName) closePanel(); return openReports(); }
-    if (b.dataset.nav === 'ally' || b.dataset.nav === 'more' || b.dataset.nav === 'train') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
+    if (b.dataset.nav === 'ally' || b.dataset.nav === 'more' || b.dataset.nav === 'train' || b.dataset.nav === 'tech') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
     setMode(b.dataset.nav);
   });
   $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); const t = e.target.closest('[data-act=rtab]'); if (t) { repTab = t.dataset.t; renderReports(); } });
