@@ -1,4 +1,5 @@
 // Prüfung von Karte, Märschen, Sammeln und Kämpfen: `npm test`
+import { armySlots } from '../shared/rules.js';
 import assert from 'node:assert/strict';
 import { generateMap, findPath, N } from '../shared/mapgen.js';
 import { syncMatch, addPlayer, command, viewFor, setSpeed } from '../shared/world.js';
@@ -102,7 +103,8 @@ const node2 = mapOf(match).objects.find(o => ['farm', 'wood', 'stone'].includes(
 assert.equal(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), '');
 assert.match(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), /sammelt schon ein Heer/, 'nur ein Heer pro Feld');
 assert.equal(command(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 1 } }, t), '');
-assert.match(command(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 1 } }, t), /Alle Heere/);
+assert.match(command(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 1 } }, t), /sammelt schon ein Heer/);
+assert.equal(armySlots(p1.state), 5, 'fünf Heere gleichzeitig');
 
 // Sicht: Ben sieht Annas Heer nicht, solange es weit weg ist
 const vb = viewFor(match, players, p2, t);

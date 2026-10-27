@@ -96,7 +96,7 @@ export const awayTroops = S => Object.values(S.away || {}).reduce((a, b) => a + 
 export const troopCount = S => homeTroops(S) + awayTroops(S);
 export const woundedCount = S => Object.values(S.wounded || {}).reduce((a, b) => a + b, 0);
 export const lazarettCap = S => 200 * S.lv.lazarett;
-export const armySlots = S => 2 + (S.lv.rathaus >= 8 ? 1 : 0) + (S.lv.rathaus >= 14 ? 1 : 0);
+export const armySlots = S => 5;   // fünf Heere gleichzeitig unterwegs, keine Obergrenze für die Truppenzahl
 export const queuedTroops = S => Object.values(S.train).flat().reduce((a, o) => a + o.count, 0);
 export const maxQueues = S => S.lv.rathaus >= 5 ? 2 : 1;
 export const inQueue = (S, id) => S.queue.find(q => q.id === id);
