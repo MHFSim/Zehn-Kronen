@@ -723,9 +723,9 @@ function placeInfo(t) {
     if (!(o.k in cnt) || Math.abs(o.x - t.x) > OP_R || Math.abs(o.y - t.y) > OP_R || !wm.exploredBit(o.x, o.y)) continue;
     cnt[o.k]++; if (o.k in lv) lv[o.k] += o.lv;
   }
-  const chip = (ico, name, k) => `<span class="${cnt[k] ? '' : 'z'}">${ico} ${cnt[k]} ${name}${cnt[k] ? ' (Stufe ' + lv[k] + ' gesamt)' : ''}</span>`;
-  $('placeInfo').innerHTML = chip('🌾', 'Felder', 'farm') + chip('🌲', 'Wälder', 'wood') + chip('⛰', 'Steinbrüche', 'stone') + chip('⛏', 'Erzminen', 'ore')
-    + (cnt.sanct ? `<span>✨ ${cnt.sanct} Heiligtum</span>` : '') + (cnt.throne ? '<span>👑 Thron</span>' : '');
+  const chip = (ico, name, k) => `<span class="${cnt[k] ? '' : 'z'}" title="${name}: ${cnt[k]}${cnt[k] ? ' (Stufe ' + lv[k] + ' gesamt)' : ''}">${ico} ${cnt[k]}</span>`;
+  $('placeInfo').innerHTML = chip('🌾', 'Nahrung', 'farm') + chip('🪵', 'Holz', 'wood') + chip('🪨', 'Stein', 'stone') + chip('⛏️', 'Erz', 'ore')
+    + (cnt.sanct ? `<span title="Heiligtum">✨ ${cnt.sanct}</span>` : '') + (cnt.throne ? '<span title="Thron">👑</span>' : '');
 }
 function placeStep() {
   const show = mode === 'map' && view && view.ally && !msel && view.match.phase === 'running';
