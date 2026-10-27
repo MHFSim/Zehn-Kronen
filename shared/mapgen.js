@@ -247,7 +247,7 @@ export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
 }
 
 // Zeit in Spielsekunden bis zu jedem Wegpunkt. speed = Felder pro Stunde.
-export const MARCH_BOOST = 60;   // Märsche sind 60× schneller: von Ecke zu Ecke etwa eine Stunde (1×-Tempo)
+export const MARCH_BOOST = 30;   // Märsche sind 30× schneller als ursprünglich: von Rand zu Rand etwa 1,7 h (Speer) bzw. 0,9 h (Reiterei) im 1×-Tempo
 export function pathTimes(map, path, speed, forestCost) {
   const arr = [0];
   for (let i = 1; i < path.length; i++) {
