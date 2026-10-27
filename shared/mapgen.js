@@ -168,11 +168,20 @@ export function generateMap(seed) {
   for (let i = 0; i < 4; i++) { const [x, y] = sanctSpot(i); add(mk('sanct', x, y, 0, { n: i })); }
   // Türme (8): in den vier Ecken und in der Mitte aller vier Ränder das nächste erreichbare Land. Dort beginnt die Kette der Außenposten; Türme sind unzerstörbar.
   [[0, 0], [N / 2, 0], [N, 0], [0, N], [N / 2, N], [N, N], [0, N / 2], [N, N / 2]].forEach(([cx, cy], i) => {
-    let best = null, bd = 1e9;
-    for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) {
-      const d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
-      if (d < bd && okCell(x, y) && free(x, y, 6)) { bd = d; best = [x, y]; }
-    }
+    // Der Platz um einen Turm muss frei sein, damit dort Außenposten (13×13) gebaut werden können: kein Wasser, kein Fels, erreichbar.
+    const clear = (x, y) => {
+      let n = 0, bad = 0;
+      for (let yy = Math.max(3, y - 8); yy <= Math.min(N - 4, y + 8); yy++) for (let xx = Math.max(3, x - 8); xx <= Math.min(N - 4, x + 8); xx++) {
+        n++; const c = cellOf(xx, yy); if (!pass[c] || !reach[c] || H[(yy * SUB + 1) * G + xx * SUB + 1] >= 0.64) bad++;
+      }
+      return n >= 100 && bad <= n * .06;
+    };
+    const cand = [];
+    for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) if (okCell(x, y) && free(x, y, 6)) cand.push([(x - cx) * (x - cx) + (y - cy) * (y - cy), x, y]);
+    cand.sort((u, v) => u[0] - v[0]);
+    let best = null;
+    for (const [, x, y] of cand) if (clear(x, y)) { best = [x, y]; break; }
+    if (!best && cand.length) best = [cand[0][1], cand[0][2]];
     if (best) add(mk('tower', best[0], best[1], 0, { n: i }));
   });
 
