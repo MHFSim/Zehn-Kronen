@@ -3,7 +3,7 @@
 import {
   RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
+  T, T_MAX, techLv, techMult, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_SEC, planMarch, marchPos } from '/shared/core.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
@@ -266,7 +266,7 @@ function setupSheet() {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
     if (act === 'close') return closeSheet();
-    if (act === 'toTech') { closeSheet(); cityCat = 'tech'; renderCity(true); $('cityDrawer').classList.add('open'); $('city').scrollTop = 0; return; }
+    if (act === 'toTech') { closeSheet(); return openPanel('tech'); }
     if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
     if (act === 'upgrade') return command({ type: 'upgrade', id });
@@ -362,13 +362,12 @@ function renderCity(force) {
   const home = homeTroops(S), away = awayTroops(S), wd = woundedCount(S);
   const A = S.lv.akademie;
   const body = BORDER.map(plateHTML).join('');
-  const techBody = (A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`)
-      + `<div class="note-box">Akademie Stufe <b>${A}</b> · Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1.${A ? '' : ''}</div>` + Object.keys(T).map(techPlateHTML).join('');
   $('cityList').innerHTML = `<div class="city-in">
     <div class="burg" data-b="rathaus"><b>Burg von ${esc(me.name)}</b><span>Rathaus Stufe ${L} · „${esc(match.name)}“</span></div>
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
-    <div class="tabbody parch">${body}<h3 class="sec" id="techSec">Forschung</h3>${techBody}</div>
+    <div class="tabbody parch">${body}</div>
+    <button type="button" class="burg techcard" data-act="openTech"><b>📜 Forschung</b><span>${A ? 'Akademie Stufe ' + A + ' · ' + (S.research ? T[S.research.id].name + ' → Stufe ' + S.research.target + ' (' + fmtT(real(S.research.left)) + ')' : 'nichts in Arbeit') : 'Akademie fehlt noch'} · Öffnen ›</span></button>
   </div>`;
   $('city').scrollTop = keepTop;
 }
@@ -423,6 +422,7 @@ function city3d() {
 function setupCity() {
   $('city').addEventListener('click', async e => {
     const act = e.target.closest('[data-act]');
+    if (act && act.dataset.act === 'openTech') return openPanel('tech');
     if (act && act.dataset.act === 'cdrawer') { $('cityDrawer').classList.toggle('open'); return; }
     if (act && act.dataset.act === 'chome') { if (cv) cv.home(); return; }
     const up = e.target.closest('[data-up]');
@@ -681,9 +681,46 @@ function updateTrainPanel() {
   if (o && p) { p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
 }
 
+/* ---------- Forschung (eigenes Menü) ---------- */
+// Genau, was eine Technik auf der angegebenen Stufe für dich bringt (mit deinen aktuellen Werten)
+function techEffect(id, lvl) {
+  const t = T[id], x = t.per * lvl, pct = Math.round(x * 100);
+  if (['food', 'wood', 'stone'].includes(t.eff)) {
+    const b = Object.keys(B).find(k => B[k].prod === t.eff), base = (15 + prodAt(b, S.lv[b])) * bonusOf(S, t.eff);
+    return `+${pct} % ${RES_DE[t.eff]}-Ertrag aus ${B[b].name}: <b>${fmtN(base * (1 + x))}/h</b> statt ${fmtN(base)}/h (bei deiner ${B[b].name}-Stufe ${S.lv[b]})`;
+  }
+  if (t.eff === 'gold') { const base = (5 + 10 * S.lv.rathaus) * bonusOf(S, 'gold'); return `+${pct} % Steuergold aus dem Rathaus: <b>${fmtN(base * (1 + x))}/h</b> statt ${fmtN(base)}/h (bei Rathaus ${S.lv.rathaus})`; }
+  if (t.eff === 'force') return `+${pct} % Angriff und +${pct} % Verteidigung für alle deine Truppen, in jedem Kampf (Burg, Außenposten, Felder, Lager)`;
+  if (t.eff === 'speed') return `+${pct} % Marschtempo: Märsche und Sammelwege dauern <b>${Math.round((1 - 1 / (1 + x)) * 100)} % kürzer</b>`;
+  if (t.eff === 'carry') { const base = Math.floor(Object.keys(S.troops).reduce((a, u) => a + (S.troops[u] || 0) * U[u].c, 0)); return `+${pct} % Traglast: Beute und Sammelmenge pro Marsch steigen, deine Truppen daheim tragen <b>${fmtN(Math.floor(base * (1 + x)))}</b> statt ${fmtN(base)}`; }
+  return '';
+}
+function techCardHTML(id) {
+  const t = T[id], L = techLv(S, id), run = S.research && S.research.id === id, next = L + 1, why = L >= T_MAX || run ? '' : techBlocker(S, id);
+  const pips = `<span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span>`;
+  let act;
+  if (run) act = `<div class="bprog"><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span><button class="spd" type="button" data-speed="research:1" aria-label="Beschleunigen">⚡</button></div>`;
+  else if (L >= T_MAX) act = '<span class="note">Höchststufe erreicht</span>';
+  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><div class="row"><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button><span class="${why ? 'why' : 'note'}">${why || 'Dauer ' + fmtT(real(techTime(id, next))) + ' · Akademie ' + techReq(next)}</span></div>`;
+  const rows = [1, 2, 3, 4, 5].map(l => `<div class="tlv ${l === L ? 'cur' : ''}"><b>Stufe ${l}${l <= L ? ' ✓' : ''}</b><div class="note">${techEffect(id, l)}</div><div class="tmeta"><span class="costs sm">${costHTML(techCost(id, l))}</span><span class="note">Dauer ${fmtT(real(techTime(id, l)))} · Akademie ${techReq(l)}</span></div></div>`).join('');
+  return `<div class="ucard tcard"><div class="uhead"><div><b>${t.name}</b> ${pips}</div><span class="utime">Stufe ${L} von ${T_MAX}</span></div>
+    <p class="note" style="margin:4px 0">${L ? 'Jetzt: ' + techEffect(id, L) : 'Noch nicht erforscht.'}</p>
+    ${L < T_MAX ? `<p class="note" style="margin:4px 0">Nächste Stufe: ${techEffect(id, next)}</p>` : ''}
+    ${act}
+    <details class="tdet"><summary>Alle Stufen</summary>${rows}</details></div>`;
+}
+function techHTML() {
+  const A = S.lv.akademie, r = S.research;
+  const strip = `<div class="strip"><div><b>${A}</b><span>Akademie</span></div><div><b>${Object.keys(T).reduce((a, id) => a + techLv(S, id), 0)}</b><span>Stufen erforscht</span></div><div><b>${Object.keys(T).length * T_MAX}</b><span>Stufen gesamt</span></div></div>`;
+  const note = A ? `<div class="note-box">Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1, die Akademie wird im Stadtmenü ausgebaut.${r ? ' Gerade in Arbeit: <b>' + T[r.id].name + '</b> → Stufe ' + r.target + '.' : ''}</div>`
+    : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`;
+  return phead('📜', 'Forschung', A ? 'Akademie Stufe ' + A : 'Akademie fehlt') + strip + note + Object.keys(T).map(techCardHTML).join('');
+}
+
 /* ---------- Panels (Bündnis, Mehr) ---------- */
 let panelName = '', panelSig = '';
 function panelSignature() {
+  if (panelName === 'tech') return JSON.stringify([S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
   return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
@@ -694,7 +731,7 @@ function renderPanel(force) {
   const el = $('sidePanelInner'), keep = {};
   el.querySelectorAll('input,select').forEach(i => { if (i.id) keep[i.id] = [i.value, document.activeElement === i]; });
   const top = $('sidePanel').scrollTop, box = $('chatBox'), atEnd = !box || box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
-  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : moreHTML();
+  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : panelName === 'tech' ? techHTML() : moreHTML();
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
@@ -713,6 +750,7 @@ function setupPanel() {
     const act = el.dataset.act, d = el.dataset, val = id => (document.getElementById(id) || {}).value || '';
     const go = () => { $('sidePanel').scrollTop = 0; renderPanel(true); };
     if (act === 'ttab') { trainTab = d.t; return go(); }
+    if (act === 'techGo') return void command({ type: 'research', tech: d.id });
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
     if (act === 'train') return void command({ type: 'train', id: trainBuilding(), unit: d.u, count: pick[d.u] || 10 });
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
