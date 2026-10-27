@@ -934,6 +934,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const m = s.m, sp = this.view.match.speed || 1; let x = '';
     const f = sec => { sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), mi = Math.floor(sec % 3600 / 60), se = sec % 60; return h ? h + ':' + String(mi).padStart(2, '0') + ':' + String(se).padStart(2, '0') : mi + ':' + String(se).padStart(2, '0'); };
     if (m.phase === 'out' || m.phase === 'back') x = ' · ' + f((m.t0 + m.arr[m.arr.length - 1] - gt) / sp);
+    else if (m.phase === 'siege') x = ' · Kampf in ' + f((m.tSiege - gt) / sp);
     else if (m.phase === 'gather' && m.tEnd > m.tStart) x = ' · ' + Math.round(Math.max(0, Math.min(1, (gt - m.tStart) / (m.tEnd - m.tStart))) * 100) + ' %';
     return s.pre + x;
   }
@@ -970,7 +971,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         }));
       }
       for (const u of s.units) u.ring.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
-      s.pre = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
+      s.pre = (m.own ? '' : m.name + ' · ') + (m.phase === 'siege' || m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
       this.setBadge(s.lab, this.badgeTxt(s, this.gtNow()), 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
     }
     for (const id in this.marchObjs) if (!keep.has(Number(id))) { const s = this.marchObjs[id]; this.scene.remove(s.grp); s.lab.el.remove(); delete this.marchObjs[id]; }

@@ -17,6 +17,7 @@ export const FALL_PROTECT = 12 * 3600;   // Schutz nach dem Fall der Burg
 export const VASSAL_TIME = 7 * DAY;      // so lange bleibt ein Vasall Vasall
 export const TRIBUTE = 0.2;              // Anteil der Erzeugung, den ein Vasall abgibt
 export const LEAVE_LOCK = 24 * 3600;     // nach dem Austritt keine Angriffe auf die früheren Verbündeten
+export const SIEGE_TIME = 5400;           // Belagerung: so lange (Spielsekunden, 1:30 h) steht ein Heer vor Burg oder Außenposten, bevor gekämpft wird
 export const THRONE_HOLD = 2 * DAY;      // so lange muss der Thron gehalten werden
 export const SANCT_BONUS = 0.15;         // Produktionsbonus je gehaltenem Heiligtum
 export const THRONE_GOLD = 0.25;         // Goldbonus für den Halter des Throns
@@ -104,7 +105,7 @@ export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, ob
 
 export function marchPos(m, gt) {
   const L = m.path.length - 1;
-  if (m.phase === 'gather' || m.phase === 'post') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
+  if (m.phase === 'gather' || m.phase === 'post' || m.phase === 'siege') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
   const el = Math.max(0, Math.min(m.arr[L], gt - m.t0));
   let i = 0; while (i < L && m.arr[i + 1] <= el) i++;
   const [ax, ay] = cellXY(m.path[i]);
@@ -112,7 +113,7 @@ export function marchPos(m, gt) {
   const [bx, by] = cellXY(m.path[i + 1]), f = (el - m.arr[i]) / (m.arr[i + 1] - m.arr[i] || 1);
   return { x: ax + .5 + (bx - ax) * f, y: ay + .5 + (by - ay) * f, i, frac: f, still: false };
 }
-export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.t0 + m.arr[m.arr.length - 1];
+export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.phase === 'siege' ? m.tSiege : m.t0 + m.arr[m.arr.length - 1];
 export function reversed(m) {
   const L = m.arr.length - 1;
   m.path = m.path.slice().reverse();

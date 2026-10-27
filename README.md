@@ -6,6 +6,7 @@ Browser-Strategiespiel für bis zu 10 Spieler auf einer gemeinsamen Weltkarte (2
 
 - **Ziel:** Wer (allein oder als Bündnis) den Thron 2 Tage hält, gewinnt, oder wer zuerst alle Feinde ausgeschaltet hat. Es gibt kein Zeitlimit.
 - **Schutz:** Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst angreift, verliert den Schutz sofort.
+- **Belagerung:** Greift ein Heer eine Burg oder einen Außenposten an, steht es nach der Ankunft 1:30 Stunden davor (Spielzeit). Erst danach wird gekämpft. In dieser Zeit bekommen Verteidiger und Bündnis eine Warnung (Banner, Meldung, Push) und können Truppen heimholen oder Verstärkung schicken.
 - **Fall einer Burg:** Das erste Mal wird der Besiegte Vasall (7 Tage, 20 % der Erträge gehen an den Sieger, danach 12 Stunden Schutz). Das zweite Mal scheidet er aus. Der Herr kann seinen Vasallen nicht selbst ausschalten, das können nur andere.
 - **Bündnisse:** höchstens die Hälfte der Spieler plus eins (bei 10 Spielern 6). Verbündete gewinnen gemeinsam, können sich nicht angreifen und Truppen in die Burg des anderen legen (60 je Rathausstufe). Jeder darf jederzeit austreten (danach 24 Stunden Angriffssperre gegen die früheren Verbündeten), neu gründen oder allein in einem Bündnis sein.
 - **Heiligtümer und Thron:** Vier Heiligtümer geben der haltenden Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Sie werden nicht besetzt: Wer mit einem Außenposten am weißen Viereck andockt, hält sie.

@@ -3,7 +3,7 @@
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
 import { battle, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf } from './combat.js';
 import {
-  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
+  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC
 } from './core.js';
@@ -137,6 +137,28 @@ export function arriveField(ctx, m, o, bt, realT, back) {
   return back();
 }
 
+
+// Belagerung: Greift ein Heer eine Burg oder einen Außenposten an, steht es nach der Ankunft SIEGE_TIME davor. Erst danach wird gekämpft.
+// So bleibt dem Gegner Zeit zum Schutz, zum Verstärken und um Verbündete zu rufen. Gibt true zurück, wenn die Belagerung beginnt.
+export function beginSiege(ctx, m, o, bt) {
+  const { match, players } = ctx, w = match.world, A = byId(players, m.owner); if (!A) return false;
+  const dur = fmtDur(SIEGE_TIME / match.speed);
+  let title, text, who = [];
+  if (m.mode === 'attack' && o && o.k === 'start') {
+    const D = players.find(p => p.state.slot === o.slot);
+    if (!D || D.state.out || allied(w, A.id, D.id) || isProtected(D.state, bt)) return false;
+    who = [D.id]; const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) who.push(id);
+    title = 'Belagerung deiner Burg!'; text = A.name + tag(w, A.id) + ' steht mit ' + sum(m.troops) + ' Truppen vor der Burg von ' + D.name + '. Der Angriff beginnt in ' + dur + '. Jetzt Truppen heimholen, Verbündete um Verstärkung bitten und die Burg ausbauen.';
+    for (const id of who) if (id !== D.id) note(ctx, id, 'attack', 'Belagerung eines Verbündeten', A.name + ' steht vor der Burg von ' + D.name + ', der Angriff beginnt in ' + dur + '. Schick Verstärkung!');
+    note(ctx, D.id, 'attack', title, text);
+  } else if (m.mode === 'raid') {
+    const op = (w.outposts || {})[m.tid], al = op && w.alliances[op.al]; if (!op || !al || allied(w, A.id, al.leader)) return false;
+    if (al.members.includes(A.id)) return false;
+    for (const id of al.members) note(ctx, id, 'attack', 'Belagerung eures Außenpostens!', A.name + tag(w, A.id) + ' steht mit ' + sum(m.troops) + ' Truppen vor einem Außenposten eures Bündnisses. Der Angriff beginnt in ' + dur + '. Schickt Besatzung hin!');
+  } else return false;
+  m.phase = 'siege'; m.sieged = true; m.tSiege = bt + SIEGE_TIME;
+  return true;
+}
 export function arriveCity(ctx, m, o, bt, realT, back) {
   const { match, players } = ctx, w = match.world, speed = match.speed;
   const A = byId(players, m.owner), D = players.find(p => p.state.slot === o.slot);

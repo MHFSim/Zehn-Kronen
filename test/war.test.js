@@ -71,6 +71,13 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.equal(run(match, players, clock, a, { type: 'march', target: cityOf(b).id, mode: 'attack', troops: { schwert: 300, bogen: 150, speer: 150 } }), '');
   assert.equal(a.state.protUntil <= match.world.gt, true);
   assert.equal(viewFor(match, players, b, clock).incoming.length, 1);
+  { // Belagerung: nach der Ankunft steht das Heer 1:30 h vor der Burg, erst dann wird gekämpft
+    const mm = match.world.marches.find(x => x.owner === a.id), feed0 = b.state.feed.length;
+    adv(match, players, mm.arr[mm.arr.length - 1] + 60);
+    assert.equal(mm.phase, 'siege', 'Heer belagert'); assert.ok(b.state.feed.length > feed0 && b.state.feed[0].title.includes('Belagerung'), 'Warnung an den Verteidiger');
+    const inc = viewFor(match, players, b, clock).incoming[0]; assert.ok(inc && inc.siege, 'Belagerung in der Anzeige');
+    adv(match, players, 3600); assert.equal(b.state.vassalOf, 0, 'nach 1 h noch kein Kampf'); assert.equal(mm.phase, 'siege');
+  }
   adv(match, players, 2 * DAY);
   assert.equal(b.state.vassalOf, a.id, 'erster Fall: Vasall');
   assert.ok(b.state.protUntil > match.world.gt || b.state.protKind === 'fall');
