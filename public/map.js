@@ -1004,20 +1004,50 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, depthTest: false, side: T.DoubleSide })); line.renderOrder = 30; grp.add(line);
     return grp;
   }
+  unionMesh(rs, color, fillA, lineA, w) {   // Vereinigung mehrerer Vierecke derselben Gruppe: eine Fläche, nur der Außenrand
+    const grp = new T.Group(), cov = new Uint8Array(N * N), yo = .13;
+    for (const r of rs) for (let y = clamp(r.y0, 0, N - 1); y <= clamp(r.y1, 0, N - 1); y++) for (let x = clamp(r.x0, 0, N - 1); x <= clamp(r.x1, 0, N - 1); x++) cov[y * N + x] = 1;
+    const has = (x, y) => x >= 0 && y >= 0 && x < N && y < N && cov[y * N + x] === 1, st = 1 / SUB, pos = [], idx = [], rp = [], ri = [];
+    const H = (x, z) => Math.max(0, this.yAt(x, z)) + yo;
+    for (let cy = 0; cy < N; cy++) for (let cx = 0; cx < N; cx++) {
+      if (!cov[cy * N + cx]) continue;
+      for (let j = 0; j < SUB; j++) for (let i = 0; i < SUB; i++) {
+        const x0 = cx + i * st, z0 = cy + j * st, b = pos.length / 3;
+        pos.push(x0, H(x0, z0), z0, x0 + st, H(x0 + st, z0), z0, x0, H(x0, z0 + st), z0 + st, x0 + st, H(x0 + st, z0 + st), z0 + st); idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+      }
+      const edge = (ax, az, bx, bz) => {
+        const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz), nx = -dz / l * w / 2, nz = dx / l * w / 2;
+        for (let k = 0; k < SUB; k++) {
+          const px = ax + dx * k / SUB, pz = az + dz * k / SUB, qx = ax + dx * (k + 1) / SUB, qz = az + dz * (k + 1) / SUB, y1 = H(px, pz) + .03, y2 = H(qx, qz) + .03, b = rp.length / 3;
+          rp.push(px - nx, y1, pz - nz, px + nx, y1, pz + nz, qx - nx, y2, qz - nz, qx + nx, y2, qz + nz); ri.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+        }
+      };
+      if (!has(cx, cy - 1)) edge(cx, cy, cx + 1, cy); if (!has(cx + 1, cy)) edge(cx + 1, cy, cx + 1, cy + 1);
+      if (!has(cx, cy + 1)) edge(cx + 1, cy + 1, cx, cy + 1); if (!has(cx - 1, cy)) edge(cx, cy + 1, cx, cy);
+    }
+    const rgb = new T.Color().setRGB(LIN(color >> 16 & 255), LIN(color >> 8 & 255), LIN(color & 255));
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+    const fill = new T.Mesh(g, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: fillA, depthWrite: false, side: T.DoubleSide })); fill.renderOrder = 2; grp.add(fill);
+    const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(rp, 3)); lg.setIndex(ri);
+    const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, depthTest: false, side: T.DoubleSide })); line.renderOrder = 30; grp.add(line);
+    return grp;
+  }
   drawTerritory() {
     for (const g of this.terrObjs) { this.territory.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     this.terrObjs = []; if (!this.view) return;
     const mine = this.view.match.players.find(p => p.id === this.myId), myG = mine ? (mine.ally ? 'a' + mine.ally : 'p' + mine.id) : '';
-    for (const r of this.rectList()) {
+    const buckets = new Map();
+    for (const r of this.rectList()) { const on = !!(r.ready || r.off), key = r.group + '|' + (r.off ? 'o' : on ? 'r' : 'b'); let b = buckets.get(key); if (!b) buckets.set(key, b = { r, on, rs: [] }); b.rs.push(r); }
+    for (const { r, on, rs } of buckets.values()) {
       const col = r.off ? 0xffffff : r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
-      const g = this.rectMesh(r.x0, r.y0, r.x1, r.y1, col, r.ready || r.off ? (me ? .2 : .14) : .07, r.ready || r.off ? .95 : .5, me ? .32 : .24); this.territory.add(g); this.terrObjs.push(g);
+      const g = this.unionMesh(rs, col, on ? (me ? .12 : .08) : .04, on ? .55 : .35, me ? .2 : .15); this.territory.add(g); this.terrObjs.push(g);
     }
     // Weiße Andock-Vierecke an Thron und Türmen; sobald ein Bündnis-Außenposten angedockt hat, in dessen Farbe
     const rl = this.rectList();
     for (const th of this.map.objects.filter(o => o.k === 'throne' || o.k === 'tower')) {
       const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad));
       const col = hit ? this.allyColor(Number(hit.group.slice(1)), hit.owner) : 0xffffff;
-      const g = this.rectMesh(th.x - pad, th.y - pad, th.x + pad, th.y + pad, col, hit ? .26 : .3, .98, .4); this.territory.add(g); this.terrObjs.push(g);
+      const g = this.rectMesh(th.x - pad, th.y - pad, th.x + pad, th.y + pad, col, hit ? .16 : .18, .7, .26); this.territory.add(g); this.terrObjs.push(g);
     }
     if (this.preview && !this.preview.ghost) {
       const p = this.preview, col = p.ok ? 0x6fe07a : 0xe0594a, g = this.rectMesh(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r, col, .24, .95, .36); this.territory.add(g); this.terrObjs.push(g);
