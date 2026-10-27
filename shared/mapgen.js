@@ -68,9 +68,9 @@ export const distC = (x, y) => Math.sqrt((x + .5 - C) * (x + .5 - C) + (y + .5 -
 function heightAt(x, y, seed, zones) {
   const dx = x - C, dy = y - C, r = Math.sqrt(dx * dx + dy * dy) / C;
   const base = fbm(x * 0.045 + 10, y * 0.045 + 10, seed, 5);
-  const mmask = smooth(0.58, 0.76, fbm(x * 0.028 + 70, y * 0.028 + 70, seed + 7, 3));
+  const mmask = smooth(0.62, 0.80, fbm(x * 0.028 + 70, y * 0.028 + 70, seed + 7, 3));
   const ridge = 1 - Math.abs(2 * fbm(x * 0.05 + 130, y * 0.05 + 130, seed + 13, 4) - 1);
-  let h = 0.43 + (base - 0.5) * 0.60 + mmask * (0.06 + ridge * ridge * 0.36);
+  let h = 0.43 + (base - 0.5) * 0.60 + mmask * (0.06 + ridge * ridge * 0.30);
   h += (fbm(x * 0.21 + 300, y * 0.21 + 300, seed + 3, 3) - 0.5) * 0.09 * smooth(0.50, 0.68, h);   // Felsdetail im Gebirge
   h -= smooth(0.84, 1.04, r) * 0.62;               // Meer am Kartenrand
   for (const z of zones) {                         // Bauland einebnen
