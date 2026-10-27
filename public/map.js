@@ -5,6 +5,7 @@
 import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoads } from '/shared/mapgen.js';
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
 import { ROCKS } from '/public/rockdata.js';
+import { VIKING } from '/public/vikingdata.js';
 import { rectsOf, roadEdgesOf, dockPad, touches, towersOf } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
@@ -351,6 +352,24 @@ function buildOutpost() {
 
 /* ---------- Einheiten ---------- */
 // liefert Körper (starr) sowie zwei Beinpaare (schwingen); col = Spielerfarbe
+// Wikinger entpacken (einmal): Dreiecke je Teil (0 Körper, 1/2 Beine) und Farbklasse
+const VIK = (() => {
+  const u8 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0)), pb = u8(VIKING.p);
+  return { n: VIKING.n, hip: VIKING.hip / 1000, P: new Int16Array(pb.buffer, 0, pb.length / 2), C: u8(VIKING.c) };
+})();
+const VIK_FOOT = ['speer', 'schwert', 'bogen', 'armbrust'];
+function vikingParts(body, la, lb, tab) {
+  const COLS = [[226, 190, 150], [150, 156, 166], [100, 74, 52], tab, [170, 120, 60], [204, 186, 150], [110, 90, 70], [70, 52, 40]], parts = [body, la, lb];
+  for (let t = 0; t < VIK.n; t++) {
+    const k = VIK.C[t], b = parts[k >> 4], col = COLS[k & 15], v = [];
+    for (let q = 0; q < 3; q++) { const i = (t * 3 + q) * 3; v.push([VIK.P[i] / 1000, VIK.P[i + 1] / 1000, VIK.P[i + 2] / 1000]); }
+    let a = [v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], c = [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]];
+    let n = [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2], a[0] * c[1] - a[1] * c[0]];
+    const l = Math.hypot(n[0], n[1], n[2]) || 1; n = [n[0] / l, n[1] / l, n[2] / l];
+    const f = (1 + (hash(b.tri++, 7, 3) - .5) * .1), cr = LIN(Math.min(255, col[0] * f)), cg = LIN(Math.min(255, col[1] * f)), cb = LIN(Math.min(255, col[2] * f));
+    for (const q of v) { b.p.push(q[0], q[1], q[2]); b.n.push(n[0], n[1], n[2]); b.c.push(cr, cg, cb); }
+  }
+}
 function buildUnit(type, col) {
   const body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150], tab = col, dk = mul(col, .65);
   const rider = (b, y, scale = 1, plate = false, lance = true) => {
@@ -366,19 +385,11 @@ function buildUnit(type, col) {
     if (barding) { body.box(.24, .08, .5, 0, .46, 0, barding); body.box(.22, .2, .08, 0, .32, .26, barding); }
     for (const [x, z, g] of [[-.07, .2, la], [.07, -.2, la], [.07, .2, lb], [-.07, -.2, lb]]) { g.box(.05, .26, .05, x, -.24, z, mul(coat, .85)); g.box(.06, .04, .06, x, -.27, z, [40, 34, 30]); }
   };
-  if (type === 'speer') {
-    body.box(.17, .26, .12, 0, .22, 0, tab); body.box(.18, .1, .13, 0, .22, 0, mul(IRON, .9)); body.sph(.065, 0, .56, 0, SK, 6); body.cone(.075, .09, 6, 0, .56, 0, IRON); body.cyl(.014, .014, .95, 4, .15, .05, 0, WOOD_D); body.cone(.028, .08, 4, .15, .98, 0, IRON);
-    body.push(new T.SphereGeometry(.12, 8, 5, 0, Math.PI), dk, -.14, .32, .04, Math.PI / 2, 1, 1, .35); body.box(.02, .1, .1, -.14, .32, .06, tab);
-    la.box(.06, .2, .07, -.04, -.1, 0, [96, 78, 60]); lb.box(.06, .2, .07, .04, -.1, 0, [96, 78, 60]);
-  } else if (type === 'schwert') {
-    body.box(.18, .28, .13, 0, .22, 0, [140, 144, 152]); body.box(.19, .14, .14, 0, .32, 0, tab); body.sph(.068, 0, .58, 0, SK, 6); body.cone(.082, .1, 6, 0, .58, 0, IRON); body.box(.015, .08, .06, 0, .67, 0, tab);
-    body.box(.02, .4, .05, .16, .12, .0, [210, 214, 220]); body.box(.02, .05, .12, .16, .2, 0, GOLD); body.push(new T.ConeGeometry(.1, .22, 3), tab, -.15, .36, .04, 0, 1, 1, .4, Math.PI, 0);
-    la.box(.06, .2, .07, -.04, -.1, 0, [80, 80, 90]); lb.box(.06, .2, .07, .04, -.1, 0, [80, 80, 90]);
-  } else if (type === 'bogen' || type === 'armbrust') {
-    body.box(.16, .26, .12, 0, .22, 0, [78, 110, 64]); body.box(.17, .06, .13, 0, .36, 0, tab); body.sph(.064, 0, .54, 0, SK, 6); body.cone(.082, .13, 6, 0, .52, 0, [70, 100, 56]);
-    body.push(new T.TorusGeometry(.2, .012, 4, 10, Math.PI), WOOD, .17, .38, .05, 0, 1, 1, 1, 0, Math.PI / 2); body.box(.012, .4, .012, .17, .18, .05, [220, 214, 200]);
-    body.box(.05, .22, .06, -.08, .3, -.1, [110, 78, 48], 0, .3); for (let i = 0; i < 3; i++) body.box(.01, .08, .01, -.08 + i * .015, .5, -.12, tab);
-    la.box(.06, .2, .07, -.04, -.1, 0, [96, 78, 60]); lb.box(.06, .2, .07, .04, -.1, 0, [96, 78, 60]);
+  if (VIK_FOOT.includes(type)) {
+    vikingParts(body, la, lb, tab);
+    if (type === 'speer') { body.cyl(.012, .012, 1.25, 5, -.17, .02, .06, WOOD_D); body.cone(.026, .1, 5, -.17, 1.27, .06, IRON); body.push(new T.CylinderGeometry(.15, .15, .025, 10), dk, .2, .4, .02, 0, 1, 1, 1, 0, Math.PI / 2); }
+    else if (type === 'schwert') { body.box(.02, .42, .05, -.19, .06, .04, [210, 214, 220]); body.box(.02, .05, .12, -.19, .22, .04, GOLD); body.push(new T.CylinderGeometry(.17, .17, .03, 10), tab, .21, .38, .03, 0, 1, 1, 1, 0, Math.PI / 2); body.push(new T.CylinderGeometry(.04, .04, .045, 6), IRON, .22, .38, .03, 0, 1, 1, 1, 0, Math.PI / 2); }
+    else { body.push(new T.TorusGeometry(.26, .012, 4, 10, Math.PI), WOOD, -.2, .42, .06, 0, 1, 1, 1, 0, Math.PI / 2 + Math.PI / 2); body.box(.012, .5, .012, -.2, .17, .06, [220, 214, 200]); body.box(.05, .26, .06, .08, .45, -.12, [110, 78, 48], 0, .3); for (let i = 0; i < 3; i++) body.box(.01, .08, .01, .08 + i * .015, .68, -.14, tab); }
   } else if (type === 'handkarren') {
     body.box(.34, .1, .5, 0, .2, 0, [140, 100, 60]); body.box(.02, .14, .5, -.17, .3, 0, WOOD_D); body.box(.02, .14, .5, .17, .3, 0, WOOD_D); body.box(.34, .14, .02, 0, .3, -.25, WOOD_D);
     for (const x of [-.2, .2]) body.push(new T.CylinderGeometry(.13, .13, .04, 10), WOOD_D, x, .13, 0, 0, 1, 1, 1, 0, Math.PI / 2);
@@ -393,7 +404,7 @@ function buildUnit(type, col) {
     horse([66, 60, 58], tab); rider(body, .56, 1.15, true, true); body.box(.2, .04, .5, 0, .62, 0, dk);
   }
   const fin = b => { const g = b.build(); return g; };
-  return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
+  return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: VIK_FOOT.includes(type) ? VIK.hip : type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
 }
 
 /* ---------- Bäume (Instanzen) ---------- */
@@ -862,7 +873,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         for (let i = 0; i < cnt; i++) {
           const g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
-          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(cav ? 1.5 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav });
+          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav });
         }
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
