@@ -114,7 +114,7 @@ function setupInput() {
     if (ptrs.size === 1) {
       moved = false; lpDone = false; downAt = { x: e.clientX, y: e.clientY }; wm.dragStart(e.clientX, e.clientY);
       clearTimeout(lpT); const lx = e.clientX, ly = e.clientY;
-      lpT = setTimeout(() => { if (moved || ptrs.size !== 1 || mode !== 'map' || !mapReady) return; lpDone = true; const t = wm.tileAtScreen(lx, ly); selectMap({ type: 'site', x: t.x, y: t.y }, false); }, 550);
+      lpT = setTimeout(() => { if (moved || ptrs.size !== 1 || mode !== 'map' || !mapReady) return; lpDone = true; const t = wm.tileAtScreen(lx, ly); selectMap({ type: 'site', x: t.x, y: t.y, post: true }, false); }, 550);
     }
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), a: ang(a, b) }; moved = true; }
   });
@@ -983,6 +983,14 @@ function siteSheet(w) {
   const poor = al && OP_COST.some((c, i) => st[RES[i]] < c);
   wm.setPreview({ x: msel.x, y: msel.y, r: OP_R, ok: !why });
   const o = { id: 'site', x: msel.x, y: msel.y }, plan = !why ? planFor(o) : null;
+  if (msel.post) {
+    wm.setPreview(null);
+    const plan2 = planFor({ id: 'post', x: msel.x, y: msel.y }), ok = view.match.phase === 'running';
+    return `<div class="sh-head"><h2>Heer hierhin schicken</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>
+      <p class="note">Das Heer bleibt dort stehen, bis du es zurückrufst. Feinde können es angreifen.</p>${pickerHTML()}`
+      + (plan2 && !plan2.error ? `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan2.duration))}</dd></dl>` : '')
+      + actionRow('Heer aufstellen', ok ? plan2 : null, ok ? '' : 'Die Partie läuft nicht.', free, '', 'post');
+  }
   let body = '';
   body += `<p class="desc">Ein Außenposten gehört eurem Bündnis und erweitert das gemeinsame Revier um ein Viereck (13×13 Felder). Es gibt nur eine Stufe. Mitglieder können ihn mit Truppen bewachen. Feinde können ihn zerstören, wenn ihr Außenposten an seinen grenzt.</p>
     <dl class="stats"><dt>Kosten (Bündnislager)</dt><dd class="costs">${costHTML(OP_COST, st || {})}</dd><dt>Bauzeit</dt><dd>${fmtT(real(opBuildTime(sum(sendList()) || 1)))} nach der Ankunft<br><span class="note">1 Einheit ${fmtT(real(OP_BUILD))}, ${OP_HELP_MAX} Einheiten ${fmtT(real(OP_BUILD_FAST))}. Mehr als ${OP_HELP_MAX} verkürzen nicht weiter.</span></dd><dt>Außenposten des Bündnisses</dt><dd>${mineN} (ohne Limit)</dd></dl>`;
