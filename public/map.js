@@ -3,7 +3,7 @@
 // Burgen, Lager, Felder, Türme und Heere sind im Code modellierte Low-Poly-Körper (Vertexfarben, keine Bilddateien).
 // Die Kamera schwebt schräg über dem Boden: ziehen = verschieben, zwei Finger = zoomen und drehen.
 import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoads } from '/shared/mapgen.js';
-import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
+import { PLAYER_COLORS, marchPos, cellXY, VIEW_ARMY } from '/shared/core.js';
 import { ROCKS } from '/public/rockdata.js';
 import { VIKING } from '/public/vikingdata.js';
 import { RIDER } from '/public/riderdata.js';
@@ -574,7 +574,11 @@ export class WorldMap {
     str = str || ''; if (str === this.fogStr && this.fogTex) return; this.fogStr = str;
     const b = new Uint8Array(Math.ceil(N * N / 8));
     try { const raw = atob(str); for (let i = 0; i < raw.length && i < b.length; i++) b[i] = raw.charCodeAt(i); } catch {}
-    this.bits = b;
+    if (this.loc) for (let i = 0; i < b.length; i++) b[i] |= this.loc[i];
+    this.bits = b; this.rebuildFog();
+  }
+  rebuildFog() {
+    const b = this.bits; this.fogVis = true;
     let f = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) f[y * N + x] = this.exploredBit(x, y);
     for (let pass = 0; pass < 2; pass++) {
       const g = new Float32Array(N * N);
@@ -582,13 +586,35 @@ export class WorldMap {
       f = g;
     }
     for (let i = 0; i < N * N; i++) this.fogData[i] = Math.round(f[i] * 255);
-    this.fogTex.needsUpdate = true; this.dirtyLabels = true;
+    this.fogTex.needsUpdate = true; this.dirtyLabels = true; this.fogApply = true;
+  }
+  // Heere decken den Weg sofort auf (der Server bestätigt es später); aufgedeckt bleibt für immer aufgedeckt
+  localReveal(gt) {
+    if (!this.bits || !this.view) return;
+    if (!this.loc) this.loc = new Uint8Array(this.bits.length);
+    let ch = false;
+    for (const id in this.marchObjs) {
+      const s = this.marchObjs[id], m = s.m; if (!m.own) continue;
+      const p = marchPos(m, gt), R = VIEW_ARMY;
+      for (let y = Math.max(0, Math.floor(p.y - R)); y <= Math.min(N - 1, Math.ceil(p.y + R)); y++) for (let x = Math.max(0, Math.floor(p.x - R)); x <= Math.min(N - 1, Math.ceil(p.x + R)); x++) {
+        if ((x + .5 - p.x) ** 2 + (y + .5 - p.y) ** 2 > R * R) continue;
+        const i = y * N + x, bit = 1 << (i & 7);
+        if (!(this.bits[i >> 3] & bit)) { this.bits[i >> 3] |= bit; this.loc[i >> 3] |= bit; ch = true; }
+      }
+    }
+    if (ch) this.rebuildFog();
+  }
+  // Alles im Nebel ist unsichtbar: Objekte, Außenposten, fremde Heere, Beschriftungen
+  applyFogVisibility() {
+    this.fogApply = false;
+    for (const id in this.obj) { const h = this.obj[id], o = h.o, own = o.k === 'start' && h.player && h.player.id === this.myId; h.fogHide = !own && !this.exploredBit(o.x, o.y); h.grp.visible = !h.fogHide; }
+    for (const id in this.opObjs) { const q = this.opObjs[id]; q.fogHide = !this.exploredBit(q.o.x, q.o.y); q.grp.visible = !q.fogHide; }
   }
   fogPatch(mat) {
     mat.onBeforeCompile = sh => {
       sh.uniforms.uFog = this.fogU;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW;').replace('#include <begin_vertex>', '#include <begin_vertex>\n{ vec4 fq = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\nfq = instanceMatrix * fq;\n#endif\nvFW = (modelMatrix * fq).xyz; }');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW; uniform sampler2D uFog;').replace('#include <color_fragment>', '#include <color_fragment>\n{ float fk = smoothstep(.12, .9, texture2D(uFog, vFW.xz / ' + N + '.0).r); diffuseColor.rgb = mix(vec3(.10, .12, .17), diffuseColor.rgb, fk); }');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW; uniform sampler2D uFog;').replace('#include <color_fragment>', '#include <color_fragment>\n{ float fk = smoothstep(.12, .9, texture2D(uFog, vFW.xz / ' + N + '.0).r); if (fk < .55) discard; }');
     };
   }
 
@@ -942,6 +968,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const dist = this.cam.dist, sb = clamp(70 / dist, .55, 1.2);
     for (const id in this.obj) {
       const h = this.obj[id]; if (!h.lab || !h.labOn) continue;
+      if (h.fogHide) { if (h.lab.vis !== false) { h.lab.el.style.display = 'none'; h.lab.vis = false; } continue; }
       const o = h.o, show = dist < 78 || o.k === 'start' || o.k === 'throne' || o.k === 'tower';
       if (!show) { h.lab.el.style.display = 'none'; h.lab.vis = false; continue; }
       place(h.lab, o.x + .5, h.grp.position.y + h.lab.up * h.grp.scale.y, o.y + .5, sb);
@@ -1212,9 +1239,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     if (this.terrDirty || t - this.terrAt > 1) { const force = this.terrDirty; this.terrAt = t; this.terrDirty = false; this.drawTerritory(force); }
     // Heere
     const gt = this.gtNow(), step = Math.floor(t * 4) % 2; let routes = [];
+    if (t - (this.fogAt || 0) > .25) { this.fogAt = t; this.localReveal(gt); }
+    if (this.fogApply) this.applyFogVisibility();
     for (const id in this.marchObjs) {
       const s = this.marchObjs[id], m = s.m, p = marchPos({ ...m, t0: m.t0 }, gt), y = this.yAt(p.x, p.y);
-      s.grp.position.set(p.x, Math.max(0, y), p.y); s.grp.visible = true;
+      s.grp.position.set(p.x, Math.max(0, y), p.y); s.grp.visible = !!m.own || !!this.exploredBit(Math.floor(p.x), Math.floor(p.y));
       const ahead = m.path[Math.min(m.path.length - 1, p.i + 1)], [ax, ay] = cellXY(ahead);
       const L = m.path.length - 1, dtc = L > 0 ? m.arr[L] / L : 1;
       if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.hd = Math.atan2(dx, dz); }
@@ -1292,11 +1321,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     };
     for (const id in this.marchObjs) { const s = this.marchObjs[id]; if (s.grp.visible) test('march', Number(id), s.grp.position.x, s.grp.position.y + .5, s.grp.position.z, .9); }
     if (best) return best;
-    for (const id in this.opObjs) { const q = this.opObjs[id]; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
+    for (const id in this.opObjs) { const q = this.opObjs[id]; if (q.fogHide) continue; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
     if (best) return best;
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 8 : o.k === 'tower' ? 6 : 1;
-      test('obj', id, o.x + .5, h.grp.position.y + hh, o.y + .5, k);
+      if (!h.fogHide) test('obj', id, o.x + .5, h.grp.position.y + hh, o.y + .5, k);
     }
     return best;
   }
