@@ -36,14 +36,14 @@ export const GATT = { inf: 'Infanterie', art: 'Artillerie', kav: 'Kavallerie', t
 const mk = (name, g, cost, t, tempo, c, at, df, req, o = {}) => ({ name, g, cost: [0, cost[0], cost[1] + (cost[2] || 0)], t, tempo, s: 60 / tempo, c, at, df, req,
   a: at ? Math.round(at.reduce((x, y) => x + y, 0) / 3) : 0, v: df ? Math.round(df.reduce((x, y) => x + y, 0) / 3) : 0, ...o });
 export const U = {
-  speer:     mk('Speerträger',     'inf',   [20, 10, 15], 240,  6.25, 22, [5, 7, 12],   [20, 31, 58], 1, { strong: ['leicht'], good: ['schwert'], weak: ['bogen'] }),
-  schwert:   mk('Schwertkämpfer',  'inf',   [25, 15, 30], 360,  6.25, 22, [10, 45, 50], [20, 35, 30], 1, { strong: ['schwer'], good: ['speer'], weak: ['armbrust'] }),
-  bogen:     mk('Bogenschütze',    'art',   [30, 15, 20], 300,  6.25, 22, [20, 60, 10], [14, 31, 10], 1, { strong: ['speer'], good: [], weak: [] }),
-  armbrust:  mk('Armbrustschütze', 'art',   [35, 20, 25], 420,  6.25, 22, [15, 21, 9],  [59, 91, 32], 3, { strong: ['schwert'], good: [], weak: ['leicht'] }),
-  leicht:    mk('Lanzenreiter',    'kav',   [40, 20, 40], 720,  5,    22, [5, 8, 30],   [40, 15, 35], 1, { strong: ['armbrust'], good: ['schwer'], weak: ['speer'] }),
-  schwer:    mk('Panzerreiter',    'kav',   [25, 15, 45], 1050, 2.5,  22, [24, 15, 21], [59, 27, 36], 5, { strong: ['bogen'], good: ['leicht'], weak: ['schwert'] }),
-  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  6.25, 500, null, null, 1),
-  ochsen:    mk('Ochsenkarren',    'trans', [95, 40, 65], 1200, 7,    2500, null, null, 4)
+  speer:     mk('Speerträger',     'inf',   [20, 10, 15], 240,  60 / 30, 22, [5, 7, 12],   [20, 31, 58], 1, { strong: ['leicht'], good: ['schwert'], weak: ['bogen'] }),
+  schwert:   mk('Schwertkämpfer',  'inf',   [25, 15, 30], 360,  60 / 30, 22, [10, 45, 50], [20, 35, 30], 1, { strong: ['schwer'], good: ['speer'], weak: ['armbrust'] }),
+  bogen:     mk('Bogenschütze',    'art',   [30, 15, 20], 300,  60 / 30, 22, [20, 60, 10], [14, 31, 10], 1, { strong: ['speer'], good: [], weak: [] }),
+  armbrust:  mk('Armbrustschütze', 'art',   [35, 20, 25], 420,  60 / 30, 22, [15, 21, 9],  [59, 91, 32], 3, { strong: ['schwert'], good: [], weak: ['leicht'] }),
+  leicht:    mk('Lanzenreiter',    'kav',   [40, 20, 40], 720,  60 / 38, 22, [5, 8, 30],   [40, 15, 35], 1, { strong: ['armbrust'], good: ['schwer'], weak: ['speer'] }),
+  schwer:    mk('Panzerreiter',    'kav',   [25, 15, 45], 1050, 60 / 38, 22, [24, 15, 21], [59, 27, 36], 5, { strong: ['bogen'], good: ['leicht'], weak: ['schwert'] }),
+  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  60 / 28, 500, null, null, 1),
+  ochsen:    mk('Ochsenkarren',    'trans', [95, 40, 65], 1200, 60 / 28, 2500, null, null, 4)
 };
 
 // Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.
