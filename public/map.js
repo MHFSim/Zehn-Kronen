@@ -610,6 +610,16 @@ export class WorldMap {
     for (const id in this.obj) { const h = this.obj[id], o = h.o, own = o.k === 'start' && h.player && h.player.id === this.myId; h.fogHide = !own && !this.exploredBit(o.x, o.y); h.grp.visible = !h.fogHide; }
     for (const id in this.opObjs) { const q = this.opObjs[id]; q.fogHide = !this.exploredBit(q.o.x, q.o.y); q.grp.visible = !q.fogHide; }
   }
+  fogDiscard(obj) {   // Revierflächen und -linien erscheinen erst auf erkundetem Gebiet
+    obj.traverse(o => { const m = o.material; if (!m) return; for (const mm of Array.isArray(m) ? m : [m]) {
+      mm.onBeforeCompile = sh => {
+        sh.uniforms.uFog = this.fogU;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvFW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW; uniform sampler2D uFog;').replace('#include <color_fragment>', '#include <color_fragment>\nif (smoothstep(.12, .9, texture2D(uFog, vFW.xz / ' + N + '.0).r) < .4) discard;');
+      };
+      mm.customProgramCacheKey = () => 'fogd'; mm.needsUpdate = true;
+    } });
+  }
   fogDepthMat() {   // Schatten versteckter Bäume entfallen ebenfalls
     if (this._fdm) return this._fdm;
     const m = this._fdm = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
@@ -1112,7 +1122,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     if (free.length) put({ group: 'free', ready: true, off: true }, free[0]), free.slice(1).forEach(f => put({ group: 'free', ready: true, off: true }, f));
     for (const { r, on, rs } of buckets.values()) {
       const col = r.off ? 0xffffff : r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
-      const g = this.unionMesh(rs, col, on ? (me ? .12 : .08) : .04, on ? .55 : .35, me ? .2 : .15); this.territory.add(g); this.terrObjs.push(g);
+      const g = this.unionMesh(rs, col, on ? (me ? .12 : .08) : .04, on ? .55 : .35, me ? .2 : .15); this.fogDiscard(g); this.territory.add(g); this.terrObjs.push(g);
     }
     if (this.preview && !this.preview.ghost) {
       const p = this.preview, col = p.ok ? 0x6fe07a : 0xe0594a, g = this.rectMesh(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r, col, .24, .95, .36); this.territory.add(g); this.terrObjs.push(g);
