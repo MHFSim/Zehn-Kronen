@@ -106,18 +106,22 @@ function revealMap(tx, ty) {
 }
 function focusMap(tx, ty, dist) { wm.focus(tx, ty, dist, document.body.classList.contains('sheet-open') ? .26 : .46); }
 function setupInput() {
-  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null;
+  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lpT = 0, lpDone = false;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y), ang = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
   view.style.touchAction = 'none';
   view.addEventListener('pointerdown', e => {
     view.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (ptrs.size === 1) { moved = false; downAt = { x: e.clientX, y: e.clientY }; wm.dragStart(e.clientX, e.clientY); }
+    if (ptrs.size === 1) {
+      moved = false; lpDone = false; downAt = { x: e.clientX, y: e.clientY }; wm.dragStart(e.clientX, e.clientY);
+      clearTimeout(lpT); const lx = e.clientX, ly = e.clientY;
+      lpT = setTimeout(() => { if (moved || ptrs.size !== 1 || mode !== 'map' || !mapReady) return; lpDone = true; const t = wm.tileAtScreen(lx, ly); selectMap({ type: 'site', x: t.x, y: t.y }, false); }, 550);
+    }
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), a: ang(a, b) }; moved = true; }
   });
   view.addEventListener('pointermove', e => {
     const prev = ptrs.get(e.pointerId); if (!prev) return;
     const cur = { x: e.clientX, y: e.clientY }; ptrs.set(e.pointerId, cur);
-    if (ptrs.size === 1) { if (dist(cur, downAt) > 8) moved = true; if (moved) wm.dragMove(cur.x, cur.y); }
+    if (ptrs.size === 1) { if (dist(cur, downAt) > 8) { moved = true; clearTimeout(lpT); } if (moved) wm.dragMove(cur.x, cur.y); }
     else if (ptrs.size === 2 && pinch) {
       const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = dist(a, b), an = ang(a, b);
       let da = an - pinch.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
@@ -126,8 +130,8 @@ function setupInput() {
   });
   const end = e => {
     if (!ptrs.has(e.pointerId)) return;
-    ptrs.delete(e.pointerId);
-    if (ptrs.size === 0 && !moved && e.type === 'pointerup') tap(e.clientX, e.clientY);
+    ptrs.delete(e.pointerId); clearTimeout(lpT);
+    if (ptrs.size === 0 && !moved && !lpDone && e.type === 'pointerup') tap(e.clientX, e.clientY);
     if (ptrs.size === 1) { const [r] = [...ptrs.values()]; wm.dragStart(r.x, r.y); downAt = { x: r.x, y: r.y }; }
     if (ptrs.size < 2) pinch = null;
   };
