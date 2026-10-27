@@ -480,7 +480,7 @@ let allyTab = '', moreSub = '', repTab = 'all';
 function revierHTML() {
   const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow(), al0 = view.ally, st = al0 ? al0.store : null;
   const revier = !al0 ? '<p class="note">Außenposten, Bündnislager und gemeinsames Revier gibt es nur im Bündnis. Gründe eines oder tritt einem bei (Tab Bündnis).</p>' : `
-    <p class="note">Das Revier gehört dem Bündnis: Jeder Außenposten beansprucht ein Viereck, die Kette beginnt an einem der vier Türme in den Kartenecken. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} Außenposten (ohne Limit).</p>
+    <p class="note">Das Revier gehört dem Bündnis: Jeder Außenposten beansprucht ein Viereck, die Kette beginnt an einem der vier Türme am Kartenrand. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} Außenposten (ohne Limit).</p>
     <div class="block"><div class="store"><h2>🏛 Bündnislager</h2><p class="stock-sub">Aktueller Stand</p>
       <div class="stock">${RES.map((r, k) => `<div class="stk ${st[r] >= OP_COST[k] ? 'ok' : 'low'}"><i class="r r-${r}"></i><b>${fmtN(st[r])}</b><span>${RES_DE[r]}</span><small>${st[r] >= OP_COST[k] ? '✓ genug' : 'noch ' + fmtN(OP_COST[k] - st[r])}</small></div>`).join('')}</div>
       <p class="stock-sub">${OP_COST.every((c, k) => st[RES[k]] >= c) ? '✅ Das Lager reicht für einen neuen Außenposten.' : '⏳ Für den nächsten Außenposten fehlt noch etwas.'}</p></div>
@@ -564,7 +564,7 @@ function tutorialHTML() {
     ['Ein Heer zu einem Feld schicken', rp.some(r => r.kind === 'gather' || r.kind === 'return'), 'Karte → Feld antippen, Truppen wählen, Sammeln.'],
     ['Ein Banditenlager besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Stufe 1 und 2 sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
-    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer, an einem der Türme in den Kartenecken. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
+    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer, an einem der Türme am Kartenrand. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
     ['Ein Heiligtum besetzen', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Die vier Heiligtümer geben dir und deinem Bündnis +15 % auf einen Rohstoff.']
   ];
@@ -576,7 +576,7 @@ function rulesHTML() {
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
-  <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der vier Türme in den Kartenecken beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut; den ersten baut der Gründer an seine Burg, danach entfällt das Burg-Viereck. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
+  <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der vier Türme am Kartenrand beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut; den ersten baut der Gründer an seine Burg, danach entfällt das Burg-Viereck. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
   <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {

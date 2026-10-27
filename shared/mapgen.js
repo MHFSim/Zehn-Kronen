@@ -166,8 +166,8 @@ export function generateMap(seed) {
   starts.forEach((s, i) => add(mk('start', s.x, s.y, 0, { slot: i })));
   add(mk('throne', Math.floor(C), Math.floor(C), 0));
   for (let i = 0; i < 4; i++) { const [x, y] = sanctSpot(i); add(mk('sanct', x, y, 0, { n: i })); }
-  // Türme: In jeder Ecke der Karte das nächste erreichbare Land. Dort beginnt die Kette der Außenposten; Türme sind unzerstörbar.
-  [[0, 0], [N, 0], [0, N], [N, N]].forEach(([cx, cy], i) => {
+  // Türme (6): in den vier Ecken und in der Mitte von Nord- und Südrand das nächste erreichbare Land. Dort beginnt die Kette der Außenposten; Türme sind unzerstörbar.
+  [[0, 0], [N / 2, 0], [N, 0], [0, N], [N / 2, N], [N, N]].forEach(([cx, cy], i) => {
     let best = null, bd = 1e9;
     for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) {
       const d = (x - cx) * (x - cx) + (y - cy) * (y - cy);

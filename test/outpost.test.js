@@ -30,7 +30,7 @@ assert.equal(run(c, { type: 'allyCreate', name: 'Blaue', tag: 'BLA' }), '');
 const al = w.alliances[1];
 assert.equal(territory(match, players, 0).length, 0, 'die Burg ist kein Revier mehr');
 // Der erste Außenposten beginnt an einem Turm in der Ecke – nicht an der Burg
-const tw = towersOf(map).sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy))[0]; assert.equal(towersOf(map).length, 4, 'vier Türme');
+const tw = towersOf(map).sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy))[0]; assert.equal(towersOf(map).length, 6, 'sechs Türme');
 { const near = findSite(a, [cx, cy], [R + OP_R, R + 2, 12, 20]); if (near) assert.match(checkSite(match, players, a, near[0], near[1], gt()), /Turm/); }
 let site = null; for (let dx = -2 * OP_R; dx <= 2 * OP_R && !site; dx += 2) for (let dy = -2 * OP_R; dy <= 2 * OP_R && !site; dy += 2) if (!checkSite(match, players, a, tw.x + dx, tw.y + dy, gt())) site = [tw.x + dx, tw.y + dy];
 assert.ok(site, 'Bauplatz am Turm');

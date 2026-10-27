@@ -103,7 +103,7 @@ export function checkSite(match, players, me, x, y, gt) {
   const mineActive = rects.some(r => r.ready && r.group === group);
   if (!mineActive) {
     const zone = t => ({ x0: t.x - TOWER_PAD, y0: t.y - TOWER_PAD, x1: t.x + TOWER_PAD, y1: t.y + TOWER_PAD });
-    if (!towersOf(map).some(t => overlaps(nr, zone(t)))) return 'Der erste Außenposten beginnt an einem der Türme in den Ecken der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
+    if (!towersOf(map).some(t => overlaps(nr, zone(t)))) return 'Der erste Außenposten beginnt an einem der Türme am Rand der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
   } else if (!rects.some(r => r.ready && r.group === group && overlaps(nr, r, 1))) return 'Ein Außenposten muss das Revier deines Bündnisses berühren.';
   return '';
 }

@@ -191,15 +191,14 @@ function buildThrone() {
 function buildTower() {
   const b = new MB(), S = [176, 170, 156], D = mul(S, .78), parts = [];
   b.cyl(3.0, 3.4, .9, 18, 0, -.3, 0, D); b.cyl(2.5, 2.9, .5, 18, 0, .6, 0, S);                         // Sockel
-  b.cyl(1.55, 2.0, 12, 16, 0, 1.1, 0, S); b.cyl(1.35, 1.55, 12, 16, 0, 13.1, 0, mul(S, 1.04));      // zwei Schaftstücke
-  b.cyl(1.2, 1.35, 12, 16, 0, 25.1, 0, mul(S, 1.08));
-  for (const y of [6, 13, 20, 27]) b.cyl(1.7 - y * .016, 1.7 - y * .016, .3, 16, 0, y, 0, D);        // Bänder
-  for (const y of [4, 10, 16, 22, 30]) for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + y; b.box(.14, .6, .1, Math.cos(a) * 1.45, y, Math.sin(a) * 1.45, [40, 36, 34], -a); }   // Schießscharten
-  b.cyl(2.4, 1.3, 1.1, 16, 0, 37.1, 0, mul(S, .9)); b.cyl(2.6, 2.6, .35, 16, 0, 38.0, 0, GOLD);   // Plattform
-  for (let i = 0; i < 10; i++) { const a = i / 10 * 6.2832; b.box(.7, .7, .45, Math.cos(a) * 2.35, 38.35, Math.sin(a) * 2.35, S, -a); }   // Zinnen
-  b.cyl(.55, .3, .34, 12, 0, 38.3, 0, IRON); b.cyl(.62, .55, .1, 12, 0, 38.6, 0, GOLD);
-  parts.push({ k: 'flame', pos: [0, 39.4, 0], s: 2.2 });
-  return { geo: b.build(), flags: [], h: 40, parts, smoke: [[0, 40.5, 0]] };
+  b.cyl(1.7, 2.1, 6.5, 16, 0, 1.1, 0, S); b.cyl(1.5, 1.7, 6.5, 16, 0, 7.6, 0, mul(S, 1.04));        // zwei Schaftstücke
+  for (const y of [4, 8, 12]) b.cyl(1.95 - y * .03, 1.95 - y * .03, .3, 16, 0, y, 0, D);              // Bänder
+  for (const y of [3, 6, 9.5, 12]) for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + y; b.box(.14, .6, .1, Math.cos(a) * 1.6, y, Math.sin(a) * 1.6, [40, 36, 34], -a); }   // Schießscharten
+  b.cyl(2.5, 1.5, 1.0, 16, 0, 14.1, 0, mul(S, .9)); b.cyl(2.7, 2.7, .3, 16, 0, 15.0, 0, GOLD);       // Plattform
+  for (let i = 0; i < 10; i++) { const a = i / 10 * 6.2832; b.box(.7, .65, .45, Math.cos(a) * 2.45, 15.3, Math.sin(a) * 2.45, S, -a); }   // Zinnen
+  b.cyl(.55, .3, .34, 12, 0, 15.3, 0, IRON); b.cyl(.62, .55, .1, 12, 0, 15.6, 0, GOLD);
+  parts.push({ k: 'flame', pos: [0, 16.4, 0], s: 1.9 });
+  return { geo: b.build(), flags: [], h: 17, parts, smoke: [[0, 17.4, 0]] };
 }
 function buildSanct() {
   const b = new MB(), parts = [];
@@ -734,7 +733,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = String(o.lv); col = RES_COL[o.k]; up = 2.0; }
       else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = 0x8a2b24; up = 2.4; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; up = 2.2; }
-      else if (o.k === 'tower') { txt = 'Turm'; col = 0x5a6070; up = 34; }
+      else if (o.k === 'tower') { txt = 'Turm'; col = 0x5a6070; up = 19; }
       else if (o.k === 'sanct' || o.k === 'throne') {
         const hd = (view.match.holds || []).find(x => x.id === id);
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
@@ -1053,7 +1052,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const id in this.opObjs) { const q = this.opObjs[id]; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
     if (best) return best;
     for (const id in this.obj) {
-      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 8 : o.k === 'tower' ? 12 : 1;
+      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 8 : o.k === 'tower' ? 6 : 1;
       test('obj', id, o.x + .5, h.grp.position.y + hh, o.y + .5, k);
     }
     return best;
