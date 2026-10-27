@@ -514,7 +514,7 @@ void main(){ vDepth=aDepth; vec4 wp=modelMatrix*vec4(position,1.0); vW=wp.xyz; v
 #include <fog_vertex>
 }`;
 const WATER_FS = `
-uniform float uTime; varying float vDepth; varying vec3 vW;
+uniform float uTime; varying float vDepth; varying vec3 vW; uniform sampler2D uFog;
 #include <fog_pars_fragment>
 float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x), mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)),f.x), f.y); }
@@ -528,6 +528,7 @@ void main(){
   float sp=pow(max(0.0,sin((vW.x+vW.z)*3.2+t*2.4+n*9.0)),40.0)*vn(p*3.0+t*.4); col+=vec3(.7,.78,.78)*sp*(1.0-d*.6);
   float foam=smoothstep(.07,.0,vDepth)*(.55+.45*sin(t*1.4+n*8.0+vW.x*1.5)); col=mix(col,vec3(.95,.98,.96),foam*.8);
   float a=clamp(.55+d*.4,0.0,.96)*smoothstep(-.06,.02,vDepth);
+  float fk=smoothstep(.12,.9,texture2D(uFog,vW.xz/280.0).r); col=mix(vec3(.08,.11,.16),col,fk);
   gl_FragColor=vec4(col,a);
 #include <fog_fragment>
 }`;
@@ -567,23 +568,48 @@ export class WorldMap {
   yAt(tx, ty) { return terrY(this.hAt(tx, ty)); }
   baseY(tx, ty, r = 1) { let m = this.yAt(tx, ty); for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) m = Math.max(m, this.yAt(tx + dx, ty + dy)); return Math.max(m, 0); }
   gtNow() { const w = this.view.world; return w.gt + (Date.now() + this.offset - w.at) / 1000 * this.speed; }
-  exploredBit() { return 1; }   // kein Nebel: die ganze Karte ist sichtbar
+  exploredBit(x, y) { return this.bits ? (this.bits[(y * N + x) >> 3] >> ((y * N + x) & 7)) & 1 : 0; }
+  // Nebel des Krieges: Bitfeld des Spielers -> weich gezeichnete Textur, die Boden, Wasser, Bäume und Gebäude abdunkelt
+  setFog(str) {
+    str = str || ''; if (str === this.fogStr && this.fogTex) return; this.fogStr = str;
+    const b = new Uint8Array(Math.ceil(N * N / 8));
+    try { const raw = atob(str); for (let i = 0; i < raw.length && i < b.length; i++) b[i] = raw.charCodeAt(i); } catch {}
+    this.bits = b;
+    let f = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) f[y * N + x] = this.exploredBit(x, y);
+    for (let pass = 0; pass < 2; pass++) {
+      const g = new Float32Array(N * N);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let a = 0, c = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= N || yy >= N) continue; a += f[yy * N + xx]; c++; } g[y * N + x] = a / c; }
+      f = g;
+    }
+    for (let i = 0; i < N * N; i++) this.fogData[i] = Math.round(f[i] * 255);
+    this.fogTex.needsUpdate = true; this.dirtyLabels = true;
+  }
+  fogPatch(mat) {
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.uFog = this.fogU;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW;').replace('#include <begin_vertex>', '#include <begin_vertex>\n{ vec4 fq = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\nfq = instanceMatrix * fq;\n#endif\nvFW = (modelMatrix * fq).xyz; }');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW; uniform sampler2D uFog;').replace('#include <color_fragment>', '#include <color_fragment>\n{ float fk = smoothstep(.12, .9, texture2D(uFog, vFW.xz / ' + N + '.0).r); diffuseColor.rgb = mix(vec3(.10, .12, .17), diffuseColor.rgb, fk); }');
+    };
+  }
 
   /* ---------- Laden ---------- */
   load(data) {
     const map = generateMap(data.seed); this.map = map; this.seed = data.seed;
     this.roads = new Float32Array(G * G); this.roadCells = new Uint8Array(N * N); this.roadSig = '';
-    this.matVC = new T.MeshLambertMaterial({ vertexColors: true });
+    this.fogData = new Uint8Array(N * N).fill(255); this.fogTex = new T.DataTexture(this.fogData, N, N, T.LuminanceFormat, T.UnsignedByteType); this.fogTex.minFilter = this.fogTex.magFilter = T.LinearFilter; this.fogTex.wrapS = this.fogTex.wrapT = T.ClampToEdgeWrapping; this.fogTex.needsUpdate = true; this.fogU = { value: this.fogTex }; this.fogStr = null;
+    this.matVC = new T.MeshLambertMaterial({ vertexColors: true }); this.fogPatch(this.matVC);
     this.matTerr = new T.MeshLambertMaterial({ vertexColors: true });
     this.matTerr.onBeforeCompile = sh => {
+      sh.uniforms.uFog = this.fogU;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = position;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-varying vec3 vWP;
+varying vec3 vWP; uniform sampler2D uFog;
 float zh(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(zh(i),zh(i+vec2(1.,0.)),f.x), mix(zh(i+vec2(0.,1.)),zh(i+vec2(1.,1.)),f.x), f.y); }`).replace('#include <color_fragment>', `#include <color_fragment>
 { vec2 p = vWP.xz; float a = zn(p*2.3)*.5 + zn(p*6.1)*.3 + zn(p*17.0)*.2; float bl = zn(vec2(p.x*38.0, p.y*7.0)) * zn(vec2(p.x*5.0, p.y*41.0));
   float g = clamp(diffuseColor.g*2.2 - diffuseColor.r*1.2 - diffuseColor.b*.6, 0.0, 1.0);
-  diffuseColor.rgb *= .84 + a*.3 + g*(bl-.25)*.22; diffuseColor.rg += vec2(.012,.02)*g*a; }`);
+  diffuseColor.rgb *= .84 + a*.3 + g*(bl-.25)*.22; diffuseColor.rg += vec2(.012,.02)*g*a; }
+{ float fk = smoothstep(.12, .9, texture2D(uFog, vWP.xz / ${N}.0).r); diffuseColor.rgb = mix(vec3(.10, .12, .17), diffuseColor.rgb, fk); }`);
     };
     this.buildTerrain(map); this.buildWater(); this.buildTrees(map); this.buildObjects(map);
     this.territory = new T.Group(); this.scene.add(this.territory); this.preview = null; this.terrAt = 0; this.terrDirty = true;
@@ -673,7 +699,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     }
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(wp, 3)); g.setAttribute('aDepth', new T.BufferAttribute(dp, 1)); g.setIndex(idx); g.boundingSphere = new T.Sphere(new T.Vector3(N / 2, 0, N / 2), N);
     this.waterMat = new T.ShaderMaterial({ vertexShader: WATER_VS, fragmentShader: WATER_FS, transparent: true, depthWrite: false, fog: true, uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uTime: { value: 0 } }]) });
-    const m = new T.Mesh(g, this.waterMat); m.position.y = -.01; m.renderOrder = 1; this.scene.add(m);
+    this.waterMat.uniforms.uFog = this.fogU; const m = new T.Mesh(g, this.waterMat); m.position.y = -.01; m.renderOrder = 1; this.scene.add(m);
     const sea = new T.Mesh(new T.PlaneGeometry(2400, 2400), new T.MeshBasicMaterial({ color: new T.Color().setRGB(LIN(14), LIN(66), LIN(98)), fog: true }));
     sea.rotation.x = -Math.PI / 2; sea.position.set(N / 2, -.4, N / 2); this.scene.add(sea);
   }
@@ -705,7 +731,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       }
     }
     const geos = { pine: treeGeo('pine'), snow: treeGeo('snow'), oak: treeGeo('oak'), bush: treeGeo('bush'), rock: treeGeo('rock') };
-    const mat = new T.MeshLambertMaterial({ vertexColors: true }), tmp = new T.Matrix4(), col = new T.Color(), q = new T.Quaternion(), e = new T.Euler();
+    const mat = new T.MeshLambertMaterial({ vertexColors: true }); this.fogPatch(mat); const tmp = new T.Matrix4(), col = new T.Color(), q = new T.Quaternion(), e = new T.Euler();
     const GREENS = { pine: [[36, 84, 48], [44, 98, 56], [30, 74, 50]], oak: [[84, 140, 52], [100, 152, 58], [70, 124, 50]], bush: [[76, 120, 56], [92, 134, 60], [66, 108, 52]], snow: [[255, 255, 255], [236, 244, 246], [248, 250, 252]], rock: [[146, 140, 128], [120, 114, 106], [162, 156, 142]] };
     this.treeChunks = []; this.nTrees = 0;
     for (const key in lists) {
@@ -799,7 +825,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 
   /* ---------- Zustand vom Server ---------- */
   sync(view, myId, offset) {
-    this.view = view; this.myId = myId; this.offset = offset || 0; this.speed = view.match.speed;
+    this.view = view; this.myId = myId; this.offset = offset || 0; this.speed = view.match.speed; if (this.fogTex) this.setFog(view.state && view.state.explored);
     const bySlot = {}; for (const p of view.match.players) bySlot[p.slot] = p;
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o;
