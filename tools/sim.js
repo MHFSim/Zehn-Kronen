@@ -4,7 +4,7 @@
 import { syncMatch, addPlayer, command, viewFor, setSpeed, setWeeks, startMatch, pauseMatch, resumeMatch, endMatch, removePlayer } from '/shared/world.js';
 import { newWorld, mapOf, takeNotes } from '/shared/core.js';
 import { cheat } from '/shared/cheat.js';
-const KEY = 'zk-sim-v7';
+const KEY = 'zk-sim-v8';
 const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'[b % 57]).join('');
 let mem = null;
 function load() {
@@ -12,7 +12,7 @@ function load() {
   try { mem = JSON.parse(localStorage.getItem(KEY)); } catch { mem = null; }
   if (!mem || !mem.matches) {
     mem = { seq: 1, adminPass: 'admin', matches: [], players: [], session: { playerId: null, admin: false } };
-    mem.matches.push({ id: mem.seq++, name: 'Testpartie', speed: 10, invite: rnd(10), max_players: 10, created: Date.now(), seed: newSeed(), world: newWorld(Date.now(), { phase: 'running' }) });
+    mem.matches.push({ id: mem.seq++, name: 'Testpartie', speed: 1, invite: rnd(10), max_players: 10, created: Date.now(), seed: newSeed(), world: newWorld(Date.now(), { phase: 'running' }) });
   }
   return mem;
 }
