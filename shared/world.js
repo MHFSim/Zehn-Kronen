@@ -251,6 +251,7 @@ export function command(match, players, player, cmd, now) {
       if (n > (S.troops[u] || 0)) return 'So viele ' + U[u].name + ' hast du nicht zu Hause';
       if (n > 0) troops[u] = n;
     }
+    if (troops.handkarren && sum(troops) === troops.handkarren) return 'Handkarren können nicht allein losziehen – schicke andere Einheiten mit.';
     let target = null;
     if (mode === 'build' || mode === 'garrison' || mode === 'raid') {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';

@@ -457,11 +457,6 @@ function buildUnit(type, col, full) {
       for (let a = 0; a < 4; a++) w.box(.05 * k, 1.1 * k, .05 * k, 0, -.55 * k, 0, WOODC, 0, a * Math.PI / 4);
       legs.push({ g: w.build(), x: sx * 1.2 * k, y: .61 * k, z: .04 * k, s: 0, spin: true });
     }
-  } else if (type === 'ochsen') {
-    horse([120, 84, 56]); body.box(.5, .12, .8, 0, .22, -.75, [140, 100, 60]); body.box(.04, .22, .8, -.25, .34, -.75, WOOD_D); body.box(.04, .22, .8, .25, .34, -.75, WOOD_D);
-    for (const x of [-.3, .3]) body.push(new T.CylinderGeometry(.2, .2, .05, 10), WOOD_D, x, .2, -.75, 0, 1, 1, 1, 0, Math.PI / 2);
-    body.box(.44, .26, .6, 0, .46, -.75, [214, 178, 90]); body.box(.04, .04, .5, 0, .34, -.3, WOOD_D);
-  } else if (type === 'leicht' || type === 'schwer') {
     const heavy = type === 'schwer', steel = [176, 182, 194], boot = heavy ? steel : [70, 52, 40], pant = heavy ? [150, 156, 168] : [110, 90, 70];
     horseModel(body, legs, type, tab); riderTorso(body, type, tab, .64);
     body.push(new T.CylinderGeometry(1, 1.1, .12, 10), tab, 0, .64, -.01, 0, .17, 1, .13);   // Waffenrock
@@ -477,7 +472,7 @@ function buildUnit(type, col, full) {
     }
   }
   const fin = b => { const g = b.build(); return g; };
-  return { legs, body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: VIK_FOOT.includes(type) ? VIK.hip : type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
+  return { legs, body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: VIK_FOOT.includes(type) ? VIK.hip : type === 'leicht' || type === 'schwer' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' };
 }
 
 /* ---------- Bäume (Instanzen) ---------- */
@@ -938,8 +933,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       keep.add(m.id); let s = this.marchObjs[m.id];
       const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
       const tr = m.troops || {}; let n = 0;
-      const ORDER = ['leicht', 'schwer', 'speer', 'schwert', 'bogen', 'armbrust', 'handkarren', 'ochsen'], kinds = [];
-      for (const u of ORDER) if (tr[u] > 0) { n += tr[u]; kinds.push([u, u === 'handkarren' || u === 'ochsen' ? tr[u] * .05 : tr[u]]); }
+      const ORDER = ['leicht', 'schwer', 'speer', 'schwert', 'bogen', 'armbrust', 'handkarren'], kinds = [];
+      for (const u of ORDER) if (tr[u] > 0) { n += tr[u]; kinds.push([u, u === 'handkarren' ? tr[u] * .05 : tr[u]]); }
       if (tr.n != null) { n = tr.n; kinds.length = 0; kinds.push(['speer', n]); }
       if (!kinds.length) kinds.push(['speer', 1]);
       if (!n) n = Object.values(tr).reduce((a, c) => a + c, 0);
@@ -958,7 +953,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         s.sig = sig; for (const u of s.units) s.grp.remove(u.g); s.units = [];
         const rows = []; for (let k = 0; k < figs.length; k += 3) rows.push(figs.slice(k, k + 3));
         rows.forEach((row, r) => row.forEach((type, c) => {
-          const cav = type === 'leicht' || type === 'schwer' || type === 'ochsen', ug = this.unitGeo(type, col, type === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
+          const cav = type === 'leicht' || type === 'schwer', ug = this.unitGeo(type, col, type === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
           const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
           g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);

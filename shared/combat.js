@@ -6,7 +6,7 @@ export const capacityOf = (troops, S) => Math.floor(Object.keys(troops).reduce((
 // Kraft der Truppen eines Spielers (Kriegskunst) als Faktor für Angriff, Verteidigung und Leben
 export const forceOf = S => S ? techMult(S, 'force') : 1;
 export const armySpeed = troops => Math.min(...Object.keys(troops).filter(u => troops[u] > 0).map(u => U[u].s));
-export const forestCostFor = troops => (troops.leicht > 0 || troops.schwer > 0 || troops.handkarren > 0 || troops.ochsen > 0) ? 1.7 : 1.2;
+export const forestCostFor = troops => (troops.leicht > 0 || troops.schwer > 0 || troops.handkarren > 0) ? 1.7 : 1.2;
 
 /* ---------- Banditenlager ---------- */
 export function campTroops(lv) {

@@ -14,8 +14,8 @@ export const B = {
               desc: 'Erzeugt Holz für Gebäude, Speere, Bögen und Rammen.' },
   stein:    { name: 'Steinbruch', x: 1, y: 7, w: 2, unlock: 2, base: [50, 80, 0], time: 10, prod: 'stone',
               desc: 'Erzeugt Stein für Mauer, Truppen und späte Gebäude.' },
-  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80], time: 15, units: ['handkarren', 'ochsen'],
-              desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können. Baut Hand- und Ochsenkarren (Transport).' },
+  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80], time: 15, units: ['handkarren'],
+              desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können. Baut Handkarren (Transport; ziehen nur mit anderen Einheiten los).' },
   kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60], time: 20, units: ['speer', 'schwert'],
               desc: 'Bildet Speerträger und Schwertkämpfer aus. Jede Stufe verkürzt die Ausbildung.' },
   schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 80], time: 25, units: ['bogen', 'armbrust'],
@@ -42,8 +42,7 @@ export const U = {
   armbrust:  mk('Armbrustschütze', 'art',   [35, 20, 25], 420,  60 / 30, 22, [15, 21, 9],  [59, 91, 32], 3, { strong: ['schwert'], good: [], weak: ['leicht'] }),
   leicht:    mk('Lanzenreiter',    'kav',   [40, 20, 40], 720,  60 / 38, 22, [5, 8, 30],   [40, 15, 35], 1, { strong: ['armbrust'], good: ['schwer'], weak: ['speer'] }),
   schwer:    mk('Panzerreiter',    'kav',   [25, 15, 45], 1050, 60 / 38, 22, [24, 15, 21], [59, 27, 36], 5, { strong: ['bogen'], good: ['leicht'], weak: ['schwert'] }),
-  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  60 / 28, 500, null, null, 1),
-  ochsen:    mk('Ochsenkarren',    'trans', [95, 40, 65], 1200, 60 / 28, 2500, null, null, 4)
+  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  60 / 28, 500, null, null, 1)
 };
 
 // Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.
