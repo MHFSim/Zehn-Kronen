@@ -6,6 +6,7 @@ import {
   T, T_MAX, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, SIEGE_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
+import { castleSafe } from '/shared/war.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
@@ -1160,7 +1161,7 @@ function renderMapSheet() {
           if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
           if (friend) body += actionRow('Truppen stationieren', plan, '', free) + `<p class="note">Stationierte Truppen helfen ${esc(p.name)} bei der Verteidigung. Du kannst sie jederzeit zurückrufen (Tab Bündnis). Die Burg nimmt höchstens ${60 * p.rathaus} fremde Truppen auf.</p>`;
           else {
-            const why = p.vassalOf === me.id ? 'Das ist dein Vasall.' : p.vassalOf && isAlly(p.vassalOf) ? 'Dieser Vasall gehört einem Verbündeten.' : prot ? 'Steht unter Schutz.' : view.match.phase !== 'running' ? 'Die Partie läuft nicht.' : '';
+            const why = p.vassalOf === me.id ? 'Das ist dein Vasall.' : p.vassalOf && isAlly(p.vassalOf) ? 'Dieser Vasall gehört einem Verbündeten.' : prot ? 'Steht unter Schutz.' : (() => { const { mt, pls } = siteCtx(); return castleSafe({ match: mt, players: pls }, { id: p.id, state: { pos: p.pos || [o.x, o.y] } }, gtNow()) ? 'Liegt im aktiven Revier ihres Bündnisses – nicht angreifbar.' : ''; })() || (view.match.phase !== 'running' ? 'Die Partie läuft nicht.' : '');
             body += (S.protUntil > gt ? '<p class="why">Wenn du angreifst, endet dein Schutz sofort.</p>' : '')
               + actionRow(armedKey === 'attack' + id ? 'Jetzt wirklich angreifen' : 'Angreifen', plan, why, free, armedKey === 'attack' + id ? 'danger' : '')
               + `<div class="row"><button class="btn ghost" type="button" data-act="spy" data-pid="${p.id}" ${S.res.gold >= 50 ? '' : 'disabled'}>Spähen (50 Gold)</button><span class="note">Der Bericht erscheint unter Berichte.</span></div>`;

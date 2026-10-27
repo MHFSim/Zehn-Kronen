@@ -45,6 +45,7 @@ export function checkLaunch(ctx, me, o, mode, troops) {
     if (tp.state.vassalOf === me.id) return 'Das ist dein Vasall.';
     if (tp.state.vassalOf && allied(w, me.id, tp.state.vassalOf)) return 'Dieser Vasall gehört einem Verbündeten.';
     if (isProtected(tp.state, gt)) return 'Dieser Spieler steht noch unter Schutz (noch ' + fmtDur((tp.state.protUntil - gt) / ctx.match.speed) + ').';
+    if (castleSafe(ctx, tp, gt)) return SAFE_MSG;
     return { target: tp };
   }
   if (mode === 'occupy') {
@@ -53,6 +54,13 @@ export function checkLaunch(ctx, me, o, mode, troops) {
   }
   return 'Unbekannte Marschart';
 }
+
+// Eine Burg im aktiven Revier ihres eigenen Bündnisses ist unangreifbar; nur Burgen außerhalb (oder auf inaktivem Revier) kann man angreifen
+export function castleSafe(ctx, D, gt) {
+  const w = ctx.match.world, al = allianceOf(w, D.id); if (!al) return false;
+  return territory(ctx.match, ctx.players, gt).some(r => r.k === 'op' && r.ready && r.group === 'a' + al.id && D.state.pos[0] >= r.x0 && D.state.pos[0] <= r.x1 && D.state.pos[1] >= r.y0 && D.state.pos[1] <= r.y1);
+}
+const SAFE_MSG = 'Diese Burg liegt im aktiven Revier ihres Bündnisses und ist nicht angreifbar. Nur Burgen auf inaktivem Revier oder ohne Revier kann man angreifen.';
 
 // Feindliche Heere, die gerade auf einem Feld sammeln und angegriffen werden dürfen
 function fieldGatherers(ctx, myId, fid, gt) {
@@ -173,7 +181,7 @@ export function beginSiege(ctx, m, o, bt) {
   let title, text, who = [];
   if (m.mode === 'attack' && o && o.k === 'start') {
     const D = players.find(p => p.state.slot === o.slot);
-    if (!D || D.state.out || allied(w, A.id, D.id) || isProtected(D.state, bt)) return false;
+    if (!D || D.state.out || allied(w, A.id, D.id) || isProtected(D.state, bt) || castleSafe(ctx, D, bt)) return false;
     who = [D.id]; const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) who.push(id);
     title = 'Belagerung deiner Burg!'; text = A.name + tag(w, A.id) + ' steht mit ' + sum(m.troops) + ' Truppen vor der Burg von ' + D.name + '. Der Angriff beginnt in ' + dur + '. Jetzt Truppen heimholen, Verbündete um Verstärkung bitten und die Burg ausbauen.';
     for (const id of who) if (id !== D.id) note(ctx, id, 'attack', 'Belagerung eines Verbündeten', A.name + ' steht vor der Burg von ' + D.name + ', der Angriff beginnt in ' + dur + '. Schick Verstärkung!');
@@ -205,6 +213,7 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   }
   if (allied(w, A.id, D.id)) return turnBack('Ihr seid inzwischen verbündet. Das Heer kehrt um.');
   if (isProtected(D.state, bt)) return turnBack(D.name + ' steht inzwischen unter Schutz. Das Heer kehrt um.');
+  if (castleSafe(ctx, D, bt)) return turnBack('Die Burg von ' + D.name + ' liegt im aktiven Revier ihres Bündnisses. Das Heer kehrt um.');
 
   // Verteidiger: Truppen zu Hause, stationierte Verbündete und die Stadtwache
   const SD = D.state, guard = guardOf(SD), homeStart = { ...SD.troops };
