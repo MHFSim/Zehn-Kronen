@@ -7,7 +7,7 @@ import {
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState
 } from './core.js';
-import { territory, touches, removeOutposts } from './outpost.js';
+import { territory, touchesObj, removeOutposts } from './outpost.js';
 
 export const SANCT_NAMES = ['Heiligtum der Felder', 'Heiligtum der Wälder', 'Heiligtum der Steine', 'Heiligtum der Erze'];
 export const SANCT_RES = ['food', 'wood', 'stone', 'ore'];
@@ -43,7 +43,7 @@ export function checkLaunch(ctx, me, o, mode, troops) {
   }
   if (mode === 'occupy') {
     if (o.k !== 'throne' && o.k !== 'sanct') return 'Dieses Ziel gibt es nicht';
-    if (!touches(territory(ctx.match, ctx.players, gt), groupOf(w, me.id), o.x, o.y)) return 'Dein Revier berührt diesen Ort nicht. Baue Außenposten in seine Richtung (Karte → freies Feld antippen).';
+    if (!touchesObj(territory(ctx.match, ctx.players, gt), groupOf(w, me.id), o)) return 'Dein Revier berührt diesen Ort nicht. Nur Bündnisse können ihr Revier mit Außenposten vergrößern: Baue Außenposten in seine Richtung (Karte → freies Feld antippen).';
     return {};
   }
   return 'Unbekannte Marschart';
@@ -209,7 +209,7 @@ const sumGarr = h => { let t = {}; for (const pid in h.garr) t = merge(t, h.garr
 export function arriveHold(ctx, m, o, bt, realT, back) {
   const { players } = ctx, w = ctx.match.world, A = byId(players, m.owner), group = groupOf(w, A.id), hold = w.holds[o.id];
   const info = { kind: o.k, id: o.id, x: o.x, y: o.y, n: o.n };
-  if (!touches(territory(ctx.match, players, bt), group, o.x, o.y)) {
+  if (!touchesObj(territory(ctx.match, players, bt), group, o)) {
     pushReport(A.state, { kind: 'hold', title: holdName(o) + ': kein Revier', win: false, target: info, text: 'Dein Revier berührt den Ort nicht mehr. Das Heer kehrt um.' }, realT);
     return back();
   }

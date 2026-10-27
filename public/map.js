@@ -4,7 +4,7 @@
 // Die Kamera schwebt schräg über dem Boden: ziehen = verschieben, zwei Finger = zoomen und drehen.
 import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoads } from '/shared/mapgen.js';
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
-import { rectsOf, roadEdgesOf } from '/shared/outpost.js';
+import { rectsOf, roadEdgesOf, dockPad, touches } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
 const CH = 20;                // Blockgröße (Felder)
@@ -183,10 +183,10 @@ function buildThrone() {
   b.cyl(.55, .3, .34, 12, 0, 4.7, 0, IRON); b.cyl(.62, .55, .1, 12, 0, 5.0, 0, GOLD);                // Feuerschale oben
   for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832; b.box(.3, .12, .12, Math.cos(a) * .22, 5.1, Math.sin(a) * .22, WOOD_D, -a); }
   b.box(.9, .22, .9, 0, .84, 0, S); b.box(.75, .42, .75, 0, 1.06, 0, GOLD); b.box(.75, 1.1, .18, 0, 1.2, -.32, GOLD); b.box(.16, .55, .55, -.34, 1.06, 0, GOLD); b.box(.16, .55, .55, .34, 1.06, 0, GOLD); b.box(.5, .12, .5, 0, 1.48, .05, RED);
-  for (const [x, z] of [[-1.4, 2.2], [1.4, 2.2]]) { b.cyl(.14, .18, .5, 8, x, .84, z, IRON); parts.push({ k: 'flame', pos: [x, 1.45 * 2, z], s: 1.1 }); }
-  parts.push({ k: 'flame', pos: [0, 11.6, 0], s: 2.6 }, { k: 'flame', pos: [.15, 11.2, .1], s: 1.8 });   // großes Lagerfeuer auf der Spitze
-  const geo = b.build(); geo.scale(1, 2, 1);                                                          // Thron doppelt so hoch
-  return { geo, flags: [], h: 12.5, parts, smoke: [[-1.4, 3.6, 2.2], [1.4, 3.6, 2.2], [0, 12.4, 0]] };
+  for (const [x, z] of [[-1.4, 2.2], [1.4, 2.2]]) { b.cyl(.14, .18, .5, 8, x, .84, z, IRON); parts.push({ k: 'flame', pos: [x, 1.45 * 4, z], s: 1.1 }); }
+  parts.push({ k: 'flame', pos: [0, 23.2, 0], s: 3.4 }, { k: 'flame', pos: [.2, 22.4, .1], s: 2.4 });   // großes Lagerfeuer auf der Spitze
+  const geo = b.build(); geo.scale(1, 4, 1);                                                          // Thron 4× so hoch wie ursprünglich
+  return { geo, flags: [], h: 25, parts, smoke: [[-1.4, 7.2, 2.2], [1.4, 7.2, 2.2], [0, 24.6, 0]] };
 }
 function buildSanct() {
   const b = new MB(), parts = [];
@@ -723,7 +723,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else if (o.k === 'sanct' || o.k === 'throne') {
         const hd = (view.match.holds || []).find(x => x.id === id);
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
-        col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; up = o.k === 'sanct' ? 3.6 : 13.6;
+        col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; up = o.k === 'sanct' ? 3.6 : 27;
       }
       if (txt !== null && !SHOW_NAMES && !/^\d+$/.test(txt) && o.k !== 'start') txt = null;
       if (txt === null) { if (h.lab) h.lab.el.style.display = 'none'; h.labOn = false; continue; }
@@ -826,6 +826,13 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const r of this.rectList()) {
       const col = r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
       const g = this.rectMesh(r.x0, r.y0, r.x1, r.y1, col, r.ready ? (me ? .2 : .14) : .07, r.ready ? .95 : .5, me ? .32 : .24); this.territory.add(g); this.terrObjs.push(g);
+    }
+    // Weißes Andock-Viereck am Thron; sobald ein Bündnis-Außenposten angedockt hat, in dessen Farbe
+    const th = this.map && this.map.objects.find(o => o.k === 'throne');
+    if (th) {
+      const pad = dockPad(th), rl = this.rectList(), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad));
+      const col = hit ? this.allyColor(Number(hit.group.slice(1)), hit.owner) : 0xffffff;
+      const g = this.rectMesh(th.x - pad, th.y - pad, th.x + pad, th.y + pad, col, hit ? .26 : .3, .98, .4); this.territory.add(g); this.terrObjs.push(g);
     }
     if (this.preview && !this.preview.ghost) {
       const p = this.preview, col = p.ok ? 0x6fe07a : 0xe0594a, g = this.rectMesh(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r, col, .24, .95, .36); this.territory.add(g); this.terrObjs.push(g);
@@ -1034,7 +1041,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const id in this.opObjs) { const q = this.opObjs[id]; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
     if (best) return best;
     for (const id in this.obj) {
-      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 4 : 1;
+      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 8 : 1;
       test('obj', id, o.x + .5, h.grp.position.y + hh, o.y + .5, k);
     }
     return best;

@@ -34,7 +34,10 @@ export function rectsOf(cities, ops, gt) {
 }
 export const overlaps = (a, b, pad = 0) => a.x0 - pad <= b.x1 && b.x0 - pad <= a.x1 && a.y0 - pad <= b.y1 && b.y0 - pad <= a.y1;
 // Berührt ein fertiges Viereck der Gruppe das Feld (tx, ty)? (auch schräg angrenzend)
-export const touches = (rects, group, tx, ty) => rects.some(r => r.ready && r.group === group && tx >= r.x0 - 1 && tx <= r.x1 + 1 && ty >= r.y0 - 1 && ty <= r.y1 + 1);
+export const touches = (rects, group, tx, ty, pad = 1) => rects.some(r => r.ready && r.group === group && tx >= r.x0 - pad && tx <= r.x1 + pad && ty >= r.y0 - pad && ty <= r.y1 + pad);
+// Andockzone eines Ortes: beim Thron ein weißes Viereck (9×9), sonst 1 Feld Rand. Ein Viereck der Gruppe muss sie berühren.
+export const dockPad = o => o.k === 'throne' ? 4 : 1;
+export const touchesObj = (rects, group, o) => touches(rects, group, o.x, o.y, dockPad(o));
 // Liegt das Feld mitten in einem fertigen Viereck der Gruppe?
 export const inside = (rects, group, tx, ty) => rects.some(r => r.ready && r.group === group && tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1);
 // Darf die Gruppe den Außenposten angreifen? Nur wenn ein fertiger eigener Außenposten an ihn angrenzt.
@@ -262,7 +265,7 @@ export function settleTerritory(ctx) {
   const rects = territory(match, players, gt);
   for (const oid of Object.keys(w.holds)) {
     const h = w.holds[oid], o = map.byId[oid];
-    if (touches(rects, h.group, o.x, o.y)) continue;
+    if (touchesObj(rects, h.group, o)) continue;
     const name = o.k === 'throne' ? 'Der Thron' : 'Heiligtum';
     for (const pid of Object.keys(h.garr)) { const P = byId(players, Number(pid)); if (P) { sendHome(ctx, P, h.garr[pid], [o.x, o.y], o.k, o.id); note(ctx, P.id, 'hold', name + ' verloren', 'Euer Revier berührt den Ort nicht mehr. Die Besatzung kehrt heim.'); } }
     delete w.holds[oid];

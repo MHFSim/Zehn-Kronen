@@ -6,7 +6,7 @@ import {
   T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
-import { cityR, checkSite, checkRaid, checkTeleport, touches, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
+import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
@@ -572,12 +572,12 @@ function tutorialHTML() {
   return `<p class="note">${done} von ${steps.length} geschafft.</p>${steps.map(([t, ok, h]) => `<div class="chk ${ok ? 'done' : ''}"><i>${ok ? '✓' : ''}</i><span><b>${t}</b><br><small class="note">${h}</small></span></div>`).join('')}`;
 }
 function rulesHTML() {
-  return `<p class="desc"><b>Ziel:</b> Wer (allein oder als Bündnis) den <b>Thron</b> in der Mitte 7 Tage hält, gewinnt. Sonst gewinnt am Ende der Partie die Gruppe mit den meisten Punkten, oder die letzte, die übrig bleibt.</p>
+  return `<p class="desc"><b>Ziel:</b> Wer den <b>Thron</b> in der Mitte 7 Tage hält, gewinnt. Das geht nur über ein Bündnis: Nur Bündnisse können ihr Revier mit Außenposten bis zum weißen Viereck am Thron vergrößern, wer allein spielt, erreicht ihn nicht. Sonst gewinnt am Ende der Partie die Gruppe mit den meisten Punkten, oder die letzte, die übrig bleibt.</p>
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
   <p class="desc"><b>Revier:</b> Jede Burg und jeder Außenposten beansprucht ein Viereck auf der Karte. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut; den ersten baut der Gründer an seine Burg, danach entfällt das Burg-Viereck. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
-  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Viereck deiner Gruppe den Ort berühren. Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
+  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
@@ -997,7 +997,7 @@ function renderMapSheet() {
     } else if (k === 'sanct' || k === 'throne') {
       const hd = (view.match.holds || []).find(x => x.id === id), plan = planFor(o), gt = gtNow(), g = holdGuard(k), sn = k === 'sanct' ? SANCT[o.n] : null;
       const eff = k === 'sanct' ? `+15 % ${RES_DE[sn[1]]} für den Halter und sein Bündnis` : '+25 % Gold für den Halter und sein Bündnis';
-      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron sieben Tage ohne Unterbrechung hält, gewinnt die Partie – allein oder gemeinsam mit dem Bündnis.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
+      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron sieben Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sie müssen ihr Revier mit Außenposten bis zum weißen Viereck um den Thron vergrößern. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
         <dl class="stats"><dt>Wirkung</dt><dd>${eff}</dd><dt>Halter</dt><dd>${hd ? '<b>' + esc(hd.label) + '</b> seit Tag ' + dayOf(hd.since) : 'frei · Wächter: ' + troopsLine(g.troops) + ' (+' + Math.round((g.mult - 1) * 100) + ' %)'}</dd>
         ${k === 'throne' && hd ? `<dt>Sieg in</dt><dd>${fmtT(real(hd.since + THRONE_HOLD - gt))}</dd>` : ''}${hd && !hd.mine ? `<dt>Besatzung</dt><dd>${fmtN(hd.total)} Einheiten</dd>` : ''}</dl>`;
       if (hd && hd.mine) {
@@ -1011,7 +1011,7 @@ function renderMapSheet() {
           if (!hd) { const sl = sendList(), r = battle(sl, g.troops, g.mult, forceOf(S)); body += `<dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(sum(sl) - sum(r.attLeft))} von ${fmtN(sum(sl))}` : 'Niederlage'}</dd>`; }
           body += '</dl>';
         }
-        const myP = view.match.players.find(p => p.id === me.id), touchOK = touches(wm.rectList(), myP && myP.ally ? 'a' + myP.ally : 'p' + me.id, o.x, o.y);
+        const myP = view.match.players.find(p => p.id === me.id), touchOK = touchesObj(wm.rectList(), myP && myP.ally ? 'a' + myP.ally : 'p' + me.id, o);
         if (!touchOK) body += '<p class="why">Dein Revier (oder das deines Bündnisses) berührt diesen Ort nicht. Baue Außenposten in seine Richtung: freies Feld antippen.</p>';
         body += actionRow(hd && hd.mine ? 'Besatzung verstärken' : hd ? 'Besatzung angreifen' : 'Besetzen', plan, touchOK ? '' : 'Kein Revier an diesem Ort.', free);
         body += '<p class="note">Die Truppen bleiben dort stehen, bis du sie zurückrufst. Verlierst du den Ort, sind sie verloren (zum Teil verwundet).</p>';
