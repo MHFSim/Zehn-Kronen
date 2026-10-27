@@ -672,29 +672,31 @@ function unitOverviewHTML() {
 const TRAIN_B = ['kaserne', 'schiess', 'stall', 'lager'];
 const trainBuilding = () => TRAIN_B.includes(trainTab) ? trainTab : TRAIN_B.find(b => S.lv[b]) || 'kaserne';
 function trainHTML() {
-  const tab = trainBuilding(), b = B[tab], L = S.lv[tab], q = S.train[tab] || [];
   const strip = `<div class="strip"><div><b>${fmtN(troopCount(S))}</b><span>Truppen gesamt</span></div><div><b>${fmtN(queuedTroops(S))}</b><span>in Ausbildung</span></div><div><b>${fmtN(Object.values(S.troops).reduce((a, n) => a + n, 0))}</b><span>daheim</span></div></div>`;
-  let body;
-  if (!L) {
-    const blk = blocker(S, tab);
-    body = `<div class="block"><h3>${b.name} fehlt</h3><p class="note">${esc(b.desc)}</p><p class="note">${blk ? esc(blk) : 'Du kannst sie jetzt bauen.'}</p><div class="row"><button class="btn" type="button" data-act="toCityB" data-b="${tab}">Zum Gebäude</button></div></div>`;
-  } else {
+  const groups = TRAIN_B.map(tab => {
+    const b = B[tab], L = S.lv[tab], q = S.train[tab] || [];
+    if (!L) {
+      const blk = blocker(S, tab);
+      return `<div class="block"><h3>${tabName(tab)}: ${b.name} fehlt</h3><p class="note">${esc(b.desc)}</p><p class="note">${blk ? esc(blk) : 'Du kannst sie jetzt bauen.'}</p><div class="row"><button class="btn" type="button" data-act="toCityB" data-b="${tab}">Zum Gebäude</button></div></div>`;
+    }
     const rows = b.units.map(u => {
       const d = U[u], ok = L >= d.req, n = pick[u] || 10, total = d.cost.map(c => c * n), home = S.troops[u] || 0;
       return `<div class="ucard ${ok ? '' : 'locked'}"><div class="uhead"><div><b>${d.name}</b><small>${fmtN(home)} daheim</small></div><span class="utime">${fmtT(real(unitTime(S, u, tab)))} je Einheit</span></div>
         <div class="ustats">${unitStatsHTML(u)}</div>
         ${ok ? `<div class="uact">${qtyHTML('pick', u, n, 1, MAX_TRAIN_COUNT, 'minus', 'plus')}
-          <button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && q.length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div><div class="costs">${costHTML(total)}</div>` : `<p class="note">Ab ${b.name} Stufe ${d.req}</p>`}</div>`;
+          <button class="btn" type="button" data-act="train" data-u="${u}" data-b="${tab}" ${afford(S, total) && q.length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div><div class="costs">${costHTML(total)}</div>` : `<p class="note">Ab ${b.name} Stufe ${d.req}</p>`}</div>`;
     }).join('');
-    const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
-    body = rows + `<div class="block"><h3>Ausbildungsschleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
-  }
-  return phead('⚔️', 'Ausbilden', `${tabName(tab)}${L ? ' · Stufe ' + L : ''}`) + strip + ptabs(TRAIN_B.map(x => [x, tabName(x), (S.train[x] || []).length]), tab, 'ttab') + body;
+    const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp="${tab}" style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt="${tab}">${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
+    return `<h3 class="tgroup">${tabName(tab)} · ${b.name} Stufe ${L}</h3>` + rows + `<div class="block"><h3>Schleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
+  }).join('');
+  return phead('⚔️', 'Ausbilden', 'Alle Einheiten') + strip + groups;
 }
 function updateTrainPanel() {
   if (panelName !== 'train') return;
-  const o = (S.train[trainBuilding()] || [])[0], p = document.querySelector('[data-tp]'), t = document.querySelector('[data-tt]');
-  if (o && p) { p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
+  for (const tab of TRAIN_B) {
+    const o = (S.train[tab] || [])[0], p = document.querySelector(`[data-tp="${tab}"]`), t = document.querySelector(`[data-tt="${tab}"]`);
+    if (o && p) { p.style.width = (1 - o.left / o.per) * 100 + '%'; if (t) t.textContent = fmtT(real(o.left + (o.count - 1) * o.per)); }
+  }
 }
 
 /* ---------- Forschung (eigenes Menü) ---------- */
@@ -769,7 +771,7 @@ function setupPanel() {
     if (act === 'ttab') { trainTab = d.t; return go(); }
     if (act === 'techGo') return void command({ type: 'research', tech: d.id });
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
-    if (act === 'train') return void command({ type: 'train', id: trainBuilding(), unit: d.u, count: pick[d.u] || 10 });
+    if (act === 'train') return void command({ type: 'train', id: d.b, unit: d.u, count: pick[d.u] || 10 });
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'sub' && d.t === 'reports') return openReports();
