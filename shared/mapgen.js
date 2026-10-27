@@ -247,7 +247,7 @@ export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
 }
 
 // Zeit in Spielsekunden bis zu jedem Wegpunkt. speed = Felder pro Stunde.
-export const MARCH_BOOST = 30;   // Märsche sind 30× schneller als ursprünglich; Reiterei zusätzlich doppelt so schnell, Fußtruppen und Karren 20 % langsamer als die Reiter (Lanzenreiter)
+export const MARCH_BOOST = 60;   // Märsche sind 60× schneller als in der Vorlage; Reiterei doppelt so schnell wie Fußtruppen-Tempo der Vorlage, Fußtruppen 20 % langsamer als der Lanzenreiter
 export function pathTimes(map, path, speed, forestCost) {
   const arr = [0];
   for (let i = 1; i < path.length; i++) {
