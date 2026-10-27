@@ -689,7 +689,9 @@ function trainHTML() {
     const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp="${tab}" style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt="${tab}">${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
     return `<h3 class="tgroup">${tabName(tab)} · ${b.name} Stufe ${L}</h3>` + rows + `<div class="block"><h3>Schleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
   }).join('');
-  return phead('⚔️', 'Ausbilden', 'Alle Einheiten') + strip + groups;
+  const byG = {}; for (const u of Object.keys(U)) { const n = (S.troops[u] || 0) + ((S.away || {})[u] || 0); byG[U[u].g] = (byG[U[u].g] || 0) + n; }
+  const typ = `<div class="strip">${Object.keys(GATT).map(g => `<div><b>${fmtN(byG[g] || 0)}</b><span>${GATT[g]}</span></div>`).join('')}</div>`;
+  return phead('⚔️', 'Ausbilden', 'Alle Einheiten') + strip + typ + groups;
 }
 function updateTrainPanel() {
   if (panelName !== 'train') return;
