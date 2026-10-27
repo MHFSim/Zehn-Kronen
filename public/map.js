@@ -955,9 +955,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const loaded = !!(m.own && m.load && Object.values(m.load).some(v => v > 0)), sig = figs.join(',') + col + (loaded ? 'F' : '');
       if (!s) {
         const grp = new T.Group(); this.scene.add(grp);
-        const pole = new T.Mesh(new T.CylinderGeometry(.02, .02, 1.5, 5), new T.MeshLambertMaterial({ color: 0x4a3624 })); pole.position.set(0, .75, -.1); grp.add(pole);
-        const flag = new T.Mesh(this.flagGeo.clone(), new T.MeshLambertMaterial({ color: 0xffffff, side: T.DoubleSide })); flag.position.set(0, 1.4, -.1); flag.scale.setScalar(.7); flag.userData.base = flag.geometry.attributes.position.array.slice(); grp.add(flag);
-        s = this.marchObjs[m.id] = { grp, flag, units: [], lab: this.mkBadge('', 0x2a2f38) }; s.lab.el.classList.add('march');
+        s = this.marchObjs[m.id] = { grp, units: [], lab: this.mkBadge('', 0x2a2f38) }; s.lab.el.classList.add('march');
       }
       s.m = m; s.col = col;
       if (s.sig !== sig) {
@@ -968,10 +966,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
           const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
           g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
-          s.units.push({ g, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.5 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
+          const rr = (type === 'handkarren' ? .42 : cav ? .4 : .3) / g.scale.x, ring = new T.Mesh(new T.RingGeometry(rr * .86, rr, 28), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); ring.rotation.x = -Math.PI / 2; ring.position.y = .04 / g.scale.x; ring.renderOrder = 2; g.add(ring);
+          s.units.push({ g, ring, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.5 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
         }));
       }
-      s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
+      for (const u of s.units) u.ring.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
       s.pre = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
       this.setBadge(s.lab, this.badgeTxt(s, this.gtNow()), 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
     }
@@ -1175,7 +1174,6 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
           u.g.rotation.y = Math.hypot(ddx, ddz) > .01 ? Math.atan2(ddx, ddz) : (u.hd || 0); u.hd = u.g.rotation.y;
         } else { u.g.position.set(u.rx, bob, u.rz); u.g.rotation.y = 0; }
       });
-      this.waveFlags([s.flag], t);
       if (t - (s.lt || 0) > .5) { s.lt = t; const bt = this.badgeTxt(s, gt); if (bt !== s.bt) { s.bt = bt; this.setBadge(s.lab, bt, 0x2a2f38); } }
       if (m.own || (this.sel && this.sel.type === 'march' && this.sel.id === m.id)) {
         const pts = [[p.x, p.y]]; for (let i = p.i + 1; i < m.path.length; i++) { const [x, yy] = cellXY(m.path[i]); pts.push([x + .5, yy + .5]); }
