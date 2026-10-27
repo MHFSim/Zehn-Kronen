@@ -113,6 +113,12 @@ async function load() {
   }).join('') : '<p class="note">Noch keine Partie. Erstelle oben die erste.</p>';
 }
 
+let sayT = 0;
+function say(t, ms = 6000) {   // statt alert/prompt (in eingebetteten Seiten oft blockiert)
+  let b = document.getElementById('adminSay');
+  if (!b) { b = document.createElement('div'); b.id = 'adminSay'; b.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;z-index:99;background:#432d19;color:#f8ebc4;border:1px solid #c99a3d;border-radius:10px;padding:10px 12px;font-weight:700;user-select:text;-webkit-user-select:text'; b.onclick = () => { b.hidden = true; }; document.body.appendChild(b); }
+  b.textContent = t; b.hidden = false; clearTimeout(sayT); sayT = setTimeout(() => { b.hidden = true; }, ms);
+}
 document.addEventListener('toggle', e => { const d = e.target; if (d.classList && d.classList.contains('cheats')) cheatOpen[d.dataset.id] = d.open; }, true);
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-cheat]'); if (!el) return;
@@ -154,10 +160,10 @@ $('matches').addEventListener('click', async e => {
   }
   if (act === 'resetpw') {
     const r = await api('/api/admin/match', { action: 'resetpw', playerId: id });
-    if (r.ok) prompt('Neues Passwort (bitte dem Spieler weitergeben):', r.data.password); else alert(r.data.error || 'Fehler');
+    say(r.ok ? 'Neues Passwort (bitte dem Spieler weitergeben): ' + r.data.password : (r.data.error || 'Fehler'), r.ok ? 60000 : 6000);
     return;
   }
-  if (act === 'start' || act === 'pause' || act === 'resume') { const r = await api('/api/admin/match', { action: act, id }); if (!r.ok) alert(r.data.error || 'Fehler'); return load(); }
+  if (act === 'start' || act === 'pause' || act === 'resume') { const r = await api('/api/admin/match', { action: act, id }); if (!r.ok) say(r.data.error || 'Fehler'); return load(); }
   if (act === 'weeks') { await api('/api/admin/match', { action: 'weeks', id, weeks: $('wk' + id).value }); return load(); }
   if (act === 'kick' || act === 'delete' || act === 'end') {
     const k = (act === 'kick' ? 'k' : act === 'end' ? 'e' : 'd') + id;

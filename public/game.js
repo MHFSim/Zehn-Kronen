@@ -622,7 +622,7 @@ function rulesHTML() {
 let devOk = false; try { devOk = sessionStorage.getItem('zk-dev') === '1'; } catch {}
 function devHTML() {
   if (!devOk) return '<div class="field"><label for="devPw">Passwort</label><input id="devPw" type="password" autocomplete="off"></div><div class="row"><button class="btn" type="button" data-act="devUnlock">Freischalten</button><span class="note" id="devMsg"></span></div>';
-  return '<p class="note">Nur für die Testversion.</p><div class="row"><button class="btn" type="button" data-act="devTools">🛠 Testwerkzeuge</button><button class="btn ghost" type="button" data-act="devAdmin">Admin</button></div>';
+  return '<p class="note">Nur für die Testversion.</p><div class="row"><button class="btn" type="button" data-act="devTools">' + (document.body.classList.contains('dev-tools') ? '🛠 Testwerkzeuge ausblenden' : '🛠 Testwerkzeuge einblenden') + '</button><button class="btn ghost" type="button" data-act="devAdmin">Admin</button></div>';
 }
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
@@ -783,7 +783,7 @@ function setupPanel() {
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'devUnlock') { if (val('devPw') === 'Bailey') { devOk = true; try { sessionStorage.setItem('zk-dev', '1'); } catch {} return go(); } const mm = $('devMsg'); if (mm) mm.textContent = 'Falsches Passwort.'; return; }
-    if (act === 'devTools') { closePanel(); document.body.classList.add('dev-tools'); const bx = document.getElementById('zkToolsBox'); if (bx && bx.hidden) document.getElementById('zkToolsBtn').click(); return; }
+    if (act === 'devTools') { closePanel(); const on = !document.body.classList.contains('dev-tools'); document.body.classList.toggle('dev-tools', on); const bx = document.getElementById('zkToolsBox'); if (on && bx && bx.hidden) document.getElementById('zkToolsBtn').click(); return; }
     if (act === 'devAdmin') { closePanel(); document.getElementById('swap').click(); return; }
     if (act === 'sub' && d.t === 'reports') return openReports();
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }

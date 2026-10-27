@@ -123,7 +123,7 @@ const routes = {
     if (err) return R(400, { error: err });
     takeNotes(m); db.rev = (db.rev || 0) + 1;
     if (!db.players.some(p => p.id === db.session.playerId)) db.session.playerId = null;
-    store(); return R(200, { ok: true });
+    store(); if (window.zkRefresh) setTimeout(window.zkRefresh, 0); return R(200, { ok: true });
   }
 };
 const realFetch = window.fetch.bind(window);
