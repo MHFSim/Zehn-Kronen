@@ -610,6 +610,16 @@ export class WorldMap {
     for (const id in this.obj) { const h = this.obj[id], o = h.o, own = o.k === 'start' && h.player && h.player.id === this.myId; h.fogHide = !own && !this.exploredBit(o.x, o.y); h.grp.visible = !h.fogHide; }
     for (const id in this.opObjs) { const q = this.opObjs[id]; q.fogHide = !this.exploredBit(q.o.x, q.o.y); q.grp.visible = !q.fogHide; }
   }
+  fogDepthMat() {   // Schatten versteckter Bäume entfallen ebenfalls
+    if (this._fdm) return this._fdm;
+    const m = this._fdm = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uFog = this.fogU;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW;').replace('#include <begin_vertex>', '#include <begin_vertex>\n{ vec4 fq = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\nfq = instanceMatrix * fq;\n#endif\nvFW = (modelMatrix * fq).xyz; }');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFW; uniform sampler2D uFog;').replace('void main() {', 'void main() {\n  if (smoothstep(.12, .9, texture2D(uFog, vFW.xz / ' + N + '.0).r) < .55) discard;');
+    };
+    return m;
+  }
   fogPatch(mat) {
     mat.onBeforeCompile = sh => {
       sh.uniforms.uFog = this.fogU;
@@ -761,7 +771,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const GREENS = { pine: [[36, 84, 48], [44, 98, 56], [30, 74, 50]], oak: [[84, 140, 52], [100, 152, 58], [70, 124, 50]], bush: [[76, 120, 56], [92, 134, 60], [66, 108, 52]], snow: [[255, 255, 255], [236, 244, 246], [248, 250, 252]], rock: [[146, 140, 128], [120, 114, 106], [162, 156, 142]] };
     this.treeChunks = []; this.nTrees = 0;
     for (const key in lists) {
-      const [kind, cc] = key.split('|'), arr = lists[key], im = new T.InstancedMesh(geos[kind], mat, arr.length);
+      const [kind, cc] = key.split('|'), arr = lists[key], im = new T.InstancedMesh(geos[kind], mat, arr.length); im.customDepthMaterial = this.fogDepthMat();
       let cx = 0, cz = 0, mx = 0;
       arr.forEach((a, i) => {
         const [x, y, s, rot, , vr] = a, yy = this.yAt(x, y); q.setFromEuler(e.set(0, rot, 0));
