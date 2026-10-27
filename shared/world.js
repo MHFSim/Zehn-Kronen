@@ -233,6 +233,18 @@ export function command(match, players, player, cmd, now) {
   if (!cmd || typeof cmd !== 'object') return 'Ungültiger Befehl';
   if (cmd.type === 'readReports') { S.reports.forEach(r => { r.read = true; }); return ''; }
   if (cmd.type === 'readFeed') { S.feedSeen = S.nextFeed - 1; return ''; }
+  if (cmd.type === 'globalChat') {   // Weltchat: alle Spieler der Partie
+    if (S.out) return 'Du bist ausgeschieden.';
+    const text = String(cmd.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!text) return 'Leere Nachricht.';
+    w.chat = w.chat || []; w.nextMsg = w.nextMsg || 1;
+    const nowT = Math.round(ctx.realT || ctx.now || Date.now()), last = [...w.chat].reverse().find(m => m.pid === player.id);
+    if (last && nowT - last.t < 1500) return 'Bitte etwas langsamer.';
+    const al = allianceOf(w, player.id);
+    w.chat.push({ id: w.nextMsg++, t: nowT, pid: player.id, name: player.name, tag: al ? al.tag : '', text });
+    if (w.chat.length > 100) w.chat.splice(0, w.chat.length - 100);
+    return '';
+  }
   if (S.out) return 'Du bist ausgeschieden und kannst die Partie nur noch verfolgen.';
   if (w.phase === 'ended') return 'Die Partie ist beendet.';
   if (typeof cmd.type === 'string' && cmd.type.startsWith('ally')) return socialCommand(ctx, player, cmd);
@@ -410,7 +422,7 @@ export function viewFor(match, players, me, now) {
       alliances: Object.values(w.alliances).map(a => ({ id: a.id, name: a.name, tag: a.tag, leader: a.leader, members: a.members, color: a.color || '' })),
       holds, chron: w.chron.slice(0, 40), result: w.result, ranking: rankingOf(match, players)
     },
-    ally, invites: mineInv, requests: myReq, incoming, sieges, myStations,
+    ally, invites: mineInv, requests: myReq, incoming, sieges, gchat: (w.chat || []).slice(-60), myStations,
     state: S,
     world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches, outposts }
   };

@@ -32,9 +32,38 @@ function accept(v) {
   if (typeof $ === 'function' && !$('game').hidden) afterAccept();
 }
 function afterAccept() {
-  try { checkFeed(); renderBanner(); renderNav(); renderPanel(false); if (match.result) showEnd(); } catch (e) { console.error(e); }
+  try { renderChat(); checkFeed(); renderBanner(); renderNav(); renderPanel(false); if (match.result) showEnd(); } catch (e) { console.error(e); }
 }
 const serverNow = () => Date.now() + offset;
+
+/* ---------- Chat auf der Karte: Global oder Bündnis ---------- */
+let chatOpen = false, chatTab = 'global', chatSeen = { global: 0, ally: 0 };
+const chatList = t => t === 'ally' ? ((view && view.ally && view.ally.chat) || []) : ((view && view.gchat) || []);
+function chatUnread() { return ['global', 'ally'].reduce((n, t) => n + chatList(t).filter(m => m.id > chatSeen[t] && m.pid !== (me && me.id)).length, 0); }
+function renderChat() {
+  const btn = $('chatBtn'), pop = $('chatPop'); if (!btn || !pop || !view) return;
+  const alOk = !!(view.ally);
+  if (chatTab === 'ally' && !alOk) chatTab = 'global';
+  const list = chatList(chatTab);
+  if (chatOpen) { const l = list.length ? list[list.length - 1].id : 0; if (l > chatSeen[chatTab]) chatSeen[chatTab] = l; }
+  const un = chatOpen ? 0 : chatUnread(), bd = $('chatBadge'); if (bd) { bd.textContent = un; bd.hidden = !un; }
+  pop.hidden = !chatOpen; if (!chatOpen) return;
+  const msgs = list.map(c => `<div class="msg ${c.pid === me.id || c.name === me.name ? 'mine' : ''}"><b>${c.tag ? '[' + esc(c.tag) + '] ' : ''}${esc(c.name)}</b><small>${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<p class="note">Noch keine Nachrichten. Schreib die erste!</p>';
+  let box = $('chatMsgs');
+  if (!box || pop.dataset.tab !== chatTab) {
+    pop.dataset.tab = chatTab;
+    const keep = $('chatIn') ? $('chatIn').value : '';
+    pop.innerHTML = `<div class="ctabs"><button type="button" data-ct="global" class="${chatTab === 'global' ? 'on' : ''}">Global</button><button type="button" data-ct="ally" class="${chatTab === 'ally' ? 'on' : ''}" ${alOk ? '' : 'disabled'}>Bündnis</button><button type="button" class="x" data-ct="close" aria-label="Schließen">✕</button></div><div class="msgs" id="chatMsgs"></div><div class="chatform"><input id="chatIn" maxlength="${chatTab === 'ally' ? 300 : 200}" placeholder="${chatTab === 'ally' ? 'Nachricht an das Bündnis' : 'Nachricht an alle'}" autocomplete="off"><button class="btn small" type="button" data-ct="send">Senden</button></div>`;
+    $('chatIn').value = keep; box = $('chatMsgs'); box.innerHTML = msgs; box.scrollTop = box.scrollHeight; return;
+  }
+  if (box.dataset.sig !== msgs) { const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 8; box.innerHTML = msgs; box.dataset.sig = msgs; if (atEnd) box.scrollTop = box.scrollHeight; }
+}
+function setupChat() {
+  $('chatBtn').addEventListener('click', () => { chatOpen = !chatOpen; renderChat(); if (chatOpen) { const b = $('chatMsgs'); if (b) b.scrollTop = b.scrollHeight; } });
+  const send = async () => { const i = $('chatIn'), t = i.value.trim(); if (!t) return; const ok = await command({ type: chatTab === 'ally' ? 'allyChat' : 'globalChat', text: t }); if (ok) { i.value = ''; renderChat(); const b = $('chatMsgs'); if (b) b.scrollTop = b.scrollHeight; } };
+  $('chatPop').addEventListener('click', e => { const b = e.target.closest('[data-ct]'); if (!b) return; const k = b.dataset.ct; if (k === 'close') { chatOpen = false; return renderChat(); } if (k === 'send') return void send(); chatTab = k; renderChat(); });
+  $('chatPop').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'chatIn') { e.preventDefault(); send(); } });
+}
 
 /* ---------- Anmeldung und Beitritt ---------- */
 const params = new URLSearchParams(location.search);
@@ -1362,7 +1391,7 @@ async function resync() {
 function startGame() {
   $auth.hidden = true; $('game').hidden = false; document.body.classList.add('playing');
   $('matchName').textContent = match.name;
-  setupSheet(); setupModal(); setupPlace(); setupNav(); setupCity(); setupPanel(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
+  setupSheet(); setupModal(); setupPlace(); setupNav(); setupCity(); setupPanel(); setupChat(); live = true; renderNav(); renderTop(); renderHud(); renderCity(true);
   connect(); afterAccept();
   setInterval(resync, 60000);
   window.zkRefresh = resync;

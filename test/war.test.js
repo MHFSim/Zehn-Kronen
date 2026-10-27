@@ -20,6 +20,16 @@ const run = (match, players, c, p, cmd) => command(match, players, p, cmd, c);
 // Bündnisgröße: Hälfte der Spieler plus eins
 assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
 
+// ---- Weltchat ----
+{
+  const { match, players } = mk(2); const [a, b] = players;
+  assert.equal(run(match, players, clock, a, { type: 'globalChat', text: '  Hallo   Welt ' }), '');
+  assert.match(run(match, players, clock, a, { type: 'globalChat', text: 'zu schnell' }), /langsamer/);
+  assert.equal(run(match, players, clock + 5000, b, { type: 'globalChat', text: 'Moin' }), '');
+  assert.match(run(match, players, clock, b, { type: 'globalChat', text: '   ' }), /Leere/);
+  const v = viewFor(match, players, a, clock); assert.deepEqual(v.gchat.map(m => m.text), ['Hallo Welt', 'Moin']);
+}
+
 // ---- Lobby: Zeit steht, Befehle gesperrt, Start gibt Schutz ----
 {
   const { match, players } = mk(2, { phase: 'lobby' });

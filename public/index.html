@@ -424,6 +424,21 @@ body.sheet-open .sheet.popup{transform:translate(-50%,0) scale(1);opacity:1;poin
 .panel .train-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px dashed var(--line)}
 .panel .prog{flex:1}
 body.mode-map .brand{display:none}
+#chatBtn{display:none;position:fixed;z-index:7;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(var(--nav) + 56px);width:44px;height:44px;border-radius:50%;border:1px solid var(--brass);background:var(--panel-2);color:var(--ink);font-size:21px;align-items:center;justify-content:center;box-shadow:0 2px 8px #0006}
+body.mode-map #chatBtn{display:flex}
+body.mode-map.sheet-open #chatBtn,body.mode-map.reports-open #chatBtn{display:none}
+#chatBtn .badge{position:absolute;top:-4px;right:-4px}
+#chatPop{position:fixed;z-index:12;left:50%;transform:translateX(-50%);bottom:calc(var(--nav) + 8px);width:min(94vw,520px);max-height:60%;display:flex;flex-direction:column;gap:8px;padding:10px;background:linear-gradient(180deg,#f9f1d8,#efe1b9);color:#2e2012;border:1px solid #c99a3d;border-radius:16px;box-shadow:0 -4px 24px #0008}
+#chatPop[hidden]{display:none}
+#chatPop .ctabs{display:flex;gap:6px;align-items:center}
+#chatPop .ctabs button{flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid #8a5412;background:#f6edd2;color:#2e2012;font-weight:700;font-size:13px}
+#chatPop .ctabs button.on{background:#8a5412;color:#fff6dc}
+#chatPop .ctabs .x{margin-left:auto;background:none;border:none;font-size:18px}
+#chatPop .msgs{height:min(34vh,260px);max-height:none;background:#fffaf0;border-color:#c9b27f}
+#chatPop .msg{background:#f6edd2;border:1px solid #c9b27f;border-radius:10px;padding:5px 9px;color:#2e2012}
+#chatPop .msg b{color:#7a4a10}#chatPop .msg small{color:#6d5a3b}
+#chatPop .msg.mine{margin-left:auto;background:#f3e2b3}
+#chatPop input{color:#1b1712;background:#fffaf0;border:1px solid #8a7447}
 </style>
 </head>
 <body>
@@ -467,6 +482,8 @@ body.mode-map .brand{display:none}
   <section class="panel" id="sidePanel" hidden><div class="sheet-inner" id="sidePanelInner"></div></section>
   <div class="modal" id="modal" hidden><div class="modal-in" id="modalIn"></div></div>
   <div class="loading" id="loading" hidden>Karte wird gemalt …</div>
+  <button type="button" id="chatBtn" aria-label="Chat">💬<span class="badge" id="chatBadge" hidden>0</span></button>
+  <div id="chatPop" hidden></div>
   <nav class="nav" id="nav" aria-label="Ansicht">
     <button type="button" data-nav="city" class="on"><i aria-hidden="true">🏰</i><span>Stadt</span></button>
     <button type="button" data-nav="tech"><i aria-hidden="true">🎓</i><span>Akademie</span></button>
