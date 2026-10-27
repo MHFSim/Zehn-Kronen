@@ -1036,18 +1036,19 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const g of this.terrObjs) { this.territory.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     this.terrObjs = []; if (!this.view) return;
     const mine = this.view.match.players.find(p => p.id === this.myId), myG = mine ? (mine.ally ? 'a' + mine.ally : 'p' + mine.id) : '';
-    const buckets = new Map();
-    for (const r of this.rectList()) { const on = !!(r.ready || r.off), key = r.group + '|' + (r.off ? 'o' : on ? 'r' : 'b'); let b = buckets.get(key); if (!b) buckets.set(key, b = { r, on, rs: [] }); b.rs.push(r); }
+    const buckets = new Map(), rl = this.rectList();
+    const put = (r, rect) => { const on = !!(r.ready || r.off), key = r.group + '|' + (r.off ? 'o' : on ? 'r' : 'b'); let bk = buckets.get(key); if (!bk) buckets.set(key, bk = { r, on, rs: [] }); bk.rs.push(rect); };
+    for (const r of rl) put(r, r);
+    // Andock-Vierecke an Thron und Türmen: verbunden mit einem Bündnisrevier werden sie mit diesem zu einer Fläche (ohne Überlappung), sonst weiß
+    const free = [];
+    for (const th of this.map.objects.filter(o => o.k === 'throne' || o.k === 'tower' || o.k === 'sanct')) {
+      const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad)), rect = { x0: th.x - pad, y0: th.y - pad, x1: th.x + pad, y1: th.y + pad };
+      if (hit) put(hit, rect); else if (th.k !== 'sanct') free.push(rect);
+    }
+    if (free.length) put({ group: 'free', ready: true, off: true }, free[0]), free.slice(1).forEach(f => put({ group: 'free', ready: true, off: true }, f));
     for (const { r, on, rs } of buckets.values()) {
       const col = r.off ? 0xffffff : r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
       const g = this.unionMesh(rs, col, on ? (me ? .12 : .08) : .04, on ? .55 : .35, me ? .2 : .15); this.territory.add(g); this.terrObjs.push(g);
-    }
-    // Weiße Andock-Vierecke an Thron und Türmen; sobald ein Bündnis-Außenposten angedockt hat, in dessen Farbe
-    const rl = this.rectList();
-    for (const th of this.map.objects.filter(o => o.k === 'throne' || o.k === 'tower')) {
-      const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad));
-      const col = hit ? this.allyColor(Number(hit.group.slice(1)), hit.owner) : 0xffffff;
-      const g = this.rectMesh(th.x - pad, th.y - pad, th.x + pad, th.y + pad, col, hit ? .16 : .18, .7, .26); this.territory.add(g); this.terrObjs.push(g);
     }
     if (this.preview && !this.preview.ghost) {
       const p = this.preview, col = p.ok ? 0x6fe07a : 0xe0594a, g = this.rectMesh(p.x - p.r, p.y - p.r, p.x + p.r, p.y + p.r, col, .24, .95, .36); this.territory.add(g); this.terrObjs.push(g);

@@ -15,7 +15,7 @@ import { buildingImage } from '/public/art.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
-let sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
+let sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -258,17 +258,17 @@ function openSheet(id) { msel = null; sel = id; document.body.classList.add('she
 // Hinweisleiste, solange ein Heer ein neues Ziel bekommt (wie in Rise of Kingdoms: Ziel antippen, das Heer zieht sofort los)
 function syncMoveBar() {
   let el = $('moveBar');
-  if (!sendFrom) { if (el) el.hidden = true; return; }
-  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span>➜ Ziel antippen – das Heer zieht sofort los</span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
+  if (!sendFrom && !sendFromOp) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span>➜ Ziel antippen – das Heer zieht sofort los</span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
   el.hidden = false;
 }
 function closeSheet() { sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
 
 async function command(cmd) {
   if (busy) return false; busy = true;
-  const moved = sendFrom && cmd.type === 'march'; if (moved) cmd = { ...cmd, from: sendFrom };
+  const moved = (sendFrom || sendFromOp) && cmd.type === 'march'; if (moved) cmd = sendFrom ? { ...cmd, from: sendFrom } : { ...cmd, fromOp: sendFromOp, troops: Object.keys(cmd.troops || {}).length ? cmd.troops : sendOpAll() };
   const r = await api('/api/cmd', cmd).catch(() => ({ ok: false, data: { error: 'Keine Verbindung zum Server.' } }));
-  busy = false; if (moved) { sendFrom = 0; syncMoveBar(); }
+  busy = false; if (moved) { sendFrom = 0; sendFromOp = ''; syncMoveBar(); }
   if (r.data && r.data.state) accept(r.data);
   if (!r.ok) toast(r.data.error || 'Das hat nicht geklappt.');
   renderSheet(); renderTop(); renderHud(); renderNav(); renderCity(true); renderBanner(); renderPanel(true);
@@ -278,7 +278,7 @@ function setupSheet() {
   $('sheetInner').addEventListener('click', async e => {
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
-    if (act === 'close') { sendFrom = 0; syncMoveBar(); return closeSheet(); }
+    if (act === 'close') { sendFrom = 0; sendFromOp = ''; syncMoveBar(); return closeSheet(); }
     if (act === 'toTech') { closeSheet(); return openPanel('tech'); }
     if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
@@ -936,14 +936,15 @@ function healHTML() {
 function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
   const hit = wm.pickAt(sx, sy);
-  if (!hit && sendFrom) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
+  if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
   if (!hit) { closeSheet(); return; }
   selectMap(hit, false);
 }
 function selectMap(hit, keepSend) {
   placing = false; 
   sel = null; msel = hit; wm.select(hit);
-  if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); send = sm ? { ...sm.troops } : {}; }
+  if (sendFromOp) send = sendOpAll();
+  else if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); send = sm ? { ...sm.troops } : {}; }
   else if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; autoSend(hit); }
   document.body.classList.add('sheet-open');
   if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; revealMap(o.x + .5, o.y + .5); }
@@ -973,14 +974,17 @@ function mapSignature() {
   const w = view.world, id = msel.id;
   return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
 }
+function sendOpAll() { const q = (view.world.outposts || []).find(x => x.id === sendFromOp), g = q && q.garr ? q.garr[me.id] : null; return g ? { ...g } : {}; }
 function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
 function planFor(o) {
+  if (sendFromOp) { const t0 = sendOpAll(), q = (view.world.outposts || []).find(x => x.id === sendFromOp); if (!q || !sum(t0)) return null; const k0 = o.id + 'op' + sendFromOp + JSON.stringify(t0) + wm.roadSig.length; if (planCache.key !== k0) planCache = { key: k0, plan: planFrom(wm.map, [q.x, q.y], o.x, o.y, t0, S) }; return planCache.plan; }
   const t = sendList(), key = o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
   if (!sum(t)) return null;
   if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, sm.phase === 'post' ? cellXY(sm.path[sm.path.length - 1]) : (q => [Math.floor(q.x), Math.floor(q.y)])(marchPos(sm, gtNow())), o.x, o.y, t, S) : planMarch(wm.map, S, o, t) }; }
   return planCache.plan;
 }
 function pickerHTML() {
+  if (sendFromOp) return `<div class="block picker"><h3>Besatzung weiterschicken</h3><p class="note">${troopsLine(sendOpAll())} ziehen vom Außenposten zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`;
   if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); return `<div class="block picker"><h3>Aufgestelltes Heer weiterschicken</h3><p class="note">${sm ? (sm.troops.n != null ? fmtN(sm.troops.n) + ' Einheiten' : troopsLine(sm.troops)) : ''} ziehen von ihrem Standort zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`; }
   const us = Object.keys(U).filter(u => S.troops[u] > 0);
   if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
@@ -996,7 +1000,7 @@ function siteCtx() {
 }
 const opOwnerName = o => { const a = (view.match.alliances || []).find(x => x.id === o.al); return a ? '[' + a.tag + '] ' + a.name : '?'; };
 function siteSheet(w) {
-  const { mt, pls } = siteCtx(), gt = gtNow(), al = view.ally, free = sendFrom || ownMarches().length < armySlots(S), st = al ? al.store : null;
+  const { mt, pls } = siteCtx(), gt = gtNow(), al = view.ally, free = sendFrom || sendFromOp || ownMarches().length < armySlots(S), st = al ? al.store : null;
   const mineN = (w.outposts || []).filter(o => o.mine).length;
   let why = checkSite(mt, pls, { id: me.id }, msel.x, msel.y, gt);
   if (!why && view.match.phase !== 'running') why = 'Die Partie läuft nicht.';
@@ -1030,7 +1034,7 @@ function siteSheet(w) {
 }
 function opSheet(w) {
   const o = (w.outposts || []).find(x => x.id === msel.id); if (!o) return '';
-  const gt = gtNow(), ready = opReady(o, gt), g = opGuard(), free = sendFrom || ownMarches().length < armySlots(S);
+  const gt = gtNow(), ready = opReady(o, gt), g = opGuard(), free = sendFrom || sendFromOp || ownMarches().length < armySlots(S);
   wm.setPreview(null);
   const names = id => pname(id);
   let body = `<dl class="stats"><dt>Gehört</dt><dd>${esc(opOwnerName(o))}</dd><dt>Revier</dt><dd>${2 * OP_R + 1}×${2 * OP_R + 1} Felder</dd>
@@ -1044,7 +1048,7 @@ function opSheet(w) {
     const mineG = (o.garr || {})[me.id], others = (w.outposts || []).filter(x => x.mine && x.id !== o.id && opReady(x, gt));
     body += pickerHTML() + actionRow('Truppen hierher schicken', planFor({ id: o.id, x: o.x, y: o.y }), '', free, '', 'garrison');
     if (mineG && sum(mineG)) {
-      body += `<div class="block"><h3>Deine Truppen hier</h3><div class="row"><button class="btn ghost" type="button" data-act="opRecall">Alle abziehen</button></div>`
+      body += `<div class="block"><h3>Deine Truppen hier</h3><div class="row"><button class="btn" type="button" data-act="opSend">Weiterschicken</button><button class="btn ghost" type="button" data-act="opRecall">Alle abziehen</button></div>`
         + (others.length ? `<p class="note">Oder zu einem anderen Außenposten schicken:</p><div class="row">${others.map(x => `<button class="btn ghost small" type="button" data-act="opMove" data-to="${x.id}">Nach ${x.x} | ${x.y}</button>`).join('')}</div>` : '') + '</div>';
     }
     body += `<div class="row"><button class="btn ${armedKey === 'opdis' + o.id ? 'danger' : 'ghost'}" type="button" data-act="opDis">${armedKey === 'opdis' + o.id ? 'Wirklich abreißen' : 'Abreißen'}</button></div><p class="note">Beim Abreißen kehren alle Besatzungen heim und ein Teil der Kosten fließt ins Bündnislager zurück.</p>`;
@@ -1090,7 +1094,7 @@ function renderMapSheet() {
     if (!h) { closeSheet(); return; }
   } else {
     wm.setPreview(null);
-    const o = wm.map.byId[msel.id], k = o.k, id = o.id, free = sendFrom || ownMarches().length < armySlots(S);
+    const o = wm.map.byId[msel.id], k = o.k, id = o.id, free = sendFrom || sendFromOp || ownMarches().length < armySlots(S);
     const title = k === 'start' ? ((view.match.players.find(p => p.slot === o.slot) || {}).name ? 'Burg von ' + esc(view.match.players.find(p => p.slot === o.slot).name) : 'Freier Burgplatz') : k === 'sanct' ? SANCT[o.n][0] : OBJ_NAME[k];
     const lv = o.lv ? `<span class="lvl">Stufe ${o.lv}</span>` : '';
     let body = '';
@@ -1187,7 +1191,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) { t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); const pr = $('mProg'), st = marchState(m); if (pr) pr.style.width = Math.round(st.pct * 100) + '%'; const gl = $('mGather'); if (gl && m.own) gl.innerHTML = lootHTML({ [m.res]: Math.floor(m.amount * st.pct) }) + ` <span class="note">von ${fmtN(m.amount)}</span>`; } }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'opSend', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -1204,9 +1208,10 @@ function mapAct(act, el) {
   else if (act === 'fattack') { if (!twice('fattack' + msel.id)) { renderSheet(); return true; } command({ type: 'march', target: msel.id, mode: 'attack', troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Überfall.', 'info'); closeSheet(); } }); }
   else if (act === 'post') command({ type: 'march', mode: 'post', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Aufstellen.', 'info'); closeSheet(); } });
   else if (act === 'patk') { const m = view.world.marches.find(x => x.id === msel.id); if (!m) return true; if (!twice('patk' + m.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'attack', target: m.tid, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff.', 'info'); closeSheet(); } }); }
+  else if (act === 'opSend') { sendFromOp = msel.id; closeSheet(); syncMoveBar(); }
   else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); syncMoveBar(); }
   else if (act === 'halt') command({ type: 'halt', id: msel.id }).then(ok => ok && toast('Das Heer bleibt stehen.', 'info'));
-  else if (act === 'sfCancel') { sendFrom = 0; closeSheet(); syncMoveBar(); }
+  else if (act === 'sfCancel') { sendFrom = 0; sendFromOp = ''; closeSheet(); syncMoveBar(); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
   else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
@@ -1285,7 +1290,7 @@ async function buildMap() {
   el.hidden = true; return true;
 }
 async function setMode(m) {
-  if (m !== 'map' && sendFrom) { sendFrom = 0; syncMoveBar(); }
+  if (m !== 'map' && (sendFrom || sendFromOp)) { sendFrom = 0; sendFromOp = ''; syncMoveBar(); }
   placing = false;
   if (!$('reports').hidden) closeReports();
   if (panelName) closePanel();

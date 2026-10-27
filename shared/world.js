@@ -12,7 +12,7 @@ import {
 } from './core.js';
 import { afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
-import { refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
+import { opReady, refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
@@ -89,6 +89,10 @@ function onGatherEnd(ctx, m, bt, realT) {
 function onHome(ctx, m, bt, realT) {
   const { match, players } = ctx, p = byId(players, m.owner); m.dead = true;
   if (!p) return;
+  if (m.redir) {   // umgeleitetes Heer: vom Ausgangspunkt (Posten oder Außenposten) noch nach Hause laufen
+    const here = m.path[m.path.length - 1], plan = planFrom(mapOf(match), cellXY(here), p.state.pos[0], p.state.pos[1], m.troops, p.state);
+    if (!plan.error && plan.path.length > 1) { m.path = plan.path; m.arr = plan.arr; m.phase = 'back'; m.t0 = bt; m.mode = 'home'; m.tk = 'start'; delete m.redir; m.dead = false; return; }
+  }
   const S = p.state; advanceTo(S, realT, match.speed);
   addTroops(S, m.troops, +1);
   for (const u in m.troops) { S.away[u] = (S.away[u] || 0) - m.troops[u]; if (S.away[u] <= 0) delete S.away[u]; }
@@ -241,6 +245,14 @@ export function command(match, players, player, cmd, now) {
     else if (mode === 'garrison' || mode === 'raid') { opx = (w.outposts || {})[String(cmd.target)]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
     if (!o) return 'Dieses Ziel gibt es nicht';
     if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin')) return 'Dieses Ziel gibt es nicht';
+    let fromOp = null;
+    if (cmd.fromOp != null) {
+      const al0 = allianceOf(w, player.id); fromOp = (w.outposts || {})[String(cmd.fromOp)];
+      if (!fromOp || !al0 || fromOp.al !== al0.id || !opReady(fromOp, w.gt)) return 'Dieser Außenposten steht nicht zur Verfügung';
+      if (!fromOp.garr[player.id] || !sum(fromOp.garr[player.id])) return 'Du hast dort keine Truppen';
+      if (mode === 'build') return 'Aus dem Außenposten kann man keinen neuen bauen';
+      if (mode === 'garrison' && opx && opx.id === fromOp.id) return 'Die Truppen sind schon dort';
+    }
     const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && (x.phase === 'post' || (x.phase === 'out' && x.mode !== 'build'))) : null;
     if (cmd.from != null && !src) return 'Dieses Heer kann gerade nicht umgeleitet werden';
     if (!src && w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
@@ -249,7 +261,7 @@ export function command(match, players, player, cmd, now) {
     if (!src) for (const u of Object.keys(U)) {
       const n = Math.floor(Number((cmd.troops || {})[u] || 0));
       if (n < 0 || !Number.isFinite(n)) return 'Ungültige Truppenzahl';
-      if (n > (S.troops[u] || 0)) return 'So viele ' + U[u].name + ' hast du nicht zu Hause';
+      if (n > ((fromOp ? fromOp.garr[player.id] : S.troops)[u] || 0)) return 'So viele ' + U[u].name + (fromOp ? ' stehen dort nicht' : ' hast du nicht zu Hause');
       if (n > 0) troops[u] = n;
     }
     if (troops.handkarren && sum(troops) === troops.handkarren) return 'Handkarren können nicht allein losziehen – schicke andere Einheiten mit.';
@@ -274,13 +286,14 @@ export function command(match, players, player, cmd, now) {
       target = c.target || null;
     }
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
-    const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : planMarch(map, S, o, troops);
+    const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S) : planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
     if (src) w.marches.splice(w.marches.indexOf(src), 1);
+    else if (fromOp) { const g = fromOp.garr[player.id]; for (const u in troops) { g[u] -= troops[u]; if (g[u] <= 0) delete g[u]; } if (!sum(g)) delete fromOp.garr[player.id]; }
     else for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : { tk: o.k, tid: o.id, mode });
-    if (src) m.redir = true;
+    if (src || fromOp) m.redir = true;
     if (mode === 'raid') noteRaid(ctx, player, opx, m);
     else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison' && mode !== 'post') afterLaunch(ctx, player, m, target, mode);
     syncMatch(match, players, now);

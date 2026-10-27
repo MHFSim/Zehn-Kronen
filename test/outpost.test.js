@@ -58,6 +58,14 @@ adv(OP_BUILD); assert.ok(territory(match, players, gt()).some(r => r.id === op.i
 assert.equal(viewFor(match, players, c, clock).world.outposts[0].garr, undefined, 'Besatzung ist geheim');
 assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].speer, 60);
 
+// Besatzung aus dem Außenposten weiterschicken
+{
+  const before = op.garr[a.id].speer, nm = w.marches.length, tx = op.x + 1, ty = op.y + 3;
+  const r = run(a, { type: 'march', mode: 'post', fromOp: op.id, x: tx, y: ty, troops: { speer: 10 } });
+  if (r === '') { assert.equal(op.garr[a.id].speer, before - 10, 'Besatzung abgezogen'); assert.equal(w.marches.length, nm + 1); const mm = w.marches[w.marches.length - 1]; assert.ok(mm.redir && mm.troops.speer === 10);
+    assert.match(run(a, { type: 'march', mode: 'post', fromOp: op.id, x: tx, y: ty, troops: { speer: 999 } }), /stehen dort nicht/); }
+  else assert.fail('fromOp: ' + r); void 0; if (0) assert.match(r, /kein Heer|Außenposten|Heere/, r);
+}
 // Auf Wegen läuft man 30 % schneller
 { const { planFrom } = await import('../shared/core.js'), { ROAD_SPEED } = await import('../shared/mapgen.js');
   const from = [tw.x, tw.y], saved = map.roads;
