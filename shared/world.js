@@ -375,7 +375,8 @@ export function viewFor(match, players, me, now) {
       const op = (w.outposts || {})[m.tid];
       if (op && myAl && op.al === myAl.id) incoming.push({ id: m.id, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', target: 'einen Außenposten', targetId: 0, mine: false, op: true, siege: m.phase === 'siege', eta: m.phase === 'siege' ? m.tSiege : m.t0 + m.arr[m.arr.length - 1] });
     }
-    if (m.phase === 'siege' && (m.mode === 'attack' || m.mode === 'raid')) sieges.push({ id: m.id, tid: m.tid, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops) });
+    if (m.phase === 'siege' && (m.mode === 'attack' || m.mode === 'raid')) { const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null;
+      sieges.push({ id: m.id, tid: m.tid, kind: op ? 'op' : 'city', tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : '?', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops) }); }
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
       tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, tSiege: m.tSiege, amount: m.amount, res: m.res, load: own ? m.load : undefined });

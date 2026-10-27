@@ -475,6 +475,8 @@ function renderBanner() {
   if (S.out) L.push(['bad', 'Du bist ausgeschieden. Du kannst die Partie weiter ansehen.']);
   else if (m.phase === 'running') {
     for (const i of view.incoming || []) L.push(['bad', `⚔ ${i.fromTag ? '[' + esc(i.fromTag) + '] ' : ''}${esc(i.from)} ${i.siege ? 'belagert' : 'greift'} ${i.mine ? 'dich' : esc(i.target)}${i.siege ? '' : ' an'} · ${i.siege ? 'Kampf beginnt in ' : 'Ankunft in '}${fmtT(real(i.eta - gt))}${i.siege ? ' – jetzt Hilfe holen!' : ''}`]);
+    const seen = new Set((view.incoming || []).map(i => i.id));
+    for (const sg of view.sieges || []) if (!seen.has(sg.id) && sg.tSiege > gt) L.push(['warn', `<span data-goto="${esc(sg.kind)}:${esc(String(sg.tid))}" style="cursor:pointer">⚔ ${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(sg.tname)} · Kampf in ${fmtT(real(sg.tSiege - gt))} – tippen und helfen</span>`]);
     if (S.protUntil > gt) L.push(['good', `🛡 ${S.protKind === 'fall' ? 'Schutz nach dem Fall deiner Burg' : 'Neulingsschutz'}: noch ${fmtT(real(S.protUntil - gt))}`]);
     if (S.vassalOf) L.push(['warn', `Du bist Vasall von ${esc(pname(S.vassalOf))} (20 % Tribut) · frei in ${fmtT(real(S.vassalUntil - gt))}. Fällt deine Burg noch einmal, scheidest du aus.`]);
     const vs = m.players.filter(p => p.vassalOf === me.id); if (vs.length) L.push(['good', `Deine Vasallen: ${vs.map(p => esc(p.name)).join(', ')}`]);
@@ -647,7 +649,7 @@ function moreHTML() {
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -687,7 +689,7 @@ function trainHTML() {
     const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
     body = rows + `<div class="block"><h3>Ausbildungsschleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
   }
-  return phead('⚔️', 'Ausbilden', `${tabName(tab)}${L ? ' · Stufe ' + L : ''}`) + strip + unitOverviewHTML() + ptabs(TRAIN_B.map(x => [x, tabName(x), (S.train[x] || []).length]), tab, 'ttab') + body;
+  return phead('⚔️', 'Ausbilden', `${tabName(tab)}${L ? ' · Stufe ' + L : ''}`) + strip + ptabs(TRAIN_B.map(x => [x, tabName(x), (S.train[x] || []).length]), tab, 'ttab') + body;
 }
 function updateTrainPanel() {
   if (panelName !== 'train') return;
@@ -736,6 +738,7 @@ let panelName = '', panelSig = '';
 function panelSignature() {
   if (panelName === 'tech') return JSON.stringify([S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
+  if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
   return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
@@ -745,7 +748,7 @@ function renderPanel(force) {
   const el = $('sidePanelInner'), keep = {};
   el.querySelectorAll('input,select').forEach(i => { if (i.id) keep[i.id] = [i.value, document.activeElement === i]; });
   const top = $('sidePanel').scrollTop, box = $('chatBox'), atEnd = !box || box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
-  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : panelName === 'tech' ? techHTML() : moreHTML();
+  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : panelName === 'tech' ? techHTML() : panelName === 'units' ? phead('🪖', 'Einheiten', 'Deine Truppen im Überblick') + unitOverviewHTML() : moreHTML();
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
@@ -769,6 +772,7 @@ function setupPanel() {
     if (act === 'train') return void command({ type: 'train', id: trainBuilding(), unit: d.u, count: pick[d.u] || 10 });
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
+    if (act === 'sub' && d.t === 'reports') return openReports();
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }
     if (act === 'donate') { const amounts = {}; for (const r of RES) { const v = Math.floor(Number(val('dn_' + r)) || 0); if (v > 0) amounts[r] = v; } if (!Object.keys(amounts).length) return void toast('Gib an, wie viel du einzahlen willst.'); return void command({ type: 'donate', amounts }).then(ok => { if (ok) { for (const r of RES) { const i = document.getElementById('dn_' + r); if (i) i.value = ''; } toast('Eingezahlt. Danke!', 'info'); } }); }
@@ -1276,8 +1280,7 @@ function openReports() {
 }
 function closeReports() { $('reports').hidden = true; if (!panelName) document.body.classList.remove('reports-open'); setNav(panelName || mode); }
 function renderNav() {
-  const n = S ? unread() : 0, b = $('navBadge'); if (b) { b.textContent = n; b.hidden = !n; }
-  const f = S ? unreadFeed() : 0, mb = $('moreBadge'); if (mb) { mb.textContent = f; mb.hidden = !f; }
+  const f = S ? unreadFeed() + unread() : 0, mb = $('moreBadge'); if (mb) { mb.textContent = f; mb.hidden = !f; }
   const a = view ? (view.invites || []).length + (view.ally ? (view.ally.requests || []).length : 0) : 0, ab = $('allyBadge'); if (ab) { ab.textContent = a; ab.hidden = !a; }
 }
 function setNav(m) { document.querySelectorAll('.nav button[data-nav]').forEach(b => b.classList.toggle('on', b.dataset.nav === m)); }
@@ -1312,10 +1315,13 @@ async function setMode(m) {
   $('city').hidden = m === 'map'; renderHud(); if (m === 'city') { renderCity(true); city3d(); if (cv) cv.resize(); }
 }
 function setupNav() {
+  $('banner').addEventListener('click', async e => {
+    const c = e.target.closest('[data-goto]'); if (!c) return; const [k, id] = c.dataset.goto.split(':');
+    await setMode('map'); if (mode === 'map') selectMap(k === 'op' ? { type: 'op', id } : { type: 'obj', id }, true);
+  });
   $('nav').addEventListener('click', e => {
     const b = e.target.closest('button[data-nav]'); if (!b) return;
-    if (b.dataset.nav === 'reports') { if (panelName) closePanel(); return openReports(); }
-    if (b.dataset.nav === 'ally' || b.dataset.nav === 'more' || b.dataset.nav === 'train' || b.dataset.nav === 'tech') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
+    if (b.dataset.nav === 'ally' || b.dataset.nav === 'units' || b.dataset.nav === 'more' || b.dataset.nav === 'train' || b.dataset.nav === 'tech') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
     setMode(b.dataset.nav);
   });
   $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); const t = e.target.closest('[data-act=rtab]'); if (t) { repTab = t.dataset.t; renderReports(); } });
