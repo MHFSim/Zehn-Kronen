@@ -179,11 +179,14 @@ function buildThrone() {
   for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832; b.cyl(.2, .24, 2.3, 10, Math.cos(a) * 2.05, .84, Math.sin(a) * 2.05, [218, 212, 194]); b.cyl(.3, .26, .16, 10, Math.cos(a) * 2.05, 3.08, Math.sin(a) * 2.05, GOLD); b.cyl(.27, .27, .1, 10, Math.cos(a) * 2.05, .84, Math.sin(a) * 2.05, mul(S, .9)); }
   b.cyl(2.35, 2.35, .16, 20, 0, 3.24, 0, GOLD);
   for (let i = 0; i < 8; i++) { const a = (i + .5) / 8 * 6.2832; b.box(.7, .9, .08, Math.cos(a) * 2.05, 2.5, Math.sin(a) * 2.05, [140, 30, 36], -a + Math.PI / 2); }   // Behänge
-  b.cone(1.9, .5, 20, 0, 3.4, 0, [196, 150, 52]); b.cone(1.4, 1.1, 20, 0, 3.7, 0, [214, 170, 62]); b.sph(.12, 0, 4.85, 0, GOLD, 6);
+  b.cone(1.9, .5, 20, 0, 3.4, 0, [196, 150, 52]); b.cone(1.4, 1.1, 20, 0, 3.7, 0, [214, 170, 62]);
+  b.cyl(.55, .3, .34, 12, 0, 4.7, 0, IRON); b.cyl(.62, .55, .1, 12, 0, 5.0, 0, GOLD);                // Feuerschale oben
+  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.2832; b.box(.3, .12, .12, Math.cos(a) * .22, 5.1, Math.sin(a) * .22, WOOD_D, -a); }
   b.box(.9, .22, .9, 0, .84, 0, S); b.box(.75, .42, .75, 0, 1.06, 0, GOLD); b.box(.75, 1.1, .18, 0, 1.2, -.32, GOLD); b.box(.16, .55, .55, -.34, 1.06, 0, GOLD); b.box(.16, .55, .55, .34, 1.06, 0, GOLD); b.box(.5, .12, .5, 0, 1.48, .05, RED);
-  b.cyl(.04, .04, 1.2, 5, 0, 4.9, 0, WOOD_D);
-  for (const [x, z] of [[-1.4, 2.2], [1.4, 2.2]]) { b.cyl(.14, .18, .5, 8, x, .84, z, IRON); parts.push({ k: 'flame', pos: [x, 1.45, z], s: 1.1 }); }
-  return { geo: b.build(), flags: [[0, 5.5, 0]], h: 5.2, parts, smoke: [[-1.4, 1.8, 2.2], [1.4, 1.8, 2.2]] };
+  for (const [x, z] of [[-1.4, 2.2], [1.4, 2.2]]) { b.cyl(.14, .18, .5, 8, x, .84, z, IRON); parts.push({ k: 'flame', pos: [x, 1.45 * 2, z], s: 1.1 }); }
+  parts.push({ k: 'flame', pos: [0, 11.6, 0], s: 2.6 }, { k: 'flame', pos: [.15, 11.2, .1], s: 1.8 });   // großes Lagerfeuer auf der Spitze
+  const geo = b.build(); geo.scale(1, 2, 1);                                                          // Thron doppelt so hoch
+  return { geo, flags: [], h: 12.5, parts, smoke: [[-1.4, 3.6, 2.2], [1.4, 3.6, 2.2], [0, 12.4, 0]] };
 }
 function buildSanct() {
   const b = new MB(), parts = [];
@@ -720,7 +723,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else if (o.k === 'sanct' || o.k === 'throne') {
         const hd = (view.match.holds || []).find(x => x.id === id);
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
-        col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; up = o.k === 'sanct' ? 3.6 : 6.2;
+        col = hd ? (hd.mine ? 0x2f7f3a : 0x8a2b24) : o.k === 'sanct' ? 0x2f6f8f : 0x9c7420; up = o.k === 'sanct' ? 3.6 : 13.6;
       }
       if (txt !== null && !SHOW_NAMES && !/^\d+$/.test(txt) && o.k !== 'start') txt = null;
       if (txt === null) { if (h.lab) h.lab.el.style.display = 'none'; h.labOn = false; continue; }
@@ -1031,7 +1034,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const id in this.opObjs) { const q = this.opObjs[id]; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
     if (best) return best;
     for (const id in this.obj) {
-      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 2 : 1;
+      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 4 : 1;
       test('obj', id, o.x + .5, h.grp.position.y + hh, o.y + .5, k);
     }
     return best;
