@@ -10,7 +10,7 @@ import { battle, campTroops, campMult } from '../shared/combat.js';
 const a = generateMap(4242), b = generateMap(4242);
 assert.deepEqual(a.objects, b.objects);
 assert.equal(a.objects.filter(o => o.k === 'start').length, 10);
-for (const s of a.starts) assert.ok(findPath(a, s.x, s.y, 48, 48), 'Startplatz erreichbar');
+for (const s of a.starts) assert.ok(findPath(a, s.x, s.y, 140, 140), 'Startplatz erreichbar');
 
 const T0 = 1_000_000_000_000;
 const match = { id: 1, name: 'Test', speed: 100, seed: 4242, world: newWorld(T0) };

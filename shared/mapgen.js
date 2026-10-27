@@ -49,9 +49,13 @@ const RING = [
   [0.5877852522924731, -0.8090169943749475], [0.9510565162951535, -0.3090169943749474]
 ];
 const AXES = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+// Türme: genau zwischen je zwei benachbarten Burgen (0° + 36° * k), alle auf demselben Kreis nahe am Kartenrand
+const GAPS = [[1, 0], [0.8090169943749475, 0.5877852522924731], [0.30901699437494745, 0.9510565162951535], [-0.30901699437494745, 0.9510565162951535], [-0.8090169943749475, 0.5877852522924731],
+  [-1, 0], [-0.8090169943749475, -0.5877852522924731], [-0.30901699437494745, -0.9510565162951535], [0.30901699437494745, -0.9510565162951535], [0.8090169943749475, -0.5877852522924731]];
 const C = N / 2;
-export const START_R = 101, SANCT_R = 53;
+export const START_R = 101, SANCT_R = 53, TOWER_R = 124;
 export const startSpot = i => [Math.floor(C + RING[i][0] * START_R), Math.floor(C + RING[i][1] * START_R)];
+export const towerSpot = i => [Math.floor(C + GAPS[i][0] * TOWER_R), Math.floor(C + GAPS[i][1] * TOWER_R)];
 const sanctSpot = i => [Math.floor(C + AXES[i][0] * SANCT_R), Math.floor(C + AXES[i][1] * SANCT_R)];
 
 export const NODE_KINDS = ['farm', 'wood', 'stone'];
@@ -64,9 +68,9 @@ export const distC = (x, y) => Math.sqrt((x + .5 - C) * (x + .5 - C) + (y + .5 -
 function heightAt(x, y, seed, zones) {
   const dx = x - C, dy = y - C, r = Math.sqrt(dx * dx + dy * dy) / C;
   const base = fbm(x * 0.045 + 10, y * 0.045 + 10, seed, 5);
-  const mmask = smooth(0.50, 0.68, fbm(x * 0.028 + 70, y * 0.028 + 70, seed + 7, 3));
+  const mmask = smooth(0.58, 0.76, fbm(x * 0.028 + 70, y * 0.028 + 70, seed + 7, 3));
   const ridge = 1 - Math.abs(2 * fbm(x * 0.05 + 130, y * 0.05 + 130, seed + 13, 4) - 1);
-  let h = 0.43 + (base - 0.5) * 0.60 + mmask * (0.06 + ridge * ridge * 0.42);
+  let h = 0.43 + (base - 0.5) * 0.60 + mmask * (0.06 + ridge * ridge * 0.36);
   h += (fbm(x * 0.21 + 300, y * 0.21 + 300, seed + 3, 3) - 0.5) * 0.09 * smooth(0.50, 0.68, h);   // Felsdetail im Gebirge
   h -= smooth(0.84, 1.04, r) * 0.62;               // Meer am Kartenrand
   for (const z of zones) {                         // Bauland einebnen
@@ -118,6 +122,7 @@ export function generateMap(seed) {
   const starts = [];
   for (let i = 0; i < SLOTS; i++) { const [x, y] = startSpot(i); starts.push({ x, y }); zones.push({ x: x + .5, y: y + .5, r: 5.5, h: 0.46 }); }
   for (let i = 0; i < 4; i++) { const [x, y] = sanctSpot(i); zones.push({ x: x + .5, y: y + .5, r: 3.5, h: 0.5 }); }
+  const tspots = GAPS.map((_, i) => towerSpot(i)); for (const [x, y] of tspots) zones.push({ x: x + .5, y: y + .5, r: 14, h: 0.46 });   // Platz für Außenposten rund um jeden Turm einebnen
   const inZone = (x, y) => zones.some(z => (x - z.x) * (x - z.x) + (y - z.y) * (y - z.y) < (z.r * 1.2) * (z.r * 1.2));
 
   const H = new Float32Array(G * G), F = new Float32Array(G * G);
@@ -131,7 +136,7 @@ export function generateMap(seed) {
   // Alle Startplätze müssen vom Thron aus erreichbar sein; sonst einen Weg in das Gebirge oder Meer schlagen
   for (let round = 0; round < 12; round++) {
     const seen = reachable(pass, Math.floor(C), Math.floor(C));
-    const lost = starts.filter(s => !seen[cellOf(s.x, s.y)]);
+    const lost = [...starts, ...tspots.map(([x, y]) => ({ x, y }))].filter(s => !seen[cellOf(s.x, s.y)]);
     if (!lost.length) break;
     for (const s of lost) {
       let x = s.x + .5, y = s.y + .5;
@@ -166,24 +171,8 @@ export function generateMap(seed) {
   starts.forEach((s, i) => add(mk('start', s.x, s.y, 0, { slot: i })));
   add(mk('throne', Math.floor(C), Math.floor(C), 0));
   for (let i = 0; i < 4; i++) { const [x, y] = sanctSpot(i); add(mk('sanct', x, y, 0, { n: i })); }
-  // Türme (8): in den vier Ecken und in der Mitte aller vier Ränder das nächste erreichbare Land. Dort beginnt die Kette der Außenposten; Türme sind unzerstörbar.
-  [[0, 0], [N / 2, 0], [N, 0], [0, N], [N / 2, N], [N, N], [0, N / 2], [N, N / 2]].forEach(([cx, cy], i) => {
-    // Der Platz um einen Turm muss frei sein, damit dort Außenposten (13×13) gebaut werden können: kein Wasser, kein Fels, erreichbar.
-    const clear = (x, y) => {
-      let n = 0, bad = 0;
-      for (let yy = Math.max(3, y - 8); yy <= Math.min(N - 4, y + 8); yy++) for (let xx = Math.max(3, x - 8); xx <= Math.min(N - 4, x + 8); xx++) {
-        n++; const c = cellOf(xx, yy); if (!pass[c] || !reach[c] || H[(yy * SUB + 1) * G + xx * SUB + 1] >= 0.64) bad++;
-      }
-      return n >= 100 && bad <= n * .06;
-    };
-    const cand = [];
-    for (let y = 3; y < N - 3; y++) for (let x = 3; x < N - 3; x++) if (okCell(x, y) && free(x, y, 6)) cand.push([(x - cx) * (x - cx) + (y - cy) * (y - cy), x, y]);
-    cand.sort((u, v) => u[0] - v[0]);
-    let best = null;
-    for (const [, x, y] of cand) if (clear(x, y)) { best = [x, y]; break; }
-    if (!best && cand.length) best = [cand[0][1], cand[0][2]];
-    if (best) add(mk('tower', best[0], best[1], 0, { n: i }));
-  });
+  // Türme (10): je einer genau zwischen zwei benachbarten Burgen am Kartenrand; das Gelände rundherum ist eingeebnet. Dort beginnt die Kette der Außenposten; Türme sind unzerstörbar.
+  tspots.forEach(([x, y], i) => add(mk('tower', x, y, 0, { n: i })));
 
   const tryPlace = (kind, cx, cy, rmin, rmax, minD, lvf, tries) => {
     for (let t = 0; t < tries; t++) {
