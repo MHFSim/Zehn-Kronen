@@ -1,6 +1,7 @@
 // Kurze Prüfung der Spielregeln: `npm test`
 import assert from 'node:assert/strict';
-import { freshState, applyCommand, advanceTo, cap, costOf, timeOf } from '../shared/rules.js';
+import { freshState, applyCommand, advanceTo, cap, costOf, timeOf, U, B } from '../shared/rules.js';
+import { capacityOf, armySpeed } from '../shared/combat.js';
 
 const t0 = 1_000_000;
 let S = freshState(t0);
@@ -21,11 +22,20 @@ assert.equal(S.lv.kaserne, 1, 'Kaserne fertig');
 
 assert.equal(applyCommand(S, { type: 'train', id: 'kaserne', unit: 'bogen', count: 5 }), 'Diese Einheit wird hier nicht ausgebildet');
 assert.equal(applyCommand(S, { type: 'train', id: 'kaserne', unit: 'speer', count: 2 }), '');
-advanceTo(S, S.at + 2 * 30 * 1000 + 1000, 1);
+advanceTo(S, S.at + 2 * 240 * 1000 + 1000, 1);
 assert.equal(S.troops.speer, 2, 'Zwei Speerträger ausgebildet');
 
 // Lagergrenze wird nicht überschritten, auch nach langer Abwesenheit mit Tempo 100
 advanceTo(S, S.at + 30 * 86400 * 1000, 100);
 assert.ok(S.res.wood <= cap(S) + 1e-9, 'Holz bleibt unter der Lagergrenze');
 
+// Einheiten laut Tabelle: Kosten ohne Nahrung, Traglast, Tempo, Transport im Lagerhaus
+{
+  assert.equal(Object.keys(U).length, 8);
+  assert.deepEqual(U.speer.cost, [0, 20, 10, 15]); assert.equal(U.speer.t, 240); assert.deepEqual(U.speer.at, [5, 7, 12]); assert.deepEqual(U.speer.df, [20, 31, 58]);
+  assert.deepEqual(U.armbrust.df, [59, 91, 32]); assert.equal(U.schwer.tempo, 5); assert.equal(U.handkarren.c, 500); assert.equal(U.ochsen.c, 2500);
+  assert.ok(B.lager.units.includes('handkarren') && B.lager.units.includes('ochsen'), 'Transport wird im Lagerhaus gebaut');
+  assert.equal(capacityOf({ handkarren: 2, speer: 10 }), 1220, 'Karren erhöhen die Traglast');
+  assert.ok(armySpeed({ speer: 10, ochsen: 1 }) < armySpeed({ speer: 10 }), 'Karren machen das Heer langsamer');
+}
 console.log('Alle Regeltests bestanden.');

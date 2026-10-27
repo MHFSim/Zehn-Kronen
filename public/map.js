@@ -315,18 +315,26 @@ function buildUnit(type, col) {
     body.box(.18, .28, .13, 0, .22, 0, [140, 144, 152]); body.box(.19, .14, .14, 0, .32, 0, tab); body.sph(.068, 0, .58, 0, SK, 6); body.cone(.082, .1, 6, 0, .58, 0, IRON); body.box(.015, .08, .06, 0, .67, 0, tab);
     body.box(.02, .4, .05, .16, .12, .0, [210, 214, 220]); body.box(.02, .05, .12, .16, .2, 0, GOLD); body.push(new T.ConeGeometry(.1, .22, 3), tab, -.15, .36, .04, 0, 1, 1, .4, Math.PI, 0);
     la.box(.06, .2, .07, -.04, -.1, 0, [80, 80, 90]); lb.box(.06, .2, .07, .04, -.1, 0, [80, 80, 90]);
-  } else if (type === 'bogen') {
+  } else if (type === 'bogen' || type === 'armbrust') {
     body.box(.16, .26, .12, 0, .22, 0, [78, 110, 64]); body.box(.17, .06, .13, 0, .36, 0, tab); body.sph(.064, 0, .54, 0, SK, 6); body.cone(.082, .13, 6, 0, .52, 0, [70, 100, 56]);
     body.push(new T.TorusGeometry(.2, .012, 4, 10, Math.PI), WOOD, .17, .38, .05, 0, 1, 1, 1, 0, Math.PI / 2); body.box(.012, .4, .012, .17, .18, .05, [220, 214, 200]);
     body.box(.05, .22, .06, -.08, .3, -.1, [110, 78, 48], 0, .3); for (let i = 0; i < 3; i++) body.box(.01, .08, .01, -.08 + i * .015, .5, -.12, tab);
     la.box(.06, .2, .07, -.04, -.1, 0, [96, 78, 60]); lb.box(.06, .2, .07, .04, -.1, 0, [96, 78, 60]);
+  } else if (type === 'handkarren') {
+    body.box(.34, .1, .5, 0, .2, 0, [140, 100, 60]); body.box(.02, .14, .5, -.17, .3, 0, WOOD_D); body.box(.02, .14, .5, .17, .3, 0, WOOD_D); body.box(.34, .14, .02, 0, .3, -.25, WOOD_D);
+    for (const x of [-.2, .2]) body.push(new T.CylinderGeometry(.13, .13, .04, 10), WOOD_D, x, .13, 0, 0, 1, 1, 1, 0, Math.PI / 2);
+    body.box(.3, .16, .3, 0, .36, .02, [214, 178, 90]); body.box(.02, .3, .3, 0, .22, .5, WOOD_D);   // Last und Deichsel
+  } else if (type === 'ochsen') {
+    horse([120, 84, 56]); body.box(.5, .12, .8, 0, .22, -.75, [140, 100, 60]); body.box(.04, .22, .8, -.25, .34, -.75, WOOD_D); body.box(.04, .22, .8, .25, .34, -.75, WOOD_D);
+    for (const x of [-.3, .3]) body.push(new T.CylinderGeometry(.2, .2, .05, 10), WOOD_D, x, .2, -.75, 0, 1, 1, 1, 0, Math.PI / 2);
+    body.box(.44, .26, .6, 0, .46, -.75, [214, 178, 90]); body.box(.04, .04, .5, 0, .34, -.3, WOOD_D);
   } else if (type === 'leicht') {
     horse([150, 108, 66]); rider(body, .5, 1, false, true);
   } else {   // schwer
     horse([66, 60, 58], tab); rider(body, .56, 1.15, true, true); body.box(.2, .04, .5, 0, .62, 0, dk);
   }
   const fin = b => { const g = b.build(); return g; };
-  return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: type === 'leicht' || type === 'schwer' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' };
+  return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
 }
 
 /* ---------- Bäume (Instanzen) ---------- */
@@ -777,9 +785,9 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       keep.add(m.id); let s = this.marchObjs[m.id];
       const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
       const tr = m.troops || {}; let type = 'speer', best = 0, n = 0;
-      for (const u in tr) { if (u === 'n') continue; n += tr[u]; if (tr[u] > best) { best = tr[u]; type = u; } }
+      for (const u in tr) { if (u === 'n') continue; n += tr[u]; const w = u === 'handkarren' || u === 'ochsen' ? tr[u] * .01 : tr[u]; if (w > best) { best = w; type = u; } }
       if (tr.n != null) n = tr.n; if (!n) n = Object.values(tr).reduce((a, c) => a + c, 0);
-      const cav = type === 'leicht' || type === 'schwer', cnt = cav ? clamp(Math.ceil(n / 60), 1, 3) : clamp(Math.ceil(n / 25), 2, 5);
+      const cav = type === 'leicht' || type === 'schwer' || type === 'ochsen', cnt = cav ? clamp(Math.ceil(n / 60), 1, 3) : clamp(Math.ceil(n / 25), 2, 5);
       if (!s) {
         const grp = new T.Group(); this.scene.add(grp);
         const pole = new T.Mesh(new T.CylinderGeometry(.02, .02, 1.5, 5), new T.MeshLambertMaterial({ color: 0x4a3624 })); pole.position.set(0, .75, -.1); grp.add(pole);

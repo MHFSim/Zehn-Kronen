@@ -16,14 +16,14 @@ export const B = {
               desc: 'Erzeugt Stein für Mauer und späte Gebäude.' },
   mine:     { name: 'Erzmine', x: 1, y: 10, w: 2, unlock: 3, base: [60, 100, 40, 0], time: 12, prod: 'ore',
               desc: 'Erzeugt Erz für Schwerter, Reiterei und Forschung.' },
-  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80, 0], time: 15,
-              desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können.' },
+  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80, 0], time: 15, units: ['handkarren', 'ochsen'],
+              desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können. Baut Hand- und Ochsenkarren (Transport).' },
   kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60, 0], time: 20, units: ['speer', 'schwert'],
               desc: 'Bildet Speerträger und Schwertkämpfer aus. Jede Stufe verkürzt die Ausbildung.' },
-  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 60, 20], time: 25, units: ['bogen'],
-              desc: 'Bildet Bogenschützen aus.' },
+  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 60, 20], time: 25, units: ['bogen', 'armbrust'],
+              desc: 'Bildet Bogen- und Armbrustschützen aus.' },
   stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 100, 150], time: 40, units: ['leicht', 'schwer'],
-              desc: 'Bildet Reiterei aus. Schwere Reiterei ab Stall Stufe 5.' },
+              desc: 'Bildet Lanzenreiter und Panzerreiter aus. Panzerreiter ab Stall Stufe 5.' },
   lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80, 0], time: 20,
               desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind.' },
   akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 150, 80], time: 40,
@@ -32,12 +32,20 @@ export const B = {
               desc: 'Stärkt die Verteidigung deiner Burg und vergrößert die Stadtwache, die sie auch ohne Truppen beschützt.' }
 };
 
+// Einheiten nach der Tabelle „Lords & Knights“: Kosten Holz/Stein/Erz, Ausbildungszeit t (Sekunden je Einheit), Tempo in Minuten je Feld,
+// Traglast c, Angriff at und Abwehr df gegen [Artillerie, Infanterie, Kavallerie]. g = Gattung. Transporter kämpfen nicht.
+export const GATT = { inf: 'Infanterie', art: 'Artillerie', kav: 'Kavallerie', trans: 'Transport' };
+const mk = (name, g, cost, t, tempo, c, at, df, req, o = {}) => ({ name, g, cost: [0, ...cost], t, tempo, s: 60 / tempo, c, at, df, req,
+  a: at ? Math.round(at.reduce((x, y) => x + y, 0) / 3) : 0, v: df ? Math.round(df.reduce((x, y) => x + y, 0) / 3) : 0, ...o });
 export const U = {
-  speer:   { name: 'Speerträger',      cost: [40, 50, 0, 0],   t: 30, a: 8,  v: 14, l: 30, s: 6,  c: 15, req: 1 },
-  schwert: { name: 'Schwertkämpfer',   cost: [50, 0, 0, 40],   t: 40, a: 14, v: 10, l: 35, s: 6,  c: 20, req: 1 },
-  bogen:   { name: 'Bogenschützen',    cost: [40, 60, 0, 0],   t: 35, a: 12, v: 8,  l: 22, s: 6,  c: 10, req: 1 },
-  leicht:  { name: 'Leichte Reiterei', cost: [80, 0, 0, 60],   t: 60, a: 12, v: 6,  l: 30, s: 12, c: 40, req: 1 },
-  schwer:  { name: 'Schwere Reiterei', cost: [120, 0, 0, 120], t: 90, a: 20, v: 14, l: 45, s: 9,  c: 25, req: 5 }
+  speer:     mk('Speerträger',     'inf',   [20, 10, 15], 240,  15,   22, [5, 7, 12],   [20, 31, 58], 1, { strong: ['leicht'], good: ['schwert'], weak: ['bogen'] }),
+  schwert:   mk('Schwertkämpfer',  'inf',   [25, 15, 30], 360,  15,   22, [10, 45, 50], [20, 35, 30], 1, { strong: ['schwer'], good: ['speer'], weak: ['armbrust'] }),
+  bogen:     mk('Bogenschütze',    'art',   [30, 15, 20], 300,  16,   22, [20, 60, 10], [14, 31, 10], 1, { strong: ['speer'], good: [], weak: [] }),
+  armbrust:  mk('Armbrustschütze', 'art',   [35, 20, 25], 420,  17,   22, [15, 21, 9],  [59, 91, 32], 3, { strong: ['schwert'], good: [], weak: ['leicht'] }),
+  leicht:    mk('Lanzenreiter',    'kav',   [40, 20, 40], 720,  10,   22, [5, 8, 30],   [40, 15, 35], 1, { strong: ['armbrust'], good: ['schwer'], weak: ['speer'] }),
+  schwer:    mk('Panzerreiter',    'kav',   [25, 15, 45], 1050, 5,    22, [24, 15, 21], [59, 27, 36], 5, { strong: ['bogen'], good: ['leicht'], weak: ['schwert'] }),
+  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  13.3, 500, null, null, 1),
+  ochsen:    mk('Ochsenkarren',    'trans', [95, 40, 65], 1200, 16.7, 2500, null, null, 4)
 };
 
 // Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.

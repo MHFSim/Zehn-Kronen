@@ -21,7 +21,7 @@ assert.equal(S.tech.ackerbau, 5); assert.match(applyCommand(S, { type: 'research
 assert.ok(techCost('ackerbau', 3)[0] > techCost('ackerbau', 1)[0]);
 // Wirkung im Kampf, bei der Traglast
 S.tech.kriegskunst = 5; S.tech.lasten = 3;
-assert.equal(forceOf(S), 1.2); assert.equal(capacityOf({ speer: 100 }, S), 1950);
+assert.equal(forceOf(S), 1.2); assert.equal(capacityOf({ speer: 100 }, S), 2860);
 const att = { speer: 100 }, def = { speer: 100 };
 assert.equal(battle(att, def, 1, 1).win, false);
 assert.equal(battle(att, def, 1, 1.5).win, true);

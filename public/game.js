@@ -1,14 +1,14 @@
 // Zehn Kronen – Spiel im Browser. Der Server ist maßgeblich; hier wird nur angezeigt
 // und zwischen zwei Server-Antworten mit denselben Regeln flüssig weitergerechnet.
 import {
-  RES, RES_DE, B, U, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
+  RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_SEC, planMarch, marchPos } from '/shared/core.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
-import { NODE_MAX, N } from '/shared/mapgen.js';
+import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
@@ -187,7 +187,7 @@ function unitsHTML(id) {
   const rows = b.units.map(u => {
     const d = U[u], ok = L >= d.req, n = pick[u] || 10, total = d.cost.map(c => c * n);
     return `<div class="unit">
-      <div><div class="unit-name">${d.name}</div><div class="unit-stats">Angriff ${d.a} · Verteidigung ${d.v} · Leben ${d.l} · Tempo ${d.s} · ${fmtT(real(unitTime(S, u, id)))} je Einheit</div></div>
+      <div><div class="unit-name">${d.name}</div><div class="unit-stats ustats">${unitStatsHTML(u)}<span>⏱ ${fmtT(real(unitTime(S, u, id)))} je Einheit</span></div></div>
       ${ok ? `<div class="stepper"><button type="button" data-act="minus" data-u="${u}" aria-label="Weniger">−</button><output>${n}</output><button type="button" data-act="plus" data-u="${u}" aria-label="Mehr">+</button></div>` : `<span class="note">ab ${b.name} Stufe ${d.req}</span>`}
       ${ok ? `<div class="row" style="grid-column:1"><span class="costs">${costHTML(total)}</span><button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && (S.train[id] || []).length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div>` : ''}
     </div>`;
@@ -616,7 +616,22 @@ function moreHTML() {
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
 let trainTab = '';
-const TRAIN_B = ['kaserne', 'schiess', 'stall'];
+// Werte einer Einheit: Angriff/Abwehr gegen Artillerie · Infanterie · Kavallerie, Traglast, Tempo
+const f1 = n => String(n).replace('.', ',');
+const unitStatsHTML = u => { const d = U[u], sec = Math.round(d.tempo * 60 / MARCH_BOOST / 1);
+  return (d.at ? `<span title="Angriff gegen Artillerie / Infanterie / Kavallerie">⚔ ${d.at.join(' / ')}</span><span title="Abwehr gegen Artillerie / Infanterie / Kavallerie">🛡 ${d.df.join(' / ')}</span>` : '<span>🚚 kämpft nicht</span>')
+    + `<span title="Traglast je Einheit">🎒 ${fmtN(d.c)}</span><span title="Tempo (1×): Sekunden je Feld">👣 ${f1(sec)} s/Feld</span>`; };
+const TNAME = { lager: 'Transport' };
+const tabName = x => TNAME[x] || B[x].name;
+// Übersicht über alle Einheiten: daheim, unterwegs, verwundet, in Ausbildung
+function unitOverviewHTML() {
+  const q = {}; for (const k in S.train) for (const o of S.train[k]) if (!o.heal) q[o.unit] = (q[o.unit] || 0) + o.count;
+  const rows = Object.keys(U).map(u => { const h = S.troops[u] || 0, a = (S.away || {})[u] || 0, w = S.wounded[u] || 0, t = q[u] || 0, tot = h + a;
+    return `<tr class="${tot + w + t ? '' : 'zero'}"><td>${U[u].name}<small>${GATT[U[u].g]}</small></td><td>${fmtN(h)}</td><td>${fmtN(a)}</td><td>${fmtN(w)}</td><td>${fmtN(t)}</td></tr>`; }).join('');
+  const cap = capacityOf(S.troops, S);
+  return `<div class="block"><h3>Deine Einheiten</h3><table class="uov"><thead><tr><th>Einheit</th><th title="Zu Hause">Daheim</th><th title="Auf Märschen oder als Besatzung">Unterw.</th><th>Verw.</th><th title="In Ausbildung">Ausb.</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">Traglast der Truppen daheim: <b>${fmtN(cap)}</b> Rohstoffe · Märsche sind so schnell wie die langsamste Einheit (Karren zählen mit).</p></div>`; }
+const TRAIN_B = ['kaserne', 'schiess', 'stall', 'lager'];
 const trainBuilding = () => TRAIN_B.includes(trainTab) ? trainTab : TRAIN_B.find(b => S.lv[b]) || 'kaserne';
 function trainHTML() {
   const tab = trainBuilding(), b = B[tab], L = S.lv[tab], q = S.train[tab] || [];
@@ -629,14 +644,14 @@ function trainHTML() {
     const rows = b.units.map(u => {
       const d = U[u], ok = L >= d.req, n = pick[u] || 10, total = d.cost.map(c => c * n), home = S.troops[u] || 0;
       return `<div class="ucard ${ok ? '' : 'locked'}"><div class="uhead"><div><b>${d.name}</b><small>${fmtN(home)} daheim</small></div><span class="utime">${fmtT(real(unitTime(S, u, tab)))} je Einheit</span></div>
-        <div class="ustats"><span>⚔ ${d.a}</span><span>🛡 ${d.v}</span><span>❤ ${d.l}</span><span>👣 ${d.s}</span><span>🎒 ${d.c}</span></div>
+        <div class="ustats">${unitStatsHTML(u)}</div>
         ${ok ? `<div class="uact"><div class="stepper"><button type="button" data-act="minus" data-u="${u}" aria-label="Weniger">−</button><output>${n}</output><button type="button" data-act="plus" data-u="${u}" aria-label="Mehr">+</button></div>
           <button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && q.length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div><div class="costs">${costHTML(total)}</div>` : `<p class="note">Ab ${b.name} Stufe ${d.req}</p>`}</div>`;
     }).join('');
     const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
     body = rows + `<div class="block"><h3>Ausbildungsschleife (${q.length} von ${MAX_TRAIN_ORDERS})</h3>${list || '<p class="note">Im Moment wird hier nichts ausgebildet.</p>'}</div>`;
   }
-  return phead('⚔️', 'Ausbilden', `${b.name}${L ? ' · Stufe ' + L : ''}`) + strip + ptabs(TRAIN_B.map(x => [x, B[x].name, (S.train[x] || []).length]), tab, 'ttab') + body;
+  return phead('⚔️', 'Ausbilden', `${tabName(tab)}${L ? ' · Stufe ' + L : ''}`) + strip + unitOverviewHTML() + ptabs(TRAIN_B.map(x => [x, tabName(x), (S.train[x] || []).length]), tab, 'ttab') + body;
 }
 function updateTrainPanel() {
   if (panelName !== 'train') return;
