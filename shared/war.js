@@ -9,9 +9,9 @@ import {
 } from './core.js';
 import { territory, touchesObj, removeOutposts } from './outpost.js';
 
-const FIELD_K = ['farm', 'wood', 'stone', 'ore'];
-export const SANCT_NAMES = ['Heiligtum der Felder', 'Heiligtum des Holzes', 'Heiligtum der Steine', 'Heiligtum der Erze'];
-export const SANCT_RES = ['food', 'wood', 'stone', 'ore'];
+const FIELD_K = ['farm', 'wood', 'stone'];
+export const SANCT_NAMES = ['Heiligtum der Felder', 'Heiligtum des Holzes', 'Heiligtum der Steine', 'Heiligtum des Goldes'];
+export const SANCT_RES = ['food', 'wood', 'stone', 'gold'];
 export const holdName = o => o.k === 'throne' ? 'Der Thron' : SANCT_NAMES[o.n] || 'Heiligtum';
 const tAt = ctx => ctx.bt != null ? ctx.bt : ctx.match.world.gt;
 const merge = (a, b) => { const r = { ...a }; for (const u in b) r[u] = (r[u] || 0) + b[u]; return r; };

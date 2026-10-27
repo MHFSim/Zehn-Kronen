@@ -19,12 +19,12 @@ export const OP_HELP_MAX = 1000;                          // so viele Einheiten 
 export const OP_MIN_TROOPS = 1;                           // jede beliebige Einheit kann bauen (sie bleibt als Besatzung)
 // Bauzeit nach Potenzgesetz: 1 Einheit 24 h, 10 ≈ 14,3 h, 100 ≈ 8,4 h, 1000 genau 5 h
 export const opBuildTime = n => OP_BUILD * Math.pow(Math.min(Math.max(1, n), OP_HELP_MAX), Math.log(OP_BUILD_FAST / OP_BUILD) / Math.log(OP_HELP_MAX));
-export const OP_COST = [400, 1000, 1200, 200];            // Nahrung, Holz, Stein, Erz – aus dem Bündnislager
+export const OP_COST = [400, 1000, 1400];                  // Nahrung, Holz, Stein – aus dem Bündnislager
 export const CLAN_SHARE = 0.25;                           // Anteil, der beim Farmen im Bündnisgebiet zusätzlich ins Bündnislager geht
 export const maxOutposts = () => Infinity;   // kein Limit
 export const cityR = rathaus => 3 + Math.ceil(rathaus / 3);
 export const opGuard = () => ({ troops: { speer: 30, bogen: 20 }, mult: 1.3 });   // Wachen ohne Besatzung
-export const storeOf = al => al ? (al.store = al.store || { food: 0, wood: 0, stone: 0, ore: 0 }) : { food: 0, wood: 0, stone: 0, ore: 0 };
+export const storeOf = al => al ? (al.store = al.store || { food: 0, wood: 0, stone: 0 }) : { food: 0, wood: 0, stone: 0 };
 export const canAfford = (al, c = OP_COST) => RES.every((r, i) => storeOf(al)[r] >= c[i]);
 export const opReady = (o, gt) => gt >= o.done;
 

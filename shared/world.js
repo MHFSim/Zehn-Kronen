@@ -66,7 +66,7 @@ function onArrive(ctx, m, bt, realT) {
   if (o.k === 'ruin') {
     if (w.ruins[o.id]) { pushReport(S, { kind: 'ruin', title: 'Ruine bereits geplündert', win: false, target: info, text: 'Hier gibt es nichts mehr zu holen.' }, realT); return back(); }
     w.ruins[o.id] = 1;
-    const loot = { food: 200 * o.lv, wood: 200 * o.lv, stone: 300 * o.lv, ore: 300 * o.lv, gold: 150 * o.lv };
+    const loot = { food: 200 * o.lv, wood: 200 * o.lv, stone: 600 * o.lv, gold: 150 * o.lv };
     m.load = loot;
     pushReport(S, { kind: 'ruin', title: 'Ruine erkundet', win: true, target: info, loot, text: 'Zwischen den alten Mauern lagen noch Vorräte.' }, realT);
     return back();

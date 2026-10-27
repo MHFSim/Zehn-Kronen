@@ -32,7 +32,7 @@ assert.ok(S.res.wood <= cap(S) + 1e-9, 'Holz bleibt unter der Lagergrenze');
 // Einheiten laut Tabelle: Kosten ohne Nahrung, Traglast, Tempo, Transport im Lagerhaus
 {
   assert.equal(Object.keys(U).length, 8);
-  assert.deepEqual(U.speer.cost, [0, 20, 10, 15]); assert.equal(U.speer.t, 240); assert.deepEqual(U.speer.at, [5, 7, 12]); assert.deepEqual(U.speer.df, [20, 31, 58]);
+  assert.deepEqual(U.speer.cost, [0, 20, 25]); assert.equal(U.speer.t, 240); assert.deepEqual(U.speer.at, [5, 7, 12]); assert.deepEqual(U.speer.df, [20, 31, 58]);
   assert.deepEqual(U.armbrust.df, [59, 91, 32]); assert.equal(U.schwer.tempo, 5); assert.equal(U.handkarren.c, 500); assert.equal(U.ochsen.c, 2500);
   assert.ok(B.lager.units.includes('handkarren') && B.lager.units.includes('ochsen'), 'Transport wird im Lagerhaus gebaut');
   assert.equal(capacityOf({ handkarren: 2, speer: 10 }), 1220, 'Karren erhöhen die Traglast');

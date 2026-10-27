@@ -282,11 +282,11 @@ function setupSheet() {
 }
 
 /* ---------- Stadt als Menü (wie bei Lords & Knights) ---------- */
-const BGROUPS = [['eco', 'Wirtschaft', '🌾', ['farm', 'saege', 'stein', 'mine', 'lager']], ['mil', 'Militär', '⚔️', ['kaserne', 'schiess', 'stall', 'lazarett']], ['adm', 'Verwaltung', '🏛️', ['rathaus', 'akademie', 'mauer']], ['tech', 'Forschung', '📜', []]];
+const BGROUPS = [['eco', 'Wirtschaft', '🌾', ['farm', 'saege', 'stein', 'lager']], ['mil', 'Militär', '⚔️', ['kaserne', 'schiess', 'stall', 'lazarett']], ['adm', 'Verwaltung', '🏛️', ['rathaus', 'akademie', 'mauer']], ['tech', 'Forschung', '📜', []]];
 let cityCat = 'eco';
-// Gebäude-Symbole im Stil der Ressourcen-Zeichen (🌾 Nahrung, 🪵 Holz, 🪨 Stein, ⛏️ Erz, 🪙 Gold)
-const BICON = { rathaus: '🏰', farm: '🌾', saege: '🪵', stein: '🪨', mine: '⛏️', lager: '📦', kaserne: '⚔️', schiess: '🏹', stall: '🐎', lazarett: '🩹', akademie: '📜', mauer: '🧱' };
-const BORDER = ['rathaus', 'farm', 'saege', 'stein', 'mine', 'lager', 'kaserne', 'schiess', 'stall', 'lazarett', 'akademie', 'mauer'];
+// Gebäude-Symbole im Stil der Ressourcen-Zeichen (🌾 Nahrung, 🪵 Holz, 🪨 Stein, 🪙 Gold)
+const BICON = { rathaus: '🏰', farm: '🌾', saege: '🪵', stein: '🪨', lager: '📦', kaserne: '⚔️', schiess: '🏹', stall: '🐎', lazarett: '🩹', akademie: '📜', mauer: '🧱' };
+const BORDER = ['rathaus', 'farm', 'saege', 'stein', 'lager', 'kaserne', 'schiess', 'stall', 'lazarett', 'akademie', 'mauer'];
 const bico = id => `<span class="bi">${BICON[id] || '🏠'}</span>`;
 const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
 const imgCache = {}, imgReal = {};
@@ -439,7 +439,7 @@ function setupCity() {
 
 /* ---------- Partie: Phase, Schutz, Bündnis, Meldungen ---------- */
 const DAY = 86400, THRONE_HOLD = 7 * DAY;
-const SANCT = [['Heiligtum der Felder', 'food'], ['Heiligtum des Holzes', 'wood'], ['Heiligtum der Steine', 'stone'], ['Heiligtum der Erze', 'ore']];
+const SANCT = [['Heiligtum der Felder', 'food'], ['Heiligtum des Holzes', 'wood'], ['Heiligtum der Steine', 'stone'], ['Heiligtum des Goldes', 'gold']];
 const pname = id => { const p = match.players.find(x => x.id === id); return p ? p.name : '?'; };
 const allyOf = id => { const p = match.players.find(x => x.id === id); return p && p.ally ? match.alliances.find(a => a.id === p.ally) : null; };
 const isAlly = id => !!(view.ally && id !== me.id && view.ally.members.includes(id));
@@ -755,13 +755,13 @@ function placeTile() {
 }
 // Welche Rohstoffpunkte liegen im Viereck (nur Erkundetes)?
 function placeInfo(t) {
-  const cnt = { farm: 0, wood: 0, stone: 0, ore: 0, sanct: 0, throne: 0 }, lv = { farm: 0, wood: 0, stone: 0, ore: 0 };
+  const cnt = { farm: 0, wood: 0, stone: 0, sanct: 0, throne: 0 }, lv = { farm: 0, wood: 0, stone: 0 };
   for (const o of wm.map.objects) {
     if (!(o.k in cnt) || Math.abs(o.x - t.x) > OP_R || Math.abs(o.y - t.y) > OP_R || !wm.exploredBit(o.x, o.y)) continue;
     cnt[o.k]++; if (o.k in lv) lv[o.k] += o.lv;
   }
   const chip = (ico, name, k) => `<span class="${cnt[k] ? '' : 'z'}" title="${name}: ${cnt[k]}${cnt[k] ? ' (Stufe ' + lv[k] + ' gesamt)' : ''}">${ico} ${cnt[k]}</span>`;
-  $('placeInfo').innerHTML = chip('🌾', 'Nahrung', 'farm') + chip('🪵', 'Holz', 'wood') + chip('🪨', 'Stein', 'stone') + chip('⛏️', 'Erz', 'ore')
+  $('placeInfo').innerHTML = chip('🌾', 'Nahrung', 'farm') + chip('🪵', 'Holz', 'wood') + chip('🪨', 'Stein', 'stone')
     + (cnt.sanct ? `<span title="Heiligtum">✨ ${cnt.sanct}</span>` : '') + (cnt.throne ? '<span title="Thron">👑</span>' : '');
 }
 function placeStep() {
@@ -854,8 +854,8 @@ function showEnd(force) {
 }
 
 /* ---------- Karte: Bedienung ---------- */
-const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', ore: 'Erzmine', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', tower: 'Turm', start: 'Burg' };
-const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Holz', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron', tower: 'Turm' };
+const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', tower: 'Turm', start: 'Burg' };
+const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Holz', stone: 'Bruch', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron', tower: 'Turm' };
 const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
 const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
 function marchRemain(m) { const L = m.arr[m.arr.length - 1], g = gtNow(); return m.phase === 'gather' ? m.tEnd - g : m.t0 + L - g; }
@@ -896,7 +896,7 @@ function selectMap(hit, keepSend) {
 // Bei Ressourcenfeldern wird die Truppenzahl so vorgewählt, dass das Feld damit geleert werden kann (mehr geht immer)
 function autoSend(hit) {
   const o = hit.type === 'obj' ? wm.map.byId[hit.id] : null;
-  if (!o || !['farm', 'wood', 'stone', 'ore'].includes(o.k)) return;
+  if (!o || !['farm', 'wood', 'stone'].includes(o.k)) return;
   const left = view.world.nodes[o.id] == null ? NODE_MAX(o.lv) : view.world.nodes[o.id];
   if (left < 50) return;
   const us = Object.keys(S.troops).filter(u => S.troops[u] > 0).sort((a, b) => U[b].c - U[a].c), pick_ = {};
@@ -1008,8 +1008,8 @@ function renderMapSheet() {
     let body = '';
     if (k === 'tower') {
       body = `<p class="desc">Startpunkt für Außenposten. Ein Bündnis beginnt hier seine Kette: Der erste Außenposten muss das weiße Feld um den Turm berühren, jeder weitere das Revier davor. Reißt die Kette in der Mitte ab, sind alle Außenposten dahinter inaktiv, bis die Lücke wieder geschlossen ist. Der Turm selbst kann nicht zerstört werden.</p>`;
-    } else if (['farm', 'wood', 'stone', 'ore'].includes(k)) {
-      const max = NODE_MAX(o.lv), left = w.nodes[id] == null ? max : w.nodes[id], res = { farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' }[k], plan = planFor(o);
+    } else if (['farm', 'wood', 'stone'].includes(k)) {
+      const max = NODE_MAX(o.lv), left = w.nodes[id] == null ? max : w.nodes[id], res = { farm: 'food', wood: 'wood', stone: 'stone' }[k], plan = planFor(o);
       body = `<dl class="stats"><dt>Vorrat</dt><dd>${fmtN(left)} von ${fmtN(max)} ${RES_DE[res]}</dd></dl>${pickerHTML()}`;
       if (plan && !plan.error) {
         const amount = Math.floor(Math.min(plan.capacity, left)), gather = amount ? GATHER_SEC * amount : 0;
@@ -1031,7 +1031,7 @@ function renderMapSheet() {
         body += actionRow('Angreifen', plan, '', free);
       }
     } else if (k === 'ruin') {
-      const done = !!w.ruins[id], plan = planFor(o), loot = { food: 200 * o.lv, wood: 200 * o.lv, stone: 300 * o.lv, ore: 300 * o.lv, gold: 150 * o.lv };
+      const done = !!w.ruins[id], plan = planFor(o), loot = { food: 200 * o.lv, wood: 200 * o.lv, stone: 600 * o.lv, gold: 150 * o.lv };
       body = `<dl class="stats"><dt>Beute (einmalig)</dt><dd class="costs">${lootHTML(loot)}</dd></dl>`;
       if (done) body += '<p class="why">Diese Ruine ist schon geplündert.</p>';
       else { body += pickerHTML(); if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`; body += actionRow('Plündern', plan, '', free); }
@@ -1083,7 +1083,7 @@ function renderMapSheet() {
     }
     h = `<div class="sh-head"><h2>${title}</h2>${lv}<button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
   }
-  const MI = { farm: '🌾', wood: '🪵', stone: '🪨', ore: '⛏️', camp: '⚔️', ruin: '🏛️', sanct: '✨', throne: '👑', tower: '🗼', start: '🏰' };
+  const MI = { farm: '🌾', wood: '🪵', stone: '🪨', camp: '⚔️', ruin: '🏛️', sanct: '✨', throne: '👑', tower: '🗼', start: '🏰' };
   const ico = msel.type === 'march' ? '🚩' : msel.type === 'site' ? '🏗️' : msel.type === 'op' ? '🗼' : MI[(wm.map.byId[msel.id] || {}).k] || '📍';
   h = h.replace('<div class="sh-head">', `<div class="sh-head"><span class="sh-ico">${ico}</span>`).replace('data-act="close">Schließen</button>', 'data-act="close" aria-label="Schließen">✕</button>');
   $('sheet').classList.add('popup');

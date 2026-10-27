@@ -2,40 +2,38 @@
 // Dieses Modul läuft auf dem Server (maßgeblich) und im Browser (nur für flüssige Anzeige).
 // Alle Werte sind Startwerte aus dem Designdokument und werden im Test angepasst.
 
-export const RES = ['food', 'wood', 'stone', 'ore'];
-export const RES_DE = { food: 'Nahrung', wood: 'Holz', stone: 'Stein', ore: 'Erz', gold: 'Gold' };
+export const RES = ['food', 'wood', 'stone'];
+export const RES_DE = { food: 'Nahrung', wood: 'Holz', stone: 'Stein', gold: 'Gold' };
 
 export const B = {
-  rathaus:  { name: 'Rathaus', x: 5, y: 5, w: 3, unlock: 1, base: [200, 250, 150, 0], time: 80,
+  rathaus:  { name: 'Rathaus', x: 5, y: 5, w: 3, unlock: 1, base: [200, 250, 150], time: 80,
               desc: 'Herz der Stadt. Seine Stufe begrenzt alle anderen Gebäude und bringt Steuergold.' },
-  farm:     { name: 'Farm', x: 1, y: 1, w: 2, unlock: 1, base: [0, 60, 20, 0], time: 8, prod: 'food',
+  farm:     { name: 'Farm', x: 1, y: 1, w: 2, unlock: 1, base: [0, 60, 20], time: 8, prod: 'food',
               desc: 'Erzeugt Nahrung für Bau, Ausbildung und Forschung. Truppen kosten keinen Unterhalt.' },
-  saege:    { name: 'Sägewerk', x: 1, y: 4, w: 2, unlock: 1, base: [50, 30, 20, 0], time: 8, prod: 'wood',
+  saege:    { name: 'Sägewerk', x: 1, y: 4, w: 2, unlock: 1, base: [50, 30, 20], time: 8, prod: 'wood',
               desc: 'Erzeugt Holz für Gebäude, Speere, Bögen und Rammen.' },
-  stein:    { name: 'Steinbruch', x: 1, y: 7, w: 2, unlock: 2, base: [50, 80, 0, 0], time: 10, prod: 'stone',
-              desc: 'Erzeugt Stein für Mauer und späte Gebäude.' },
-  mine:     { name: 'Erzmine', x: 1, y: 10, w: 2, unlock: 3, base: [60, 100, 40, 0], time: 12, prod: 'ore',
-              desc: 'Erzeugt Erz für Schwerter, Reiterei und Forschung.' },
-  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80, 0], time: 15, units: ['handkarren', 'ochsen'],
+  stein:    { name: 'Steinbruch', x: 1, y: 7, w: 2, unlock: 2, base: [50, 80, 0], time: 10, prod: 'stone',
+              desc: 'Erzeugt Stein für Mauer, Truppen und späte Gebäude.' },
+  lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80], time: 15, units: ['handkarren', 'ochsen'],
               desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können. Baut Hand- und Ochsenkarren (Transport).' },
-  kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60, 0], time: 20, units: ['speer', 'schwert'],
+  kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60], time: 20, units: ['speer', 'schwert'],
               desc: 'Bildet Speerträger und Schwertkämpfer aus. Jede Stufe verkürzt die Ausbildung.' },
-  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 60, 20], time: 25, units: ['bogen', 'armbrust'],
+  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 80], time: 25, units: ['bogen', 'armbrust'],
               desc: 'Bildet Bogen- und Armbrustschützen aus.' },
-  stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 100, 150], time: 40, units: ['leicht', 'schwer'],
+  stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 250], time: 40, units: ['leicht', 'schwer'],
               desc: 'Bildet Lanzenreiter und Panzerreiter aus. Panzerreiter ab Stall Stufe 5.' },
-  lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80, 0], time: 20,
+  lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80], time: 20,
               desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind.' },
-  akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 150, 80], time: 40,
+  akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 230], time: 40,
               desc: 'Hier erforschst du Verbesserungen für Wirtschaft und Militär. Höhere Stufen erlauben höhere Forschungsstufen.' },
-  mauer:    { name: 'Mauer & Tor', x: 6, y: 11, w: 2, unlock: 3, base: [0, 100, 200, 0], time: 20,
+  mauer:    { name: 'Mauer & Tor', x: 6, y: 11, w: 2, unlock: 3, base: [0, 100, 200], time: 20,
               desc: 'Stärkt die Verteidigung deiner Burg und vergrößert die Stadtwache, die sie auch ohne Truppen beschützt.' }
 };
 
-// Einheiten nach der Tabelle „Lords & Knights“: Kosten Holz/Stein/Erz, Ausbildungszeit t (Sekunden je Einheit), Tempo in Minuten je Feld,
+// Einheiten nach der Tabelle „Lords & Knights“: Kosten Holz/Stein (Erz-Kosten der Tabelle sind im Stein enthalten), Ausbildungszeit t (Sekunden je Einheit), Tempo in Minuten je Feld,
 // Traglast c, Angriff at und Abwehr df gegen [Artillerie, Infanterie, Kavallerie]. g = Gattung. Transporter kämpfen nicht.
 export const GATT = { inf: 'Infanterie', art: 'Artillerie', kav: 'Kavallerie', trans: 'Transport' };
-const mk = (name, g, cost, t, tempo, c, at, df, req, o = {}) => ({ name, g, cost: [0, ...cost], t, tempo, s: 60 / tempo, c, at, df, req,
+const mk = (name, g, cost, t, tempo, c, at, df, req, o = {}) => ({ name, g, cost: [0, cost[0], cost[1] + (cost[2] || 0)], t, tempo, s: 60 / tempo, c, at, df, req,
   a: at ? Math.round(at.reduce((x, y) => x + y, 0) / 3) : 0, v: df ? Math.round(df.reduce((x, y) => x + y, 0) / 3) : 0, ...o });
 export const U = {
   speer:     mk('Speerträger',     'inf',   [20, 10, 15], 240,  15,   22, [5, 7, 12],   [20, 31, 58], 1, { strong: ['leicht'], good: ['schwert'], weak: ['bogen'] }),
@@ -51,14 +49,13 @@ export const U = {
 // Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.
 // per = Wirkung je Stufe, Kosten und Zeit wachsen mit der Stufe, Stufe n braucht Akademie 2n-1.
 export const T = {
-  ackerbau:    { name: 'Ackerbau',      icon: 'farm',    per: .08, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80, 0],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
-  forst:       { name: 'Forstwirtschaft', icon: 'saege', per: .08, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80, 0],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
-  steinmetz:   { name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60, 0], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
-  bergbau:     { name: 'Bergbau',        icon: 'mine',   per: .08, unit: 'Erz',       eff: 'ore',   base: [100, 100, 80, 40], time: 60, desc: 'Mehr Erz aus der Mine' },
-  handel:      { name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 100, 60], time: 70, desc: 'Mehr Steuergold' },
-  kriegskunst: { name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 100, 150], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
-  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .06, unit: 'Marschtempo', eff: 'speed', base: [150, 150, 50, 50], time: 75, desc: 'Deine Heere marschieren schneller' },
-  lasten:      { name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100, 0], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
+  ackerbau:    { name: 'Ackerbau',      icon: 'farm',    per: .08, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
+  forst:       { name: 'Forstwirtschaft', icon: 'saege', per: .08, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
+  steinmetz:   { name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
+  handel:      { name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
+  kriegskunst: { name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
+  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .06, unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
+  lasten:      { name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
 };
 export const T_MAX = 5;
 export const techLv = (S, id) => (S.tech && S.tech[id]) || 0;
@@ -84,7 +81,7 @@ export function freshState(now) {
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
   troops.speer = 20; troops.handkarren = 1;   // Startheer: 20 Speerträger und 1 Handkarren
-  return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null, items: {}, tpAt: -1e9 };
+  return { res: { food: 600, wood: 600, stone: 650, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null, items: {}, tpAt: -1e9 };
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);

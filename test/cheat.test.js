@@ -12,7 +12,7 @@ assert.equal(cheat(match, players, { kind: 'resources', player: a.id, food: 500,
 assert.equal(a.state.res.food, 1100); assert.equal(a.state.res.gold, 170); assert.equal(b.state.res.food, 600);
 assert.equal(cheat(match, players, { kind: 'troops', player: 'all', count: 50, unit: 'speer' }, T0), ''); assert.equal(b.state.troops.speer, 70);
 assert.equal(cheat(match, players, { kind: 'levels', player: a.id, level: 6 }, T0), ''); assert.equal(a.state.lv.rathaus, 6); assert.equal(a.state.lv.farm, 6);
-a.state.res.food = a.state.res.wood = a.state.res.stone = a.state.res.ore = 9999;
+a.state.res.food = a.state.res.wood = a.state.res.stone = 9999;
 assert.equal(command(match, players, a, { type: 'upgrade', id: 'rathaus' }, T0), ''); assert.equal(a.state.queue.length, 1);
 assert.equal(cheat(match, players, { kind: 'finish', player: a.id }, T0), ''); assert.equal(a.state.queue.length, 0); assert.equal(a.state.lv.rathaus, 7);
 assert.equal(cheat(match, players, { kind: 'items', player: a.id, teleport: 2, sp15: 3 }, T0), ''); assert.equal(a.state.items.teleport, 2);

@@ -21,7 +21,7 @@ assert.notDeepEqual(p1.state.pos, p2.state.pos);
 // Ausbilden geht schneller mit Hilfe der Starttruppen
 p1.state.troops.speer = 60; p1.state.troops.schwert = 40;
 const map = mapOf(match);
-const myNode = map.objects.filter(o => ['farm', 'wood', 'stone', 'ore'].includes(o.k)).sort((x, y) =>
+const myNode = map.objects.filter(o => ['farm', 'wood', 'stone'].includes(o.k)).sort((x, y) =>
   Math.hypot(x.x - p1.state.pos[0], x.y - p1.state.pos[1]) - Math.hypot(y.x - p1.state.pos[0], y.y - p1.state.pos[1]))[0];
 
 // Zu viele Truppen und fehlende Ziele werden abgelehnt
@@ -31,7 +31,7 @@ assert.match(command(match, players, p1, { type: 'march', target: 'gibtsnicht', 
 assert.match(command(match, players, p1, { type: 'march', target: myNode.id, troops: {} }, t), /Keine Truppen/);
 
 // Sammeln: hin, sammeln, zurück
-const before = p1.state.res[({ farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' })[myNode.k]];
+const before = p1.state.res[({ farm: 'food', wood: 'wood', stone: 'stone' })[myNode.k]];
 assert.equal(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 30, schwert: 20 } }, t), '');
 assert.equal(match.world.marches.length, 1);
 assert.equal(p1.state.troops.speer, 30);
@@ -52,7 +52,7 @@ syncMatch(match, players, t);
 assert.equal(match.world.marches.length, 0, 'Heer ist zurück');
 assert.equal(p1.state.troops.speer, 60);
 assert.equal(Object.keys(p1.state.away).length, 0);
-const res = ({ farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' })[myNode.k];
+const res = ({ farm: 'food', wood: 'wood', stone: 'stone' })[myNode.k];
 assert.ok(p1.state.res[res] > before, 'Beute angekommen');
 assert.ok(p1.state.reports.some(r => r.kind === 'return'), 'Bericht über die Rückkehr');
 assert.ok(nodeLeft(match.world, myNode, match.world.gt) < 3000 * myNode.lv + 1);
@@ -98,7 +98,7 @@ assert.equal(match.world.marches.length, 0, 'Heer wieder zuhause');
 assert.ok(p1.state.reports.some(r => r.kind === 'return' && r.loot.gold > 0), 'Beute aus dem Lager');
 
 // Heer-Obergrenze
-const node2 = mapOf(match).objects.find(o => ['farm', 'wood', 'stone', 'ore'].includes(o.k) && o.id !== myNode.id);
+const node2 = mapOf(match).objects.find(o => ['farm', 'wood', 'stone'].includes(o.k) && o.id !== myNode.id);
 assert.equal(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), '');
 assert.match(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), /sammelt schon ein Heer/, 'nur ein Heer pro Feld');
 assert.equal(command(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 1 } }, t), '');

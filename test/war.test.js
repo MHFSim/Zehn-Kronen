@@ -64,7 +64,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.match(run(match, players, clock, a, { type: 'march', target: cityOf(b).id, mode: 'attack', troops: { schwert: 100 } }), /Schutz/);
   assert.match(run(match, players, clock, a, { type: 'march', target: cityOf(a).id, mode: 'attack', troops: { schwert: 100 } }), /eigene/);
   adv(match, players, 4.1 * DAY);
-  for (const p of players) { p.state.res.food = p.state.res.wood = p.state.res.stone = p.state.res.ore = 3000; }
+  for (const p of players) { p.state.res.food = p.state.res.wood = p.state.res.stone = 3000; }
   b.state.troops = {}; // verteidigt nur die Stadtwache
   const before = { ...a.state.res };
   assert.equal(run(match, players, clock, a, { type: 'march', target: cityOf(b).id, mode: 'attack', troops: { schwert: 300, bogen: 150, speer: 150 } }), '');
@@ -145,15 +145,15 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
 // ---- Überfall auf Sammler ----
 {
   const { match, players } = mk(2); const [a, b] = players;
-  const map = mapOf(match), node = map.objects.filter(o => ['farm', 'wood', 'stone', 'ore'].includes(o.k)).sort((x, y) => Math.hypot(x.x - b.state.pos[0], x.y - b.state.pos[1]) - Math.hypot(y.x - b.state.pos[0], y.y - b.state.pos[1]))[0];
+  const map = mapOf(match), node = map.objects.filter(o => ['farm', 'wood', 'stone'].includes(o.k)).sort((x, y) => Math.hypot(x.x - b.state.pos[0], x.y - b.state.pos[1]) - Math.hypot(y.x - b.state.pos[0], y.y - b.state.pos[1]))[0];
   adv(match, players, 4.1 * DAY);
-  give(a, { schwert: 400 }); give(b, { speer: 30 });
+  give(a, { schwert: 900 }); give(b, { speer: 150 });
   assert.match(run(match, players, clock, a, { type: 'march', target: node.id, mode: 'attack', troops: { schwert: 100 } }), /niemand/);
-  assert.equal(run(match, players, clock, b, { type: 'march', target: node.id, troops: { speer: 30 } }), '');
+  assert.equal(run(match, players, clock, b, { type: 'march', target: node.id, troops: { speer: 150 } }), '');
   { const g0 = match.world.marches.find(m => m.owner === b.id); adv(match, players, g0.arr[g0.arr.length - 1] + 30); }
   assert.equal(match.world.marches.find(m => m.owner === b.id).phase, 'gather');
   give(a, { speer: 10 }); assert.match(run(match, players, clock, a, { type: 'march', target: node.id, troops: { speer: 10 } }), /sammelt schon ein Heer/);
-  assert.equal(run(match, players, clock, a, { type: 'march', target: node.id, mode: 'attack', troops: { schwert: 300 } }), '');
+  assert.equal(run(match, players, clock, a, { type: 'march', target: node.id, mode: 'attack', troops: { schwert: 800 } }), '');
   adv(match, players, 12 * 3600);
   assert.ok(!match.world.marches.some(m => m.owner === b.id), 'Sammler vernichtet');
   assert.ok(b.state.reports.some(r => r.kind === 'pvp' && r.role === 'def' && !r.win), 'Bericht Opfer');

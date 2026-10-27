@@ -12,7 +12,7 @@ const [a, b, c, d] = players; let clock = T0;
 const adv = sec => { clock += sec / match.speed * 1000; syncMatch(match, players, clock); };
 const run = (p, cmd) => command(match, players, p, cmd, clock);
 const give = (p, t) => { for (const u in t) p.state.troops[u] = (p.state.troops[u] || 0) + t[u]; };
-const rich = p => { for (const r of ['food', 'wood', 'stone', 'ore']) p.state.res[r] = 99999; p.state.res.gold = 99999; };
+const rich = p => { for (const r of ['food', 'wood', 'stone']) p.state.res[r] = 99999; p.state.res.gold = 99999; };
 const map = mapOf(match), w = match.world;
 const gt = () => w.gt;
 
@@ -43,7 +43,7 @@ assert.equal(run(a, { type: 'allyColor', color: '#112233' }), ''); assert.equal(
 give(a, { speer: 200 }); give(b, { speer: 200, schwert: 100 }); rich(a); rich(b);
 assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), /Bündnislager/);
 assert.match(run(a, { type: 'donate', amounts: { food: 1e9 } }), /nicht/);
-assert.equal(run(a, { type: 'donate', amounts: { food: 1000, wood: 2000, stone: 2000, ore: 500 } }), '');
+assert.equal(run(a, { type: 'donate', amounts: { food: 1000, wood: 2000, stone: 2000 } }), '');
 assert.equal(storeOf(al).wood, 2000); assert.equal(a.state.res.wood, 99999 - 2000);
 assert.equal(viewFor(match, players, b, clock).ally.store.food, 1000, 'alle Mitglieder sehen das Lager');
 assert.equal(opBuildTime(1), 24 * 3600); assert.ok(Math.abs(opBuildTime(1000) - 5 * 3600) < 1); assert.equal(opBuildTime(1000), opBuildTime(5000), 'mehr als 1000 Einheiten verkürzen nicht weiter');
@@ -74,7 +74,7 @@ const site2 = findSite(a, [op.x, op.y], [2 * OP_R + 1, 2 * OP_R, 2 * OP_R - 2]);
 assert.equal(run(b, { type: 'march', mode: 'garrison', target: op.id, troops: { speer: 80 } }), '');
 give(c, { speer: 5 }); assert.match(run(c, { type: 'march', mode: 'garrison', target: op.id, troops: { speer: 1 } }), /Keine Truppen|Bündnis/);
 adv(DAY); assert.equal(op.garr[b.id].speer, 80);
-storeOf(al).food = storeOf(al).wood = storeOf(al).stone = storeOf(al).ore = 99999;
+storeOf(al).food = storeOf(al).wood = storeOf(al).stone = 99999;
 assert.equal(run(b, { type: 'march', mode: 'build', x: site2[0], y: site2[1], troops: { speer: 50 } }), '');
 adv(DAY + OP_BUILD);
 assert.equal(Object.keys(w.outposts).length, 2);
@@ -106,7 +106,7 @@ assert.deepEqual(a.state.pos, spot); assert.equal(a.state.items.teleport, 0);
 assert.equal(run(a, { type: 'buy', item: 'teleport', n: 1 }), ''); assert.match(run(a, { type: 'teleport', x: spot[0], y: spot[1] + 1 }), /lädt/);
 
 // Speedups
-a.state.res.food = a.state.res.wood = a.state.res.stone = a.state.res.ore = 9999;
+a.state.res.food = a.state.res.wood = a.state.res.stone = 9999;
 assert.equal(run(a, { type: 'upgrade', id: 'rathaus' }), '');
 const left0 = a.state.queue[0].left;
 assert.match(run(a, { type: 'useSpeed', item: 'sp5', kind: 'build', ref: 'rathaus' }), /keinen/);

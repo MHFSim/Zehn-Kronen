@@ -488,7 +488,7 @@ export function buildAtlas(PIXI) {
     add('castle' + t, W, Hh, W / 2, AY, c => castle(c, t));
   }
   add('flag', 18, 14, 1, 2, c => flagCloth(c));
-  add('farm', 130, 110, 65, 70, nodeFarm); add('wood', 130, 110, 65, 70, nodeWood); add('stone', 130, 110, 65, 70, nodeStone); add('ore', 130, 110, 65, 70, nodeOre);
+  add('farm', 130, 110, 65, 70, nodeFarm); add('wood', 130, 110, 65, 70, nodeWood); add('stone', 130, 110, 65, 70, nodeStone);
   add('camp', 220, 180, 110, 112, camp); add('campDead', 200, 100, 100, 70, campDead);
   add('ruin', 220, 190, 110, 118, ruin); add('sanct', 250, 240, 125, 150, sanct); add('throne', 330, 290, 165, 190, throne); add('slot', 130, 80, 65, 50, slot);
   for (let k = 0; k < 3; k++) add('fire' + k, 48, 48, 24, 40, c => fireFrame(c, k));

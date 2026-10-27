@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { freshState, applyCommand, advanceTo, rate, techCost, techTime, techMult, T_MAX, T } from '../shared/rules.js';
 import { battle, capacityOf, forceOf } from '../shared/combat.js';
-const S = freshState(0); S.res = { food: 1e5, wood: 1e5, stone: 1e5, ore: 1e5, gold: 0 };
+const S = freshState(0); S.res = { food: 1e5, wood: 1e5, stone: 1e5, gold: 0 };
 assert.match(applyCommand(S, { type: 'research', tech: 'ackerbau' }), /Akademie/);
 S.lv.akademie = 1; S.lv.rathaus = 9;
 assert.match(applyCommand(S, { type: 'research', tech: 'gibtsnicht' }), /Unbekannt/);
@@ -25,5 +25,5 @@ assert.equal(forceOf(S), 1.2); assert.equal(capacityOf({ speer: 100 }, S), 2860)
 const att = { speer: 100 }, def = { speer: 100 };
 assert.equal(battle(att, def, 1, 1).win, false);
 assert.equal(battle(att, def, 1, 1.5).win, true);
-assert.equal(Object.keys(T).length, 8);
+assert.equal(Object.keys(T).length, 7);
 console.log('Alle Forschungstests bestanden.');

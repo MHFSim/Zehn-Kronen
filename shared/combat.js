@@ -17,7 +17,7 @@ export function campTroops(lv) {
   return t;
 }
 export const campMult = lv => 1 + 0.10 * (lv - 1);
-export const campLoot = lv => ({ food: 300 * lv, wood: 300 * lv, stone: 200 * lv, ore: 150 * lv, gold: 20 * lv });
+export const campLoot = lv => ({ food: 300 * lv, wood: 300 * lv, stone: 350 * lv, gold: 20 * lv });
 
 /* ---------- Kampf ---------- */
 // Jede Einheit hat Angriff und Abwehr gegen Artillerie, Infanterie und Kavallerie. Je Runde fällt von einer Zielgruppe h

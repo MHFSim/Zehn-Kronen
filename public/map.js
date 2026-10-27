@@ -279,7 +279,7 @@ function buildRuin(dead) {
   if (!dead) { b.box(.5, .28, .34, .1, 0, .3, [120, 84, 52]); b.box(.52, .05, .36, .1, .28, .3, GOLD); }
   return { geo: b.build(), flags: [], h: 1.5 };
 }
-const NODE_K = ['farm', 'wood', 'stone', 'ore'];
+const NODE_K = ['farm', 'wood', 'stone'];
 function buildDepleted() {
   const b = new MB(), D = [112, 92, 66];
   b.cyl(1.5, 1.7, .14, 14, 0, 0, 0, D, .2); b.cyl(1.0, 1.25, .1, 12, .1, .14, -.05, mul(D, .88), .25);
@@ -393,8 +393,8 @@ void main(){
 #include <fog_fragment>
 }`;
 
-const SKIRT = { farm: [[132, 108, 66], 2.2], wood: [[104, 84, 54], 1.9], stone: [[140, 134, 120], 2.0], ore: [[96, 90, 82], 2.1], camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
-const KIND_R = { start: 2.8, tower: 2.4, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, ore: 1.7, camp: 1.9, ruin: 1.7 };
+const SKIRT = { farm: [[132, 108, 66], 2.2], wood: [[104, 84, 54], 1.9], stone: [[140, 134, 120], 2.0], camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
+const KIND_R = { start: 2.8, tower: 2.4, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, camp: 1.9, ruin: 1.7 };
 
 export class WorldMap {
   constructor(THREE, host) {
@@ -465,7 +465,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const at = (x, y) => H[clamp(y, 0, G - 1) * G + clamp(x, 0, G - 1)];
     const C = { sand: [220, 202, 148], g1: [104, 152, 64], g2: [78, 126, 52], olive: [136, 142, 72], rock: [132, 122, 106], rock2: [98, 92, 86], snow: [240, 244, 250], forest: [44, 86, 44], dirt: [156, 128, 90], dsand: [150, 150, 120], dwater: [38, 90, 112] };
     const pads = { start: [[118, 104, 78], 2.3, .6], camp: [[112, 94, 68], 2.2, .7], ruin: [[112, 106, 90], 1.9, .55], sanct: [[205, 200, 184], 2.4, .8], throne: [[190, 180, 150], 3.4, .8], tower: [[170, 164, 148], 3.0, .8],
-      farm: [[150, 126, 70], 1.9, .5], wood: [[98, 82, 52], 1.7, .55], stone: [[150, 144, 130], 1.9, .6], ore: [[100, 92, 82], 2.1, .6] };
+      farm: [[150, 126, 70], 1.9, .5], wood: [[98, 82, 52], 1.7, .55], stone: [[150, 144, 130], 1.9, .6] };
     const pre = new Float32Array(n * 3), nz3 = new Float32Array(n), ao = new Float32Array(n);
     this.tv = { pre, nz3, ao, col, C, pads, map };
     for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++) {
@@ -610,7 +610,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   buildObjects(map) {
     this.models = {}; const M = this.models;
     M.slot = buildSlot(); M.throne = buildThrone(); M.tower = buildTower(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true); M.depleted = buildDepleted();
-    for (const k of ['farm', 'wood', 'stone', 'ore']) M[k] = { farm: buildFarm, wood: buildWood, stone: buildStone, ore: buildOre }[k]();
+    for (const k of ['farm', 'wood', 'stone']) M[k] = { farm: buildFarm, wood: buildWood, stone: buildStone }[k]();
     this.unitGeos = {}; this.castleCache = {}; this.smokeList = [];
     this.flagGeo = new T.PlaneGeometry(.7, .42, 6, 2); this.flagGeo.translate(.35, 0, 0);
     this.fireGeo = new T.ConeGeometry(.2, .55, 6); this.fireMat = new T.MeshBasicMaterial({ color: 0xffb040 });
@@ -627,7 +627,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else {
         const mdl = M[o.k]; hd.main = mesh(mdl); g.add(hd.main);
         if (NODE_K.includes(o.k)) { hd.emptyM = mesh(M.depleted); hd.emptyM.visible = false; g.add(hd.emptyM); }
-        if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { const k = .95 + .05 * o.lv; g.scale.setScalar(k); }
+        if (['farm', 'wood', 'stone'].includes(o.k)) { const k = .95 + .05 * o.lv; g.scale.setScalar(k); }
         if (o.k === 'sanct') { hd.glow = new T.Mesh(new T.OctahedronGeometry(.42), this.glowMat); hd.glow.position.set(0, 2.9, 0); g.add(hd.glow); }
         if (o.k === 'tower') { this.attachParts(hd, M.tower); hd.smokeOffs = M.tower.smoke; }
         if (o.k === 'throne') { this.addFlags(hd, M.throne.flags, 0xe9c860); this.attachParts(hd, M.throne); hd.smokeOffs = M.throne.smoke; }
@@ -737,7 +737,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     void bar;
   }
   rebuildLabels(view) {
-    const RES_COL = { farm: 0xb58a22, wood: 0x7b5630, stone: 0x6b6f75, ore: 0x3f6b94 };
+    const RES_COL = { farm: 0xb58a22, wood: 0x7b5630, stone: 0x6b6f75 };
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, up = 1.6;
       if (o.k === 'start' && h.player) {
@@ -749,7 +749,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         else if (pl.protUntil > gt) txt = '🛡 ' + txt;
         if (h.castle) h.castle.visible = true;
       }
-      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = h.empty ? 'leer' : String(o.lv); col = h.empty ? 0x7a6a55 : RES_COL[o.k]; up = h.empty ? 1.2 : 2.0; }
+      else if (['farm', 'wood', 'stone'].includes(o.k)) { txt = h.empty ? 'leer' : String(o.lv); col = h.empty ? 0x7a6a55 : RES_COL[o.k]; up = h.empty ? 1.2 : 2.0; }
       else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = 0x8a2b24; up = 2.4; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; up = 2.2; }
       else if (o.k === 'tower') { txt = 'Turm'; col = 0x5a6070; up = 19; }

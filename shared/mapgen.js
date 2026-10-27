@@ -54,8 +54,8 @@ export const START_R = 101, SANCT_R = 53;
 export const startSpot = i => [Math.floor(C + RING[i][0] * START_R), Math.floor(C + RING[i][1] * START_R)];
 const sanctSpot = i => [Math.floor(C + AXES[i][0] * SANCT_R), Math.floor(C + AXES[i][1] * SANCT_R)];
 
-export const NODE_KINDS = ['farm', 'wood', 'stone', 'ore'];
-export const NODE_RES = { farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' };
+export const NODE_KINDS = ['farm', 'wood', 'stone'];
+export const NODE_RES = { farm: 'food', wood: 'wood', stone: 'stone' };
 export const NODE_MAX = lv => 3000 * lv;
 export const cellOf = (x, y) => y * N + x;
 export const distC = (x, y) => Math.sqrt((x + .5 - C) * (x + .5 - C) + (y + .5 - C) * (y + .5 - C));
@@ -201,7 +201,7 @@ export function generateMap(seed) {
   // Rest der Karte
   const scatter = (kind, count, minD, lvf, r0 = 6) => { for (let i = 0; i < count; i++) tryPlace(kind, C, C, r0, C * 0.9, minD, lvf, 80); };
   // Ressourcen: deutlich weniger und nie in Thronnähe
-  scatter('farm', 14, 10, nodeLv, 36); scatter('wood', 14, 8, nodeLv, 36); scatter('stone', 11, 10, nodeLv, 36); scatter('ore', 11, 8, nodeLv, 36);
+  scatter('farm', 14, 10, nodeLv, 36); scatter('wood', 14, 8, nodeLv, 36); scatter('stone', 14, 10, nodeLv, 36);
   scatter('camp', 14, 10, campLv);
 
   const map = { seed, N, H, F, pass, reach, objects, starts, byId: Object.fromEntries(objects.map(o => [o.id, o])) };

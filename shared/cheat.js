@@ -49,7 +49,7 @@ export function cheat(match, players, c, now) {
     }
     case 'store': {
       const n = num(c.amount, 5000);
-      for (const al of alsOf()) { al.store = al.store || { food: 0, wood: 0, stone: 0, ore: 0 }; for (const r of RES) al.store[r] += n; }
+      for (const al of alsOf()) { al.store = al.store || { food: 0, wood: 0, stone: 0 }; for (const r of RES) al.store[r] += n; }
       return '';
     }
     case 'items':
