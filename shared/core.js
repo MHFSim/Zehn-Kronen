@@ -9,7 +9,7 @@ export const DAY = 86400;
 export const PLAYER_COLORS = ['#c8372d', '#2f6fd1', '#e2b02e', '#3f9d4c', '#8a4bc4', '#e0782b', '#27a7a1', '#d9609c', '#9aa5b1', '#b9d03a'];
 export const NODE_REGEN = 0.01;          // Anteil des Höchstvorrats pro Spielstunde
 export const CAMP_RESPAWN = 6 * 3600;    // bis ein Lager wiederkommt
-export const GATHER_FULL = 2 * 3600;     // bis ein Heer seine volle Traglast gesammelt hat
+export const GATHER_SEC = 60;            // Sammeln: 1 Rohstoff pro Minute, unabhängig von der Truppenzahl (die Traglast begrenzt nur die Menge)
 export const VIEW_CITY = 11, VIEW_ARMY = 6;
 export const PROTECT = 4 * DAY;          // Neulingsschutz
 export const FALL_PROTECT = 12 * 3600;   // Schutz nach dem Fall der Burg

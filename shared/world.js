@@ -6,7 +6,7 @@ import { N, startSpot, SLOTS, NODE_RES, NODE_KINDS } from './mapgen.js';
 import { U, freshState, advanceTo, applyCommand, armySlots } from './rules.js';
 import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from './combat.js';
 import {
-  DAY, GATHER_FULL, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, campAlive,
+  DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur
 } from './core.js';
@@ -38,7 +38,7 @@ function onArrive(ctx, m, bt, realT) {
       return back();
     }
     w.nodes[o.id] = { left: left, t: bt };
-    m.phase = 'gather'; m.tStart = bt; m.tEnd = bt + GATHER_FULL * amount / cap; m.amount = amount; m.res = NODE_RES[o.k];
+    m.phase = 'gather'; m.tStart = bt; m.tEnd = bt + GATHER_SEC * amount; m.amount = amount; m.res = NODE_RES[o.k];
     return;
   }
   if (o.k === 'camp') {

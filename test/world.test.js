@@ -47,7 +47,7 @@ t += (dur + 60) / 100 * 1000;
 syncMatch(match, players, t);
 assert.equal(match.world.marches[0].phase, 'gather');
 // nach Sammeldauer und Rückweg ist alles wieder zuhause
-t += (2 * 3600 + 2 * dur + 600) / 100 * 1000;
+{ const g = match.world.marches[0]; assert.equal(g.tEnd - g.tStart, 60 * g.amount, '1 Rohstoff pro Minute'); t += ((g.tEnd - g.tStart) + 2 * dur + 600) / 100 * 1000; }
 syncMatch(match, players, t);
 assert.equal(match.world.marches.length, 0, 'Heer ist zurück');
 assert.equal(p1.state.troops.speer, 60);

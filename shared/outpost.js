@@ -13,8 +13,12 @@ import { RES, TELEPORT_COOLDOWN } from './rules.js';
 
 /* ---------- Regeln ---------- */
 export const OP_R = 6;                                    // halbe Seitenlänge: 13×13 Felder
-export const OP_BUILD = 2 * 3600;                         // Bauzeit in Spielsekunden
-export const OP_MIN_TROOPS = 50;                          // so viele Truppen braucht ein Bautrupp (er bleibt als Besatzung)
+export const OP_BUILD = 24 * 3600;                        // Bauzeit mit 1 Einheit (Spielsekunden)
+export const OP_BUILD_FAST = 5 * 3600;                    // Bauzeit mit 1000 Einheiten
+export const OP_HELP_MAX = 1000;                          // so viele Einheiten verkürzen die Bauzeit höchstens (mehr dürfen trotzdem dort stehen)
+export const OP_MIN_TROOPS = 1;                           // jede beliebige Einheit kann bauen (sie bleibt als Besatzung)
+// Bauzeit nach Potenzgesetz: 1 Einheit 24 h, 10 ≈ 14,3 h, 100 ≈ 8,4 h, 1000 genau 5 h
+export const opBuildTime = n => OP_BUILD * Math.pow(Math.min(Math.max(1, n), OP_HELP_MAX), Math.log(OP_BUILD_FAST / OP_BUILD) / Math.log(OP_HELP_MAX));
 export const OP_COST = [400, 1000, 1200, 200];            // Nahrung, Holz, Stein, Erz – aus dem Bündnislager
 export const CLAN_SHARE = 0.25;                           // Anteil, der beim Farmen im Bündnisgebiet zusätzlich ins Bündnislager geht
 export const maxOutposts = () => Infinity;   // kein Limit
@@ -171,9 +175,9 @@ export function arriveBuild(ctx, m, bt, realT, back) {
   const info = { kind: 'outpost', id: m.tid, x, y };
   let why = al ? checkSite(match, players, A, x, y, bt) : 'Du bist in keinem Bündnis mehr.';
   if (why) { if (al) refundStore(w, al.id); pushReport(S, { kind: 'outpost', title: 'Bau nicht möglich', win: false, target: info, text: why + ' Das Heer kehrt zurück' + (al ? ', die Rohstoffe liegen wieder im Bündnislager.' : '.') }, realT); return back(); }
-  const id = 'op' + w.nextOp++, o = { id, al: al.id, by: A.id, x, y, done: bt + OP_BUILD, garr: { [A.id]: { ...m.troops } } };
+  const id = 'op' + w.nextOp++, o = { id, al: al.id, by: A.id, x, y, done: bt + opBuildTime(sum(m.troops)), garr: { [A.id]: { ...m.troops } } };
   w.outposts[id] = o; m.dead = true;
-  pushReport(S, { kind: 'outpost', title: 'Außenposten wird gebaut', win: true, target: { ...info, id }, text: 'Dein Bautrupp (' + sum(m.troops) + ' Truppen) bleibt als Besatzung dort. In ' + fmtDur(OP_BUILD / match.speed) + ' ist der Außenposten fertig und das Revier von „' + al.name + '“ wächst.' }, realT);
+  pushReport(S, { kind: 'outpost', title: 'Außenposten wird gebaut', win: true, target: { ...info, id }, text: 'Dein Bautrupp (' + sum(m.troops) + ' Truppen) bleibt als Besatzung dort. In ' + fmtDur(opBuildTime(sum(m.troops)) / match.speed) + ' ist der Außenposten fertig und das Revier von „' + al.name + '“ wächst.' }, realT);
   for (const pid of al.members) if (pid !== A.id) note(ctx, pid, 'ally', 'Neuer Außenposten', A.name + ' baut einen Außenposten und vergrößert euer Revier.');
 }
 export function checkGarrison(ctx, me, o) { const al = allianceOf(ctx.match.world, me.id); return al && o.al === al.id ? '' : 'Nur Außenposten deines Bündnisses kannst du bewachen.'; }

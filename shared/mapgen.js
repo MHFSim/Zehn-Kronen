@@ -247,12 +247,13 @@ export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
 }
 
 // Zeit in Spielsekunden bis zu jedem Wegpunkt. speed = Felder pro Stunde.
+export const MARCH_BOOST = 60;   // Märsche sind 60× schneller: von Ecke zu Ecke etwa eine Stunde (1×-Tempo)
 export function pathTimes(map, path, speed, forestCost) {
   const arr = [0];
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1], b = path[i], ax = a % N, ay = (a - ax) / N, bx = b % N, by = (b - bx) / N;
     const step = (ax !== bx && ay !== by ? SQ2 : 1) * (map.pass[b] === 2 ? forestCost : 1) / (map.roads && map.roads[b] ? ROAD_SPEED : 1);
-    arr.push(arr[i - 1] + step / speed * 3600);
+    arr.push(arr[i - 1] + step / (speed * MARCH_BOOST) * 3600);
   }
   return arr;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command, viewFor } from '../shared/world.js';
 import { newWorld, mapOf, DAY } from '../shared/core.js';
 import { NODE_KINDS } from '../shared/mapgen.js';
-import { checkSite, checkTeleport, territory, touches, inside, cityR, towersOf, OP_R, OP_BUILD, OP_COST, storeOf } from '../shared/outpost.js';
+import { checkSite, checkTeleport, territory, touches, inside, cityR, towersOf, OP_R, OP_BUILD, OP_COST, storeOf, opBuildTime } from '../shared/outpost.js';
 
 const T0 = 1_000_000_000_000;
 const match = { id: 1, name: 'T', speed: 100, seed: 4242, world: newWorld(T0) }, players = [];
@@ -46,7 +46,8 @@ assert.match(run(a, { type: 'donate', amounts: { food: 1e9 } }), /nicht/);
 assert.equal(run(a, { type: 'donate', amounts: { food: 1000, wood: 2000, stone: 2000, ore: 500 } }), '');
 assert.equal(storeOf(al).wood, 2000); assert.equal(a.state.res.wood, 99999 - 2000);
 assert.equal(viewFor(match, players, b, clock).ally.store.food, 1000, 'alle Mitglieder sehen das Lager');
-assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 20 } }), /mindestens/);
+assert.equal(opBuildTime(1), 24 * 3600); assert.ok(Math.abs(opBuildTime(1000) - 5 * 3600) < 1); assert.equal(opBuildTime(1000), opBuildTime(5000), 'mehr als 1000 Einheiten verkürzen nicht weiter');
+assert.ok(opBuildTime(10) < opBuildTime(1) && opBuildTime(100) < opBuildTime(10) && opBuildTime(100) > opBuildTime(1000), 'mehr Einheiten bauen schneller');
 
 // Bauen aus dem Lager
 assert.equal(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), '');

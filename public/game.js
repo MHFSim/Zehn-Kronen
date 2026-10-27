@@ -5,8 +5,8 @@ import {
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
-import { PLAYER_COLORS, GATHER_FULL, planMarch, marchPos } from '/shared/core.js';
-import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
+import { PLAYER_COLORS, GATHER_SEC, planMarch, marchPos } from '/shared/core.js';
+import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
@@ -886,12 +886,12 @@ function siteSheet(w) {
   const o = { id: 'site', x: msel.x, y: msel.y }, plan = !why ? planFor(o) : null;
   let body = '';
   body += `<p class="desc">Ein Außenposten gehört eurem Bündnis und erweitert das gemeinsame Revier um ein Viereck (13×13 Felder). Es gibt nur eine Stufe. Mitglieder können ihn mit Truppen bewachen. Feinde können ihn zerstören, wenn ihr Außenposten an seinen grenzt.</p>
-    <dl class="stats"><dt>Kosten (Bündnislager)</dt><dd class="costs">${costHTML(OP_COST, st || {})}</dd><dt>Bauzeit</dt><dd>${fmtT(real(OP_BUILD))} nach der Ankunft</dd><dt>Außenposten des Bündnisses</dt><dd>${mineN} (ohne Limit)</dd></dl>`;
+    <dl class="stats"><dt>Kosten (Bündnislager)</dt><dd class="costs">${costHTML(OP_COST, st || {})}</dd><dt>Bauzeit</dt><dd>${fmtT(real(opBuildTime(sum(sendList()) || 1)))} nach der Ankunft<br><span class="note">1 Einheit ${fmtT(real(OP_BUILD))}, ${OP_HELP_MAX} Einheiten ${fmtT(real(OP_BUILD_FAST))}. Mehr als ${OP_HELP_MAX} verkürzen nicht weiter.</span></dd><dt>Außenposten des Bündnisses</dt><dd>${mineN} (ohne Limit)</dd></dl>`;
   if (why) body += `<p class="why">${esc(why)}</p>`;
   else {
     body += pickerHTML();
     if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
-    body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Mindestens ${OP_MIN_TROOPS} Truppen bleiben als Besatzung dort. Du kannst sie jederzeit abziehen.</p>`;
+    body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Die Einheiten bleiben als Besatzung dort (beliebig viele). Du kannst sie jederzeit abziehen.</p>`;
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
@@ -953,7 +953,7 @@ function renderMapSheet() {
       const max = NODE_MAX(o.lv), left = w.nodes[id] == null ? max : w.nodes[id], res = { farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' }[k], plan = planFor(o);
       body = `<dl class="stats"><dt>Vorrat</dt><dd>${fmtN(left)} von ${fmtN(max)} ${RES_DE[res]}</dd></dl>${pickerHTML()}`;
       if (plan && !plan.error) {
-        const amount = Math.floor(Math.min(plan.capacity, left)), gather = amount ? GATHER_FULL * amount / plan.capacity : 0;
+        const amount = Math.floor(Math.min(plan.capacity, left)), gather = amount ? GATHER_SEC * amount : 0;
         body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Traglast</dt><dd>${fmtN(plan.capacity)}</dd><dt>Ertrag</dt><dd class="costs">${lootHTML({ [res]: amount })}</dd><dt>Sammeln</dt><dd>${fmtT(real(gather))}</dd><dt>Gesamt</dt><dd>${fmtT(real(2 * plan.duration + gather))}</dd></dl>`;
       }
       body += actionRow('Sammeln', plan, left < 50 ? 'Das Feld ist erschöpft.' : '', free);
