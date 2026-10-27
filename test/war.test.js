@@ -1,4 +1,5 @@
 // Prüfung von Schutz, Bündnissen, Angriffen, Vasallen, Ausscheiden, Stationieren, Thron und Spielende: `npm test`
+import { cellXY } from '../shared/core.js';
 import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command, viewFor, startMatch, pauseMatch, resumeMatch, endMatch } from '../shared/world.js';
 import { newWorld, mapOf, DAY, allianceCap, byId } from '../shared/core.js';
@@ -166,7 +167,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   adv(match, players, 4.1 * DAY);
   give(a, { speer: 40 }); give(b, { schwert: 400 });
   const px = a.state.pos[0] + 6, py = a.state.pos[1] + 6;
-  assert.match(run(match, players, clock, a, { type: 'march', mode: 'post', x: 1, y: 1, troops: { speer: 40 } }), /Wasser|außerhalb/);
+  assert.match(run(match, players, clock, a, { type: 'march', mode: 'post', x: 1, y: 1, troops: { speer: 40 } }), /kein Heer aufstellen/);
   assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', x: px, y: py, troops: { speer: 40 } }), '');
   { const g0 = match.world.marches.find(m => m.owner === a.id); adv(match, players, g0.arr[g0.arr.length - 1] + 30); }
   const post = match.world.marches.find(m => m.owner === a.id); assert.equal(post.phase, 'post', 'Heer steht');
@@ -181,15 +182,30 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   const pid = match.world.marches.find(m => m.owner === a.id).id;
   assert.equal(run(match, players, clock, a, { type: 'recall', id: pid }), '');
   adv(match, players, 2 * DAY); assert.ok(!match.world.marches.some(m => m.owner === a.id), 'Heer wieder daheim'); assert.equal(a.state.troops.speer >= 10, true);
+  const qx = (() => { const mp = mapOf(match); for (const d of [-1, 1, -2, 2, -3, 3]) if (mp.pass[py * 280 + px + d] && mp.pass[py * 280 + px + d] !== 2) return px + d; throw new Error('kein Platz'); })();
   // weiterschicken: aufgestelltes Heer zieht von seinem Standort zu einem neuen Platz
   give(a, { speer: 12 }); assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', x: px, y: py, troops: { speer: 12 } }), '');
   { const g3 = match.world.marches.find(m => m.owner === a.id); adv(match, players, g3.arr[g3.arr.length - 1] + 30); assert.equal(g3.phase, 'post'); }
   const pm = match.world.marches.find(m => m.owner === a.id), awayBefore = a.state.away.speer;
-  assert.match(run(match, players, clock, a, { type: 'march', from: 99999, mode: 'post', x: px + 3, y: py, troops: {} }), /nicht auf der Karte/);
-  assert.equal(run(match, players, clock, a, { type: 'march', from: pm.id, mode: 'post', x: px + 3, y: py, troops: {} }), '');
+  assert.match(run(match, players, clock, a, { type: 'march', from: 99999, mode: 'post', x: qx, y: py, troops: {} }), /nicht umgeleitet/);
+  assert.equal(run(match, players, clock, a, { type: 'march', from: pm.id, mode: 'post', x: qx, y: py, troops: {} }), '');
   const pm2 = match.world.marches.filter(m => m.owner === a.id); assert.equal(pm2.length, 1); assert.equal(pm2[0].phase, 'out'); assert.equal(pm2[0].troops.speer, 12);
   assert.equal(a.state.away.speer, awayBefore, 'Truppen nicht doppelt verbucht');
-  adv(match, players, pm2[0].arr[pm2[0].arr.length - 1] + 30); assert.equal(pm2[0].phase, 'post'); assert.deepEqual(pm2[0].site, { x: px + 3, y: py });
+  adv(match, players, pm2[0].arr[pm2[0].arr.length - 1] + 30); assert.equal(pm2[0].phase, 'post'); assert.deepEqual(pm2[0].site, { x: qx, y: py });
+  // Heimschicken nach dem Weiterschicken: der Weg endet in der Burg, die Truppen sind danach wieder daheim
+  const speerHome = a.state.troops.speer || 0;
+  assert.equal(run(match, players, clock, a, { type: 'recall', id: pm2[0].id }), '');
+  assert.equal(pm2[0].phase, 'back'); assert.deepEqual(cellXY(pm2[0].path[pm2[0].path.length - 1]), [a.state.pos[0], a.state.pos[1]], 'Rückweg endet zu Hause');
+  adv(match, players, pm2[0].arr[pm2[0].arr.length - 1] + 30); assert.ok(!match.world.marches.some(m => m.owner === a.id)); assert.equal(a.state.troops.speer, speerHome + 12, 'Truppen wieder daheim');
+  // Anhalten und Umleiten unterwegs
+  give(a, { speer: 8 }); assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', x: px, y: py, troops: { speer: 8 } }), '');
+  const w1 = match.world.marches.find(m => m.owner === a.id); adv(match, players, w1.arr[w1.arr.length - 1] / 2);
+  assert.equal(run(match, players, clock, a, { type: 'march', from: w1.id, mode: 'post', x: qx, y: py, troops: {} }), '');
+  const w2 = match.world.marches.find(m => m.owner === a.id); assert.notEqual(w2.id, w1.id); assert.equal(w2.phase, 'out');
+  adv(match, players, w2.arr[w2.arr.length - 1] / 2);
+  assert.equal(run(match, players, clock, a, { type: 'halt', id: w2.id }), ''); assert.equal(w2.phase, 'post', 'angehalten');
+  assert.equal(run(match, players, clock, a, { type: 'recall', id: w2.id }), ''); adv(match, players, w2.arr[w2.arr.length - 1] + 30);
+  assert.ok(!match.world.marches.some(m => m.owner === a.id), 'angehaltenes Heer kehrt heim');
 }
 
 console.log('Alle Kriegstests bestanden.');

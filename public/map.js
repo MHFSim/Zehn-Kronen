@@ -373,15 +373,11 @@ function vikingParts(body, la, lb, tab) {
 }
 // Reiter entpacken (einmal)
 const RID = (() => { const u8 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0)), pb = u8(RIDER.p); return { n: RIDER.n, P: new Int16Array(pb.buffer, 0, pb.length / 2), C: u8(RIDER.c) }; })();
-const RIDER_LOOK = {
-  leicht: [[124, 88, 58], [120, 108, 96], [150, 156, 166], null, [60, 44, 34], null],
-  schwer: [[62, 58, 58], [176, 182, 194], [190, 196, 208], null, [36, 32, 32], null]
-};
-function riderParts(body, type, tab) {
-  const COLS = RIDER_LOOK[type].map(c => c || tab);
+function riderTorso(body, type, tab, y0) {
+  const COLS = type === 'schwer' ? [[176, 182, 194], [196, 202, 214], tab] : [[128, 116, 100], [150, 156, 166], tab];
   for (let t = 0; t < RID.n; t++) {
     const col = COLS[RID.C[t]], v = [];
-    for (let q = 0; q < 3; q++) { const i = (t * 3 + q) * 3; v.push([RID.P[i] / 1000, RID.P[i + 1] / 1000, RID.P[i + 2] / 1000]); }
+    for (let q = 0; q < 3; q++) { const i = (t * 3 + q) * 3; v.push([RID.P[i] / 1000, RID.P[i + 1] / 1000 + y0, RID.P[i + 2] / 1000]); }
     const a = [v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], c = [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]];
     let n = [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2], a[0] * c[1] - a[1] * c[0]];
     const l = Math.hypot(n[0], n[1], n[2]) || 1; n = [n[0] / l, n[1] / l, n[2] / l];
@@ -389,8 +385,36 @@ function riderParts(body, type, tab) {
     for (const q of v) { body.p.push(q[0], q[1], q[2]); body.n.push(n[0], n[1], n[2]); body.c.push(cr, cg, cb); }
   }
 }
+// Pferd mit vier einzeln schwingenden Beinen; Rücken bei y = .6, Blick nach +z
+function horseModel(body, legs, type, tab) {
+  const heavy = type === 'schwer', coat = heavy ? [64, 58, 56] : [128, 90, 60], dark = mul(coat, .5), light = mul(coat, 1.12), hoof = [40, 34, 30], steel = [176, 182, 194];
+  const S = (col, x, y, z, rx, ry, rz, ax = 0, az = 0, jit) => body.push(new T.SphereGeometry(1, 10, 7), col, x, y, z, az, rx, ry, rz, ax, 0, jit);
+  S(coat, 0, .5, 0, .14, .15, .3); S(coat, 0, .52, .21, .145, .17, .15); S(coat, 0, .53, -.2, .15, .16, .16);   // Rumpf, Brust, Kruppe
+  S(coat, 0, .72, .36, .068, .19, .085, .62); S(light, 0, .9, .5, .06, .1, .065, 2.2); S(mul(coat, .8), 0, .8, .6, .042, .045, .048);   // Hals, Kopf, Maul
+  body.cone(.02, .07, 5, .04, .95, .46, coat); body.cone(.02, .07, 5, -.04, .95, .46, coat);   // Ohren
+  for (let k = 0; k < 7; k++) body.box(.03, .07, .035, 0, .86 - k * .035 + .05, .27 + k * .028 - .02, dark, 0, .62 + .1 * k);   // Mähne
+  body.push(new T.ConeGeometry(.05, .46, 6), dark, 0, .33, -.43, 0, 1, 1, 1, -.28, 0);   // Schweif
+  if (!heavy) { body.box(.03, .05, .12, 0, .84, .53, [236, 230, 216], 0, -.1); }   // Blesse
+  // Sattel und Decke
+  body.box(.34, .03, .36, 0, .6, 0, tab); body.box(.2, .05, .22, 0, .63, -.02, [96, 66, 42]); body.box(.2, .02, .03, 0, .62, .22, [70, 46, 30]);
+  body.box(.012, .22, .012, .17, .4, .02, [80, 56, 36]); body.box(.012, .22, .012, -.17, .4, .02, [80, 56, 36]);   // Steigbügelriemen
+  body.box(.012, .012, .3, 0, .93, .35, [70, 46, 30], 0, -.4);   // Zügel
+  if (heavy) {   // Rossharnisch: Decke in Spielerfarbe, Brust- und Stirnplatte aus Stahl
+    S(tab, 0, .5, -.02, .153, .162, .21); S(steel, 0, .56, .26, .15, .13, .08); S(steel, 0, .93, .5, .066, .08, .07, 2.2);
+    body.box(.05, .02, .16, 0, 1.0, .46, steel, 0, -.4); for (let k = 0; k < 4; k++) body.box(.15, .03, .05, 0, .5 + k * .05, .3 + k * .02, steel);
+  }
+  // Beine: Gelenk am Rumpf (y = .42), Schwingen um die Achse quer zum Pferd
+  const leg = (front, sg, x, z) => {
+    const b = new MB(), lc = front ? coat : mul(coat, .95), sock = !heavy && ((x > 0) === (z > 0));
+    b.push(new T.CylinderGeometry(.055, .035, .22, 6), lc, 0, -.1, front ? .01 : -.01, 0, 1, 1, 1, front ? 0 : .25, 0);
+    b.push(new T.CylinderGeometry(.03, .026, .2, 6), sock ? [236, 230, 216] : mul(lc, .85), 0, -.3, front ? .0 : -.05, 0, 1, 1, 1, front ? 0 : -.2, 0);
+    b.box(.065, .05, .08, 0, -.4, front ? .01 : -.05, hoof); if (heavy) b.box(.075, .06, .075, 0, -.31, front ? .0 : -.04, steel);
+    legs.push({ g: b.build(), x, y: .42, z, s: sg });
+  };
+  leg(true, 1, .085, .22); leg(true, -1, -.085, .22); leg(false, -1, .085, -.22); leg(false, 1, -.085, -.22);
+}
 function buildUnit(type, col) {
-  const body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150], tab = col, dk = mul(col, .65);
+  const legs = [], body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150], tab = col, dk = mul(col, .65);
   const rider = (b, y, scale = 1, plate = false, lance = true) => {
     const m = plate ? [170, 176, 188] : [120, 110, 100];
     b.box(.18 * scale, .2 * scale, .12 * scale, 0, y, 0, plate ? m : tab); b.sph(.065 * scale, 0, y + .26 * scale, 0, SK, 6); b.sph(.075 * scale, 0, y + .29 * scale, 0, plate ? [180, 186, 198] : [150, 150, 158], 6, .8);
@@ -418,18 +442,22 @@ function buildUnit(type, col) {
     for (const x of [-.3, .3]) body.push(new T.CylinderGeometry(.2, .2, .05, 10), WOOD_D, x, .2, -.75, 0, 1, 1, 1, 0, Math.PI / 2);
     body.box(.44, .26, .6, 0, .46, -.75, [214, 178, 90]); body.box(.04, .04, .5, 0, .34, -.3, WOOD_D);
   } else if (type === 'leicht' || type === 'schwer') {
-    riderParts(body, type, tab);
+    const heavy = type === 'schwer', steel = [176, 182, 194], boot = heavy ? steel : [70, 52, 40], pant = heavy ? [150, 156, 168] : [110, 90, 70];
+    horseModel(body, legs, type, tab); riderTorso(body, type, tab, .64);
+    body.push(new T.CylinderGeometry(1, 1.1, .12, 10), tab, 0, .64, -.01, 0, .17, 1, .13);   // Waffenrock
+    for (const sx of [-1, 1]) { body.box(.075, .13, .11, sx * .13, .5, .02, pant, 0, -.2, sx * .1); body.box(.07, .2, .09, sx * .16, .32, .06, boot, 0, .15, sx * .05); body.box(.07, .04, .12, sx * .16, .3, .1, boot); }
     if (type === 'leicht') {   // Lanzenreiter: lange Lanze mit Wimpel
-      const th = 1.15, d = [0, Math.cos(th), Math.sin(th)], hx = -.13, hy = .6, hz = .08;
+      const th = 1.15, d = [0, Math.cos(th), Math.sin(th)], hx = -.2, hy = .74, hz = .12;
       body.push(new T.CylinderGeometry(.012, .016, 1.4, 5), WOOD_D, hx + d[0] * .25, hy + d[1] * .25, hz + d[2] * .25, 0, 1, 1, 1, th, 0);
       body.push(new T.ConeGeometry(.03, .14, 5), IRON, hx + d[0] * .99, hy + d[1] * .99, hz + d[2] * .99, 0, 1, 1, 1, th, 0);
       body.push(new T.BoxGeometry(.01, .1, .2), tab, hx + d[0] * .85, hy + d[1] * .85 - .04, hz + d[2] * .85 - .1, 0, 1, 1, 1, th, 0);
-    } else {   // Panzerreiter: Kurzschwert
-      body.box(.02, .4, .05, -.16, .46, .06, [210, 214, 220], 0, .3); body.box(.02, .05, .12, -.16, .6, .05, GOLD);
+    } else {   // Panzerreiter: Kurzschwert und Schild
+      body.box(.02, .4, .05, -.22, .56, .1, [210, 214, 220], 0, .3); body.box(.02, .05, .12, -.22, .7, .09, GOLD);
+      body.push(new T.ConeGeometry(.13, .3, 3), tab, .24, .72, .08, 0, 1, 1, .35, Math.PI, 0); body.box(.02, .1, .1, .24, .78, .1, steel);
     }
   }
   const fin = b => { const g = b.build(); return g; };
-  return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: VIK_FOOT.includes(type) ? VIK.hip : type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
+  return { legs, body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: VIK_FOOT.includes(type) ? VIK.hip : type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
 }
 
 /* ---------- Bäume (Instanzen) ---------- */
@@ -898,7 +926,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         for (let i = 0; i < cnt; i++) {
           const g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
-          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.15 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav });
+          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m = new T.Mesh(L.g, this.matVC); m.position.set(L.x, L.y, L.z); m.castShadow = true; g.add(m); return { m, s: L.s }; }) });
         }
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
@@ -1092,7 +1120,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.grp.rotation.y = Math.atan2(dx, dz); }
       s.units.forEach((u, k) => {
         const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
-        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
+        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.s * sw * 1.1; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
       });
       this.waveFlags([s.flag], t);
       if (m.own || (this.sel && this.sel.type === 'march' && this.sel.id === m.id)) {

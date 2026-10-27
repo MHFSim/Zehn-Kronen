@@ -205,6 +205,19 @@ export function removePlayer(match, players, pid, now) {
   syncMatch(match, players, now); purge(mkCtx(match, players, now), pid);
 }
 
+// Zelle, auf der ein stehendes oder laufendes Heer gerade ist
+function curCell(m, gt) {
+  if (m.phase === 'post' || m.phase === 'gather') return m.path[m.path.length - 1];
+  const p = marchPos(m, gt); return m.path[Math.min(m.path.length - 1, p.i + (p.frac >= .5 ? 1 : 0))];
+}
+// Heer von seinem jetzigen Ort nach Hause schicken (neu geplanter Weg)
+function sendBack(ctx, player, m, gt) {
+  const S = player.state, plan = planFrom(mapOf(ctx.match), cellXY(curCell(m, gt)), S.pos[0], S.pos[1], m.troops, S);
+  if (plan.error) return plan.error;
+  m.path = plan.path; m.arr = plan.arr; m.phase = 'back'; m.t0 = gt; m.mode = 'home'; m.tk = 'start'; delete m.redir;
+  return '';
+}
+
 /* ---------- Befehle ---------- */
 export function command(match, players, player, cmd, now) {
   syncMatch(match, players, now); refreshRoads(match, players, match.world.gt);
@@ -228,10 +241,10 @@ export function command(match, players, player, cmd, now) {
     else if (mode === 'garrison' || mode === 'raid') { opx = (w.outposts || {})[String(cmd.target)]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
     if (!o) return 'Dieses Ziel gibt es nicht';
     if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin')) return 'Dieses Ziel gibt es nicht';
-    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && x.phase === 'post') : null;
-    if (cmd.from != null && !src) return 'Dieses Heer steht nicht auf der Karte';
+    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && (x.phase === 'post' || (x.phase === 'out' && x.mode !== 'build'))) : null;
+    if (cmd.from != null && !src) return 'Dieses Heer kann gerade nicht umgeleitet werden';
     if (!src && w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
-    if (src && mode === 'post' && o.id === src.tid) return 'Das Heer steht schon dort';
+    if (src && src.phase === 'post' && mode === 'post' && o.id === src.tid) return 'Das Heer steht schon dort';
     const troops = src ? { ...src.troops } : {};
     if (!src) for (const u of Object.keys(U)) {
       const n = Math.floor(Number((cmd.troops || {})[u] || 0));
@@ -248,24 +261,25 @@ export function command(match, players, player, cmd, now) {
       else { const why = checkRaid(ctx, player, opx); if (why) return why; }
     } else if (mode === 'post') {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
-      if (!SITE_OK(map, o.x, o.y)) return 'Auf Wasser oder außerhalb der Karte kann man kein Heer aufstellen.';
+      if (!SITE_OK(map, o.x, o.y) || !map.pass[o.y * N + o.x]) return 'Hier kann man kein Heer aufstellen (Wasser, Fels oder außerhalb der Karte).';
     } else if (mode === 'normal') {
       if (o.k === 'camp' && !campAlive(w, o.id, w.gt)) return 'Dieses Lager ist gerade zerstört';
       if (o.k === 'ruin' && w.ruins[o.id]) return 'Diese Ruine ist schon geplündert';
       if (NODE_KINDS.includes(o.k) && nodeLeft(w, o, w.gt) < NODE_EMPTY) return 'Dieses Feld ist erschöpft';
-      if (NODE_KINDS.includes(o.k) && w.marches.some(g => !g.dead && g.tid === o.id && !g.mode && g.phase !== 'back')) return 'Auf diesem Feld sammelt schon ein Heer (oder ist unterwegs dorthin).';
+      if (NODE_KINDS.includes(o.k) && w.marches.some(g => g !== src && !g.dead && g.tid === o.id && !g.mode && g.phase !== 'back')) return 'Auf diesem Feld sammelt schon ein Heer (oder ist unterwegs dorthin).';
     } else {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
       const c = checkLaunch(ctx, player, o, mode, troops); if (typeof c === 'string') return c;
       target = c.target || null;
     }
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
-    const plan = src ? planFrom(map, cellXY(src.path[src.path.length - 1]), o.x, o.y, troops, S) : planMarch(map, S, o, troops);
+    const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
     if (src) w.marches.splice(w.marches.indexOf(src), 1);
     else for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : { tk: o.k, tid: o.id, mode });
+    if (src) m.redir = true;
     if (mode === 'raid') noteRaid(ctx, player, opx, m);
     else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison' && mode !== 'post') afterLaunch(ctx, player, m, target, mode);
     syncMatch(match, players, now);
@@ -275,7 +289,7 @@ export function command(match, players, player, cmd, now) {
     const m = w.marches.find(x => x.id === Number(cmd.id) && x.owner === player.id);
     if (!m) return 'Dieses Heer gibt es nicht';
     if (m.phase === 'back') return 'Das Heer ist schon auf dem Rückweg';
-    if (m.phase === 'post') { m.phase = 'back'; m.t0 = w.gt; m.load = {}; reversed(m); return ''; }
+    if (m.phase === 'post') { m.load = {}; return sendBack(ctx, player, m, w.gt); }
     if (m.phase === 'gather') {
       const o = mapOf(match).byId[m.tid], frac = Math.max(0, Math.min(1, (w.gt - m.tStart) / (m.tEnd - m.tStart || 1)));
       const amount = Math.floor(m.amount * frac), n = w.nodes[o.id] || { left: nodeLeft(w, o, w.gt), t: w.gt };
@@ -283,6 +297,7 @@ export function command(match, players, player, cmd, now) {
       m.load = amount > 0 ? { [m.res]: amount } : {};
       gatherFinds(player.state, m.id, (w.gt - m.tStart));
       m.phase = 'back'; m.t0 = w.gt; reversed(m);
+    } else if (m.redir) { m.load = {}; return sendBack(ctx, player, m, w.gt);
     } else {
       const el = Math.max(0, w.gt - m.t0); let i = 0; while (i < m.path.length - 1 && m.arr[i + 1] <= el) i++;
       const a0 = m.arr[i]; m.path = m.path.slice(0, i + 1).reverse(); m.arr = m.arr.slice(0, i + 1).map((_, j) => a0 - m.arr[i - j]);
@@ -290,6 +305,14 @@ export function command(match, players, player, cmd, now) {
       if (m.mode === 'build') { const al = allianceOf(w, player.id); if (al) refundStore(w, al.id); }
       if (m.path.length < 2) { m.path = [m.path[0], m.path[0]]; m.arr = [0, 1]; }
     }
+    return '';
+  }
+  if (cmd.type === 'halt') {
+    const m = w.marches.find(x => x.id === Number(cmd.id) && x.owner === player.id && !x.dead);
+    if (!m) return 'Dieses Heer gibt es nicht';
+    if (m.phase !== 'out' || m.mode === 'build') return 'Dieses Heer kann gerade nicht anhalten';
+    const c = curCell(m, w.gt), [hx, hy] = cellXY(c);
+    m.path = [c, c]; m.arr = [0, 1]; m.phase = 'post'; m.mode = 'post'; m.tk = 'post'; m.tid = 'post' + hx + '_' + hy; m.site = { x: hx, y: hy }; m.load = {}; m.redir = true;
     return '';
   }
   if (cmd.type === 'spy') return spy(ctx, player, Number(cmd.target));

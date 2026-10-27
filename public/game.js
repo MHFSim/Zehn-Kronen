@@ -960,7 +960,7 @@ function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] 
 function planFor(o) {
   const t = sendList(), key = o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
   if (!sum(t)) return null;
-  if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, cellXY(sm.path[sm.path.length - 1]), o.x, o.y, t, S) : planMarch(wm.map, S, o, t) }; }
+  if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, sm.phase === 'post' ? cellXY(sm.path[sm.path.length - 1]) : (q => [Math.floor(q.x), Math.floor(q.y)])(marchPos(sm, gtNow())), o.x, o.y, t, S) : planMarch(wm.map, S, o, t) }; }
   return planCache.plan;
 }
 function pickerHTML() {
@@ -1054,7 +1054,7 @@ function renderMapSheet() {
       <dt>Truppen</dt><dd>${m.troops.n != null ? fmtN(m.troops.n) + ' Einheiten' : troopsLine(m.troops)}</dd>${m.own && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
       ${m.phase === 'gather' && m.own ? `<dt>Sammelt</dt><dd class="costs">${lootHTML({ [m.res]: Math.floor(m.amount * Math.max(0, Math.min(1, (gtNow() - m.tStart) / (m.tEnd - m.tStart || 1)))) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
       ${!m.own && m.phase === 'post' ? `${pickerHTML()}<div class="row"><button class="btn ${armedKey === 'patk' + m.id ? 'danger' : ''}" type="button" data-act="patk" ${!sum(sendList()) || ownMarches().length >= armySlots(S) ? 'disabled' : ''}>${armedKey === 'patk' + m.id ? 'Jetzt wirklich angreifen' : 'Heer angreifen'}</button></div>` : ''}
-      ${m.own && m.phase === 'post' ? `<div class="row"><button class="btn" type="button" data-act="sfStart">Weiterschicken</button></div>` : ''}
+      ${m.own && (m.phase === 'post' || (m.phase === 'out' && m.mode !== 'build')) ? `<div class="row"><button class="btn" type="button" data-act="sfStart">Weiterschicken</button>${m.phase === 'out' ? '<button class="btn ghost" type="button" data-act="halt">Anhalten</button>' : ''}</div>` : ''}
       ${m.own && m.phase !== 'back' ? `<div class="row"><button class="btn ghost" type="button" data-act="recall">${m.phase === 'gather' ? 'Heimrufen (Beute bis jetzt)' : 'Zurückrufen'}</button></div>` : ''}`;
   } else if (msel.type === 'site' || msel.type === 'op') {
     h = msel.type === 'site' ? siteSheet(w) : opSheet(w);
@@ -1158,7 +1158,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -1176,6 +1176,7 @@ function mapAct(act, el) {
   else if (act === 'post') command({ type: 'march', mode: 'post', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Aufstellen.', 'info'); closeSheet(); } });
   else if (act === 'patk') { const m = view.world.marches.find(x => x.id === msel.id); if (!m) return true; if (!twice('patk' + m.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'attack', target: m.tid, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff.', 'info'); closeSheet(); } }); }
   else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); toast('Tippe das neue Ziel an oder drücke lange auf eine Stelle der Karte.', 'info'); }
+  else if (act === 'halt') command({ type: 'halt', id: msel.id }).then(ok => ok && toast('Das Heer bleibt stehen.', 'info'));
   else if (act === 'sfCancel') { sendFrom = 0; closeSheet(); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
