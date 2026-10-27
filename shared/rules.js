@@ -88,9 +88,9 @@ export function freshState(now) {
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);
-export const costOf = (id, t) => B[id].base.map(c => round5(c * Math.pow(1.5, t - 1)));
-export const timeOf = (id, t) => B[id].time * Math.pow(1.6, t - 1);
-export const capFor = l => Math.round(1500 * Math.pow(1.6, l));
+export const costOf = (id, t) => B[id].base.map(c => round5(c * Math.pow(1.3, t - 1)));
+export const timeOf = (id, t) => B[id].time * Math.pow(1.3, t - 1);
+export const capFor = l => Math.round(1500 * Math.pow(1.25, l));
 export const cap = S => capFor(S.lv.lager);
 export const protectedPct = S => S.lv.lager ? Math.min(40, 20 + S.lv.lager) : 20;
 export const prodAt = (id, l) => l <= 0 ? 0 : Math.round(120 * l * Math.pow(1.15, l - 1));
@@ -117,7 +117,7 @@ export function rate(S, r) {
 export function blocker(S, id) {
   const b = B[id], t = S.lv[id] + 1;
   if (S.lv.rathaus < b.unlock) return 'Freigeschaltet ab Rathaus Stufe ' + b.unlock;
-  if (id === 'rathaus' && t > 20) return 'Höchststufe erreicht';
+  if (id === 'rathaus' && t > 30) return 'Höchststufe erreicht';
   if (id !== 'rathaus' && t > S.lv.rathaus) return 'Erst das Rathaus auf Stufe ' + t + ' ausbauen';
   if (inQueue(S, id)) return 'Wird bereits gebaut';
   if (S.queue.length >= maxQueues(S)) return 'Alle Bauschleifen belegt';
