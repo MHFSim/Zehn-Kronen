@@ -920,6 +920,7 @@ function healHTML() {
 function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
   const hit = wm.pickAt(sx, sy);
+  if (!hit && sendFrom) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
   if (!hit) { closeSheet(); return; }
   selectMap(hit, false);
 }
@@ -1175,7 +1176,7 @@ function mapAct(act, el) {
   else if (act === 'fattack') { if (!twice('fattack' + msel.id)) { renderSheet(); return true; } command({ type: 'march', target: msel.id, mode: 'attack', troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Überfall.', 'info'); closeSheet(); } }); }
   else if (act === 'post') command({ type: 'march', mode: 'post', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Aufstellen.', 'info'); closeSheet(); } });
   else if (act === 'patk') { const m = view.world.marches.find(x => x.id === msel.id); if (!m) return true; if (!twice('patk' + m.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'attack', target: m.tid, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff.', 'info'); closeSheet(); } }); }
-  else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); toast('Tippe das neue Ziel an oder drücke lange auf eine Stelle der Karte.', 'info'); }
+  else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); toast('Tippe auf die Karte: das Heer zieht sofort dorthin.', 'info'); }
   else if (act === 'halt') command({ type: 'halt', id: msel.id }).then(ok => ok && toast('Das Heer bleibt stehen.', 'info'));
   else if (act === 'sfCancel') { sendFrom = 0; closeSheet(); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
