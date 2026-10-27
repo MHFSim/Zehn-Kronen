@@ -4,6 +4,7 @@
 // Die Kamera schwebt schräg über dem Boden: ziehen = verschieben, zwei Finger = zoomen und drehen.
 import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoads } from '/shared/mapgen.js';
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
+import { ROCKS } from '/public/rockdata.js';
 import { rectsOf, roadEdgesOf, dockPad, touches, towersOf } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
@@ -47,6 +48,22 @@ class MB {
   }
   sph(r, x, y, z, col, seg = 8, sy = 1) { return this.push(new T.SphereGeometry(r, seg, Math.max(3, seg * .75 | 0)), col, x, y, z, 0, 1, sy, 1); }
   ico(r, x, y, z, col, sy = 1, sx = 1, ry = 0, det = 0) { return this.push(new T.IcosahedronGeometry(r, det), col, x, y, z, ry, sx, sy, sx); }
+  // Felsen aus public/rockdata.js (Dreiecke mit fester Farbe): sc = Maßstab, ry = Drehung um die Hochachse
+  rock(r, sc, x, y, z, ry = 0, tint = 1) {
+    const cs = Math.cos(ry), sn = Math.sin(ry), mid = [x, y + r.h * sc * .5, z];
+    for (let t = 0; t < r.n; t++) {
+      const v = [];
+      for (let q = 0; q < 3; q++) { const i = (t * 3 + q) * 3, px = r.P[i] / 1000 * sc, py = r.P[i + 1] / 1000 * sc, pz = r.P[i + 2] / 1000 * sc; v.push([x + px * cs + pz * sn, y + py, z - px * sn + pz * cs]); }
+      let a = [v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], b = [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]];
+      let n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      const l = Math.hypot(n[0], n[1], n[2]) || 1; n = [n[0] / l, n[1] / l, n[2] / l];
+      const cx = (v[0][0] + v[1][0] + v[2][0]) / 3 - mid[0], cy = (v[0][1] + v[1][1] + v[2][1]) / 3 - mid[1], cz = (v[0][2] + v[1][2] + v[2][2]) / 3 - mid[2];
+      if (n[0] * cx + n[1] * cy + n[2] * cz < 0) { n = [-n[0], -n[1], -n[2]]; const w = v[1]; v[1] = v[2]; v[2] = w; }
+      const k = (1 + (hash(this.tri++, 5, 3) - .5) * .06) * tint, cr = LIN(Math.min(255, r.C[t * 3] * k)), cg = LIN(Math.min(255, r.C[t * 3 + 1] * k)), cb = LIN(Math.min(255, r.C[t * 3 + 2] * k));
+      for (const q of v) { this.p.push(q[0], q[1], q[2]); this.n.push(n[0], n[1], n[2]); this.c.push(cr, cg, cb); }
+    }
+    return this;
+  }
   build() {
     const g = new T.BufferGeometry();
     g.setAttribute('position', new T.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(this.n, 3)); g.setAttribute('color', new T.Float32BufferAttribute(this.c, 3));
@@ -231,14 +248,22 @@ function buildWood(lv) {
   b.cyl(.03, .03, .9, 5, 1.1, .1, -.5, WOOD_D); b.box(.3, .05, .12, 1.1, .85, -.5, IRON); b.box(.06, .05, .5, 1.1, .1, -.5, WOOD_D, .5);                              // Axt im Klotz
   return { geo: b.build(), flags: [], h: 1.5, smoke: [[-.1, 1.2, -1.0]] };
 }
-function buildStone(lv) {
+// Felsen entpacken (einmal)
+const ROCK = ROCKS.map(r => {
+  const u8 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0)), pb = u8(r.p);
+  return { n: r.n, w: r.w, h: r.h, d: r.d, P: new Int16Array(pb.buffer, 0, pb.length / 2), C: u8(r.c) };
+});
+// Steinbruch: eine Gruppe aus Felsen (drei Varianten) und ein paar gehauene Blöcke
+const STONE_V = [
+  [[7, .62, 0, 0, .3], [3, 1, 1.5, .6, .8], [6, .8, -1.4, .9, 2]],
+  [[4, .7, -.2, 0, 1.2], [0, .8, 1.4, .7, .1], [3, .9, .8, -1.3, 2.6]],
+  [[5, .8, 0, 0, .6], [2, .7, -1.3, .8, 1.7], [1, .7, 1.2, .8, 3], [6, .6, .2, -1.4, 1]]
+];
+function buildStone(lv, variant = 0) {
   const b = new MB();
-  for (let i = 0; i < 4; i++) { const s = 2.2 - i * .5; b.box(s, .22, s * .9, -.2, i * .22, 0, mul([168, 162, 148], 1 - i * .08)); }
-  for (const [x, z, w, d, h] of [[1.2, -.9, .6, .5, .5], [1.4, -.2, .5, .5, .4], [-1.6, .9, .6, .5, .5], [-1.2, 1.3, .5, .4, .35]]) b.box(w, h, d, x, 0, z, [192, 186, 172]);
-  b.cyl(.06, .06, 1.9, 5, -.4, 0, 1.2, WOOD_D); b.box(1.5, .08, .08, .3, 1.8, 1.2, WOOD_D); b.box(.3, .08, .08, -.55, 1.8, 1.2, WOOD_D, 0, 0, .5); b.cyl(.012, .012, .5, 4, .9, 1.3, 1.2, [200, 180, 140]); b.box(.28, .22, .28, .9, 1.08, 1.2, [170, 164, 148]);
-  b.box(.3, .18, .3, -1.7, 0, -.4, [196, 190, 176]); b.ico(.16, -1.7, .28, -.4, [210, 204, 190], 1.1);                                                                          // Rohling
-  b.box(.45, .2, .3, -.8, 0, -1.2, [74, 58, 44]); b.cyl(.08, .08, .06, 8, -.95, .02, -1.05, [30, 30, 30], 0); b.cyl(.08, .08, .06, 8, -.65, .02, -1.05, [30, 30, 30], 0);
-  return { geo: b.build(), flags: [], h: 1.9 };
+  for (const [ri, sc, x, z, ry] of STONE_V[variant % STONE_V.length]) b.rock(ROCK[ri], sc * 1.25, x * 1.2, 0, z * 1.2, ry);
+  b.box(.5, .3, .4, -.9, 0, -1.3, [188, 182, 168], .3); b.box(.4, .24, .34, -.4, 0, -1.6, [176, 170, 156], -.2);
+  return { geo: b.build(), flags: [], h: 2.2 };
 }
 function buildOre(lv) {
   const b = new MB();
@@ -611,6 +636,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.models = {}; const M = this.models;
     M.slot = buildSlot(); M.throne = buildThrone(); M.tower = buildTower(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true); M.depleted = buildDepleted();
     for (const k of ['farm', 'wood', 'stone']) M[k] = { farm: buildFarm, wood: buildWood, stone: buildStone }[k]();
+    M.stoneV = [buildStone(1, 0), buildStone(1, 1), buildStone(1, 2)];
     this.unitGeos = {}; this.castleCache = {}; this.smokeList = [];
     this.flagGeo = new T.PlaneGeometry(.7, .42, 6, 2); this.flagGeo.translate(.35, 0, 0);
     this.fireGeo = new T.ConeGeometry(.2, .55, 6); this.fireMat = new T.MeshBasicMaterial({ color: 0xffb040 });
@@ -625,7 +651,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else if (o.k === 'camp') { hd.alive = mesh(M.campAlive); hd.deadM = mesh(M.campDead); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); this.attachParts(hd, M.campAlive); hd.smokeOffs = M.campAlive.smoke; }
       else if (o.k === 'ruin') { hd.alive = mesh(M.ruin); hd.deadM = mesh(M.ruinDone); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); }
       else {
-        const mdl = M[o.k]; hd.main = mesh(mdl); g.add(hd.main);
+        const mdl = o.k === 'stone' ? M.stoneV[Math.floor(hash(o.x, o.y, 9) * M.stoneV.length)] : M[o.k]; hd.main = mesh(mdl); g.add(hd.main);
         if (NODE_K.includes(o.k)) { hd.emptyM = mesh(M.depleted); hd.emptyM.visible = false; g.add(hd.emptyM); }
         if (['farm', 'wood', 'stone'].includes(o.k)) { const k = .95 + .05 * o.lv; g.scale.setScalar(k); }
         if (o.k === 'sanct') { hd.glow = new T.Mesh(new T.OctahedronGeometry(.42), this.glowMat); hd.glow.position.set(0, 2.9, 0); g.add(hd.glow); }
