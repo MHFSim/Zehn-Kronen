@@ -11,7 +11,7 @@ export const NODE_REFILL = 6 * 3600;      // Ein Feld ist 6 Stunden nach dem let
 export const NODE_EMPTY = 50;             // darunter gilt ein Feld als leer
 export const CAMP_RESPAWN = 6 * 3600;    // bis ein Lager wiederkommt
 export const GATHER_SEC = 3;             // Sammeln: 20 Rohstoffe pro Minute, unabhängig von der Truppenzahl (die Traglast begrenzt nur die Menge)
-export const VIEW_CITY = 15, VIEW_ARMY = 10;
+export const VIEW_CITY = 20, VIEW_ARMY = 15;
 export const PROTECT = 4 * DAY;          // Neulingsschutz
 export const FALL_PROTECT = 12 * 3600;   // Schutz nach dem Fall der Burg
 export const VASSAL_TIME = 7 * DAY;      // so lange bleibt ein Vasall Vasall
