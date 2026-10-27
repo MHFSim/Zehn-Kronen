@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command, viewFor, startMatch, pauseMatch, resumeMatch, endMatch } from '../shared/world.js';
 import { newWorld, mapOf, DAY, allianceCap, byId } from '../shared/core.js';
+import { territory } from '../shared/outpost.js';
 
 const T0 = 1_000_000_000_000;
 const mk = (n, o = {}) => {
@@ -108,7 +109,18 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   // Thron besetzen (braucht Revier: ohne Außenposten geht es nicht)
   give(a, { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 });
   assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /Revier/);
-  match.world.outposts.opT = { id: 'opT', al: Object.values(match.world.alliances)[0].id, by: a.id, x: 137, y: 137, done: 0, garr: {} };
+  // Kette von Außenposten von der Burg bis zum Thron (jeder berührt den vorigen)
+  const alId = Object.values(match.world.alliances)[0].id, sp = a.state.pos, chain = [];
+  { const n = Math.ceil(Math.hypot(137 - sp[0], 137 - sp[1]) / 9);
+    for (let i = 1; i <= n; i++) { const id = 'opT' + i; match.world.outposts[id] = { id, al: alId, by: a.id, x: Math.round(sp[0] + (137 - sp[0]) * i / n), y: Math.round(sp[1] + (137 - sp[1]) * i / n), done: 0, garr: {} }; chain.push(id); } }
+  // Wird ein Außenposten in der Mitte zerstört, sind alle dahinter inaktiv: der Thron ist nicht mehr erreichbar
+  { const mid = chain[Math.floor(chain.length / 2)], saved = match.world.outposts[mid]; delete match.world.outposts[mid];
+    const rs = territory(match, players, clock), off = rs.filter(r => r.off).map(r => r.id);
+    assert.ok(off.length > 0 && off.every(id => chain.indexOf(id) > chain.indexOf(mid)), 'Außenposten hinter der Lücke sind inaktiv');
+    assert.ok(rs.filter(r => r.k === 'op' && !r.off).every(r => chain.indexOf(r.id) < chain.indexOf(mid)), 'davor bleiben aktiv');
+    assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /Revier/);
+    match.world.outposts[mid] = saved;
+    assert.equal(territory(match, players, clock).filter(r => r.off).length, 0, 'Lücke geschlossen: alles wieder aktiv'); }
   assert.equal(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 } }), '');
   adv(match, players, 3 * DAY);
   assert.ok(match.world.holds.throne1, 'Thron gehalten');

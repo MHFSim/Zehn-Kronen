@@ -29,8 +29,23 @@ export const opReady = (o, gt) => gt >= o.done;
 export function rectsOf(cities, ops, gt) {
   const out = [];
   for (const c of cities) { const r = cityR(c.rathaus); out.push({ k: 'city', id: 'c' + c.pid, owner: c.pid, group: c.group, x: c.x, y: c.y, r, x0: c.x - r, y0: c.y - r, x1: c.x + r, y1: c.y + r, ready: true }); }
-  for (const o of ops) out.push({ k: 'op', id: o.id, owner: o.owner, group: o.group, x: o.x, y: o.y, r: OP_R, x0: o.x - OP_R, y0: o.y - OP_R, x1: o.x + OP_R, y1: o.y + OP_R, ready: gt >= o.done });
-  return out;
+  for (const o of ops) out.push({ k: 'op', id: o.id, owner: o.owner, group: o.group, x: o.x, y: o.y, r: OP_R, x0: o.x - OP_R, y0: o.y - OP_R, x1: o.x + OP_R, y1: o.y + OP_R, ready: gt >= o.done, built: gt >= o.done, done: o.done });
+  // Verbindung: Nur Außenposten, die über eine Kette sich berührender Vierecke bis zur Burg (bzw. zum ersten Außenposten) reichen, sind aktiv.
+  // Wird ein Außenposten in der Mitte zerstört, sind alle dahinter inaktiv (weiß), bis das Bündnis die Lücke wieder schließt.
+  const drop = new Set();
+  for (const g of new Set(ops.map(o => o.group))) {
+    const mem = out.filter(r => r.group === g), built = mem.filter(r => r.k === 'op' && r.built);
+    if (!built.length) continue;
+    let roots = mem.filter(r => r.k === 'city');
+    if (!roots.length) roots = [built.slice().sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)))[0]];
+    const act = new Set(roots), q = [...roots];
+    while (q.length) { const r = q.pop(); for (const o of built) if (!act.has(o) && overlaps(r, o, 1)) { act.add(o); q.push(o); } }
+    let off = false;
+    for (const o of built) if (!act.has(o)) { o.ready = false; o.off = true; off = true; }
+    // Die Burg zählt nur noch, solange das Revier nicht vollständig aus Außenposten besteht
+    if (!off) for (const r of mem) if (r.k === 'city') drop.add(r);
+  }
+  return out.filter(r => !drop.has(r));
 }
 export const overlaps = (a, b, pad = 0) => a.x0 - pad <= b.x1 && b.x0 - pad <= a.x1 && a.y0 - pad <= b.y1 && b.y0 - pad <= a.y1;
 // Berührt ein fertiges Viereck der Gruppe das Feld (tx, ty)? (auch schräg angrenzend)
@@ -48,9 +63,8 @@ export const opView = (w, o) => ({ ...o, group: 'a' + o.al, owner: leaderOf(w.al
 // Städte und Außenposten einer laufenden Partie
 export function territory(match, players, gt) {
   const w = match.world, cities = [], ops = [];
-  // Vor dem ersten fertigen Außenposten zählt nur die Burg des Gründers als Revier; danach entfällt dieses Viereck
-  const firstDone = al => Object.values(w.outposts || {}).some(o => o.al === al.id && gt >= o.done);
-  for (const p of players) if (!p.state.out && p.state.slot >= 0 && (al => al && al.leader === p.id && !firstDone(al))(allianceOf(w, p.id))) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
+  // Die Burg des Gründers ist die Wurzel des Reviers; rectsOf blendet sie aus, sobald Außenposten sie ersetzen
+  for (const p of players) if (!p.state.out && p.state.slot >= 0 && (al => al && al.leader === p.id)(allianceOf(w, p.id))) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
   for (const id in (w.outposts || {})) { const o = w.outposts[id]; if (w.alliances[o.al]) ops.push(opView(w, o)); }
   return rectsOf(cities, ops, gt);
 }

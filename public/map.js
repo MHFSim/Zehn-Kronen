@@ -793,9 +793,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   /* ---------- Revier und Außenposten ---------- */
   rectList() {
     const v = this.view, gt = this.gtNow(), grp = p => p.ally ? 'a' + p.ally : 'p' + p.id;
-    const al = (v.match.alliances || []).find(a => a.leader === this.myId), ops = v.world.outposts || [];
-    const show = al && !ops.some(o => o.al === al.id && gt >= o.done);
-    const cities = show ? v.match.players.filter(p => p.id === this.myId && !p.out && p.slot >= 0).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) })) : [];
+    const ops = v.world.outposts || [], leaders = new Set((v.match.alliances || []).map(a => a.leader));
+    const cities = v.match.players.filter(p => leaders.has(p.id) && !p.out && p.slot >= 0 && p.pos).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) }));
     return rectsOf(cities, ops, gt);
   }
   allyColor(alId, owner) { const a = (this.view.match.alliances || []).find(x => x.id === alId); return a && a.color ? parseInt(a.color.slice(1), 16) : this.ownerColor(owner); }
@@ -824,8 +823,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.terrObjs = []; if (!this.view) return;
     const mine = this.view.match.players.find(p => p.id === this.myId), myG = mine ? (mine.ally ? 'a' + mine.ally : 'p' + mine.id) : '';
     for (const r of this.rectList()) {
-      const col = r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
-      const g = this.rectMesh(r.x0, r.y0, r.x1, r.y1, col, r.ready ? (me ? .2 : .14) : .07, r.ready ? .95 : .5, me ? .32 : .24); this.territory.add(g); this.terrObjs.push(g);
+      const col = r.off ? 0xffffff : r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
+      const g = this.rectMesh(r.x0, r.y0, r.x1, r.y1, col, r.ready || r.off ? (me ? .2 : .14) : .07, r.ready || r.off ? .95 : .5, me ? .32 : .24); this.territory.add(g); this.terrObjs.push(g);
     }
     // Weißes Andock-Viereck am Thron; sobald ein Bündnis-Außenposten angedockt hat, in dessen Farbe
     const th = this.map && this.map.objects.find(o => o.k === 'throne');

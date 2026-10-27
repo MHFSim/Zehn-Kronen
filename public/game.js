@@ -901,7 +901,7 @@ function opSheet(w) {
   wm.setPreview(null);
   const names = id => pname(id);
   let body = `<dl class="stats"><dt>Gehört</dt><dd>${esc(opOwnerName(o))}</dd><dt>Revier</dt><dd>${2 * OP_R + 1}×${2 * OP_R + 1} Felder</dd>
-    <dt>Zustand</dt><dd>${ready ? 'fertig' : 'im Bau, noch ' + fmtT(real(o.done - gt))}</dd><dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>`;
+    <dt>Zustand</dt><dd>${ready ? ((wm.rectList().find(r => r.id === o.id) || {}).off ? '<b>inaktiv</b> – keine Verbindung zur Burg. Schließe die Lücke mit einem neuen Außenposten.' : 'fertig') : 'im Bau, noch ' + fmtT(real(o.done - gt))}</dd><dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>`;
   if (o.mine) {
     const gr = o.garr || {}, ids = Object.keys(gr).filter(k => sum(gr[k]) > 0);
     body += `<dt>Besatzung</dt><dd>${ids.length ? ids.map(k => `<div><b>${esc(names(Number(k)))}</b>${Number(k) === me.id ? ' (du)' : ''}: ${troopsLine(gr[k])}</div>`).join('') : 'niemand'}</dd></dl>`;

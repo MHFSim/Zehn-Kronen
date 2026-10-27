@@ -119,7 +119,9 @@ give(c, { schwert: 800, speer: 400 }); rich(c); give(d, { schwert: 400 }); rich(
 adv(5 * DAY);
 assert.match(run(c, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 100 } }), /angrenzt/);
 const sideX = target.x + 2 * OP_R + 1;
-w.outposts.opC = { id: 'opC', al: cAl.id, by: c.id, x: sideX, y: target.y, done: 0, garr: {} };
+{ // Kette von der Burg des Bündnisleiters bis neben das Ziel (inaktive, getrennte Außenposten könnten nicht angreifen)
+  const lead = players.find(p => p.id === cAl.leader), sp = lead.state.pos, n = Math.ceil(Math.hypot(sideX - sp[0], target.y - sp[1]) / 9);
+  for (let i = 1; i <= n; i++) { const id = i === n ? 'opC' : 'opC' + i; w.outposts[id] = { id, al: cAl.id, by: c.id, x: Math.round(sp[0] + (sideX - sp[0]) * i / n), y: Math.round(sp[1] + (target.y - sp[1]) * i / n), done: 0, garr: {} }; } }
 assert.equal(run(d, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 100 } }), 'Nur Bündnisse kämpfen um Außenposten. Gründe eines oder tritt einem bei.');
 assert.equal(run(c, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 800, speer: 400 } }), '');
 adv(2 * DAY);
