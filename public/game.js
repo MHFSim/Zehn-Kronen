@@ -165,9 +165,10 @@ document.addEventListener('change', e => {           // beim Loslassen / Bestät
 function renderTop() {
   const c = cap(S);
   $('res').innerHTML = [...RES, 'gold'].map(r => {
-    const v = S.res[r], rt = rate(S, r), pct = r === 'gold' ? 0 : Math.min(100, v / c * 100);
+    const v = S.res[r], rt = rate(S, r), bn = (S.bonus && S.bonus[r]) || 0, pct = r === 'gold' ? 0 : Math.min(100, v / c * 100);
     return `<div class="res-cell" title="${RES_DE[r]}: ${fmtN(v)}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtK(v)}</div>
       <div class="res-rate ${rt < 0 ? 'neg' : ''}">${rt >= 0 ? '+' : ''}${fmtK(rt)}/h</div>
+      ${bn ? `<div class="res-bonus" title="Bonus durch ein gehaltenes ${r === 'gold' ? 'Thron- oder Heiligtum' : 'Heiligtum'}">✦ +${Math.round(bn * 100)} % Bonus</div>` : ''}
       <div class="res-bar">${r === 'gold' ? '' : `<i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i>`}</div></div>`;
   }).join('');
   $('speed').className = 'speed' + (live ? '' : ' off');
