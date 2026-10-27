@@ -1,6 +1,6 @@
 # Zehn Kronen
 
-Browser-Strategiespiel für bis zu 10 Spieler auf einer gemeinsamen Weltkarte (200 x 200 Felder). Jeder hat eine Burg, baut sie aus, bildet Truppen aus, sammelt Rohstoffe, besiegt Banditen, schließt Bündnisse, greift andere Spieler an und kämpft um den Thron in der Mitte. Eine Partie dauert 8 bis 12 Wochen.
+Browser-Strategiespiel für bis zu 10 Spieler auf einer gemeinsamen Weltkarte (280 x 280 Felder). Jeder hat eine Burg, baut sie aus, bildet Truppen aus, sammelt Rohstoffe, besiegt Banditen, schließt Bündnisse, greift andere Spieler an und kämpft um den Thron in der Mitte. Eine Partie dauert 8 bis 12 Wochen.
 
 **Spielregeln in Kürze**
 
@@ -78,14 +78,14 @@ Der Server ist maßgeblich: Bauaufträge, Ausbildung und Ressourcen werden dort 
 In der Akademie laufen acht Forschungen (Ackerbau, Forstwirtschaft, Steinmetzkunst, Bergbau, Handel, Kriegskunst, Marschordnung, Lasten) mit je fünf Stufen. Es läuft immer nur eine; Stufe n braucht Akademie 2n−1. Sie steigern Erträge, Gold, Kampfkraft, Marschtempo und Beutekapazität. Die Stadtansicht (Holz und Pergament) hat Reiter Wirtschaft, Militär, Verwaltung, Forschung.
 
 ## Revier, Außenposten und Bündnislager
-Ohne Bündnis gibt es kein Revier. Zu Beginn sieht nur der Gründer das Viereck seiner Burg; den **ersten Außenposten baut der Gründer** daran, danach entfällt das Burg-Viereck. Die Farbe des Reviers wählt der Anführer im Bündnis-Menü (Verwaltung). Gebaut wird nur über den Button „Außenposten“ auf der Karte, die Burg versetzt man nur über „Teleportieren“ (darunter), nicht durch Antippen. **Außenposten gehören immer dem Bündnis** und haben nur eine Stufe (13×13 Felder). Man baut sie nur an das Revier des eigenen Bündnisses, bezahlt aus dem **Bündnislager** (400 Nahrung, 1000 Holz, 1200 Stein, 200 Erz) und schickt mindestens 50 Truppen als Bautrupp, der als Besatzung bleibt. Bündnisse halten höchstens 3 + 2 × Mitglieder Außenposten.
+Ohne Bündnis gibt es kein Revier. Die Burg hat kein eigenes Revier; den **ersten Außenposten baut der Gründer** an einem der zehn Türme am Kartenrand (Viereck muss das weiße Feld um den Turm berühren). Die Farbe des Reviers wählt der Anführer im Bündnis-Menü (Verwaltung). Gebaut wird nur über den Button „Außenposten“ auf der Karte, die Burg versetzt man nur über „Teleportieren“ (darunter), nicht durch Antippen. **Außenposten gehören immer dem Bündnis** und haben nur eine Stufe (13×13 Felder). Man baut sie nur an das Revier des eigenen Bündnisses, bezahlt aus dem **Bündnislager** (400 Nahrung, 1000 Holz, 1200 Stein, 200 Erz) und schickt mindestens 50 Truppen als Bautrupp, der als Besatzung bleibt. Bündnisse halten höchstens 3 + 2 × Mitglieder Außenposten.
 
 - **Wachen:** Jedes Mitglied kann Truppen in Außenposten des Bündnisses stellen, jederzeit abziehen oder zu einem anderen Außenposten schicken.
-- **Lager:** Wer im Bündnisgebiet Felder, Wälder, Brüche oder Minen abbaut, füllt das Lager zusätzlich um 25 % der Beute (dem Spieler wird nichts abgezogen). Eigene Rohstoffe kann man jederzeit einzahlen (Bündnis → Revier & Lager).
+- **Lager:** Wer im Bündnisgebiet Felder, Wälder oder Brüche abbaut, füllt das Lager zusätzlich um 25 % der Beute (dem Spieler wird nichts abgezogen). Eigene Rohstoffe kann man jederzeit einzahlen (Bündnis → Revier & Lager).
 - **Angriff:** Einen feindlichen Außenposten kann nur angreifen, wer einen eigenen, fertigen Außenposten direkt daneben gebaut hat. Gewinnt der Angreifer, verschwindet der Posten samt Revier.
 - **Heiligtümer und Thron** gehören der Gruppe, deren Viereck das weiße Andockfeld berührt (keine Besatzung nötig).
 - **Wege:** Mit den Außenposten entstehen Wege (Burg des Gründers → erster Außenposten, dann jeweils zum nächsten bestehenden Punkt). Auf Wegen sind Heere 30 % schneller (`ROAD_SPEED` in `shared/mapgen.js`).
-- **Platzieren:** Der Button „Außenposten“ auf der Karte zeigt oben, wie viele Felder, Wälder, Steinbrüche und Erzminen im Viereck liegen.
+- **Platzieren:** Der Button „Außenposten“ auf der Karte zeigt oben, wie viele Felder, Wälder und Steinbrüche im Viereck liegen. Jedes Feld im fertigen Revier bringt dem Bündnislager automatisch 50 pro Stunde.
 - **Shop** (Mehr → Shop, bezahlt mit Gold): *Teleporter* (800 Gold, versetzt die Burg an einen freien Ort im Bündnisgebiet, danach 12 Stunden Pause, mit Lichteffekt) und *Beschleuniger* (5 Min. 15 Gold, 1 Std. 150, 8 Std. 1000), die Bau, Ausbildung oder Forschung verkürzen (⚡ beim jeweiligen Auftrag).
 
 Die Regeln stehen in `shared/outpost.js` und `shared/rules.js` (ITEMS), die Zahlen oben in diesen Dateien.
