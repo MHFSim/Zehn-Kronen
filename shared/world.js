@@ -8,11 +8,11 @@ import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from
 import {
   DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
-  settleAway, fmtDur, cellXY, planFrom
+  settleAway, fmtDur, cellXY, planFrom, allied, isProtected
 } from './core.js';
-import { beginSiege, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { beginSiege, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
-import { opReady, refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
+import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
@@ -28,6 +28,7 @@ function onArrive(ctx, m, bt, realT) {
   if (m.mode === 'post') { m.phase = 'post'; return; }
   if (m.mode === 'attack' && m.tk === 'post') { const [px, py] = cellXY(m.path[m.path.length - 1]); return arriveField(ctx, m, { k: 'post', id: m.tid, x: px, y: py }, bt, realT, back); }
   if (m.mode === 'build') return arriveBuild(ctx, m, bt, realT, back);
+  if (m.mode === 'assist') return arriveAssist(ctx, m, bt, realT, back);
   if (!m.sieged && beginSiege(ctx, m, o, bt)) return;
   if (m.mode === 'garrison') return arriveGarrison(ctx, m, bt, realT, back);
   if (m.mode === 'raid') return arriveRaid(ctx, m, bt, realT, back);
@@ -238,11 +239,16 @@ export function command(match, players, player, cmd, now) {
 
   if (cmd.type === 'march') {
     const map = mapOf(match), mode = cmd.mode || 'normal';
-    if (!['normal', 'attack', 'station', 'occupy', 'build', 'garrison', 'raid', 'post'].includes(mode)) return 'Unbekannte Marschart';
+    if (!['normal', 'attack', 'station', 'occupy', 'build', 'garrison', 'raid', 'post', 'assist'].includes(mode)) return 'Unbekannte Marschart';
     let o = map.byId[String(cmd.target)], opx = null;
     if (mode === 'build') { const x = Math.floor(Number(cmd.x)), y = Math.floor(Number(cmd.y)); o = { k: 'site', id: 'site' + x + '_' + y, x, y }; }
     else if (mode === 'post') { const x = Math.floor(Number(cmd.x)), y = Math.floor(Number(cmd.y)); o = { k: 'post', id: 'post' + x + '_' + y, x, y }; }
     else if (mode === 'attack' && String(cmd.target).startsWith('post')) { const pm = w.marches.find(g => !g.dead && g.phase === 'post' && g.tid === String(cmd.target)); o = pm ? { k: 'post', id: pm.tid, x: pm.site.x, y: pm.site.y } : null; }
+    else if (mode === 'assist') {
+      const t = String(cmd.target), bo = map.byId[t];
+      if (bo && bo.k === 'start') { const Dp = players.find(p => p.state.slot === bo.slot); o = Dp ? { ...bo, x: Dp.state.pos[0], y: Dp.state.pos[1] } : null; }
+      else { opx = (w.outposts || {})[t]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
+    }
     else if (mode === 'garrison' || mode === 'raid') { opx = (w.outposts || {})[String(cmd.target)]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
     if (!o) return 'Dieses Ziel gibt es nicht';
     if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin')) return 'Dieses Ziel gibt es nicht';
@@ -266,13 +272,19 @@ export function command(match, players, player, cmd, now) {
       if (n > 0) troops[u] = n;
     }
     if (troops.handkarren && sum(troops) === troops.handkarren) return 'Handkarren können nicht allein losziehen – schicke andere Einheiten mit.';
-    let target = null;
+    let target = null, assistSiege = null, assistSide = '';
     if (mode === 'build' || mode === 'garrison' || mode === 'raid') {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
       if (mode === 'build') {
         const why = checkBuild(match, players, player, o.x, o.y, troops, w.gt); if (why) return why;
       } else if (mode === 'garrison') { const why = checkGarrison(ctx, player, opx); if (why) return why; }
       else { const why = checkRaid(ctx, player, opx); if (why) return why; }
+    } else if (mode === 'assist') {
+      if (!sum(troops)) return 'Keine Truppen ausgewählt';
+      const side = cmd.side === 'def' ? 'def' : 'att', Dp = o.k === 'start' ? players.find(p => p.state.slot === map.byId[o.id].slot) : null, alD = opx ? w.alliances[opx.al] : null;
+      const inDef = pl => Dp ? (pl.id === Dp.id || allied(w, pl.id, Dp.id)) : !!(alD && alD.members.includes(pl.id));
+      assistSiege = checkAssist(ctx, player, o.id, side, cmd.siege, inDef); if (typeof assistSiege === 'string') return assistSiege;
+      assistSide = side;
     } else if (mode === 'post') {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
       if (!SITE_OK(map, o.x, o.y) || !map.pass[o.y * N + o.x]) return 'Hier kann man kein Heer aufstellen (Wasser, Fels oder außerhalb der Karte).';
@@ -289,14 +301,16 @@ export function command(match, players, player, cmd, now) {
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
     const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S) : planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
+    if (assistSiege && w.gt + plan.arr[plan.arr.length - 1] >= assistSiege.tSiege) return 'Zu spät: Die Belagerung ist vorbei, bevor deine Truppen ankommen.';
     if (src) w.marches.splice(w.marches.indexOf(src), 1);
     else if (fromOp) { const g = fromOp.garr[player.id]; for (const u in troops) { g[u] -= troops[u]; if (g[u] <= 0) delete g[u]; } if (!sum(g)) delete fromOp.garr[player.id]; }
     else for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
-    const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : { tk: o.k, tid: o.id, mode });
+    const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'assist' ? { tk: o.k, tid: o.id, mode, side: assistSide, siegeId: assistSiege.id } : { tk: o.k, tid: o.id, mode });
     if (src || fromOp) m.redir = true;
+    if (mode === 'assist' && assistSide === 'att') { if (isProtected(S, w.gt)) S.protUntil = w.gt; S.stats.attacks++; }
     if (mode === 'raid') noteRaid(ctx, player, opx, m);
-    else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison' && mode !== 'post') afterLaunch(ctx, player, m, target, mode);
+    else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison' && mode !== 'post' && mode !== 'assist') afterLaunch(ctx, player, m, target, mode);
     syncMatch(match, players, now);
     return '';
   }
@@ -304,6 +318,7 @@ export function command(match, players, player, cmd, now) {
     const m = w.marches.find(x => x.id === Number(cmd.id) && x.owner === player.id);
     if (!m) return 'Dieses Heer gibt es nicht';
     if (m.phase === 'back') return 'Das Heer ist schon auf dem Rückweg';
+    if (m.aux && m.aux.length) releaseAux(ctx, m);
     if (m.phase === 'post') { m.load = {}; return sendBack(ctx, player, m, w.gt); }
     if (m.phase === 'gather') {
       const o = mapOf(match).byId[m.tid], frac = Math.max(0, Math.min(1, (w.gt - m.tStart) / (m.tEnd - m.tStart || 1)));
@@ -350,7 +365,7 @@ export function viewFor(match, players, me, now) {
     if ((x - S.pos[0] - .5) ** 2 + (y - S.pos[1] - .5) ** 2 <= VIEW_CITY * VIEW_CITY) return true;
     return w.marches.some(m => m.owner === me.id && (() => { const p = marchPos(m, gt); return (x - p.x) ** 2 + (y - p.y) ** 2 <= VIEW_ARMY * VIEW_ARMY; })());
   };
-  const marches = [], incoming = [];
+  const marches = [], incoming = [], sieges = [];
   for (const m of w.marches) {
     const own = m.owner === me.id, friend = friends.includes(m.owner), p = marchPos(m, gt);
     if (m.mode === 'attack' && (m.phase === 'out' || m.phase === 'siege')) {
@@ -360,6 +375,7 @@ export function viewFor(match, players, me, now) {
       const op = (w.outposts || {})[m.tid];
       if (op && myAl && op.al === myAl.id) incoming.push({ id: m.id, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', target: 'einen Außenposten', targetId: 0, mine: false, op: true, siege: m.phase === 'siege', eta: m.phase === 'siege' ? m.tSiege : m.t0 + m.arr[m.arr.length - 1] });
     }
+    if (m.phase === 'siege' && (m.mode === 'attack' || m.mode === 'raid')) sieges.push({ id: m.id, tid: m.tid, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops) });
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
       tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, tSiege: m.tSiege, amount: m.amount, res: m.res, load: own ? m.load : undefined });
@@ -391,7 +407,7 @@ export function viewFor(match, players, me, now) {
       alliances: Object.values(w.alliances).map(a => ({ id: a.id, name: a.name, tag: a.tag, leader: a.leader, members: a.members, color: a.color || '' })),
       holds, chron: w.chron.slice(0, 40), result: w.result, ranking: rankingOf(match, players)
     },
-    ally, invites: mineInv, requests: myReq, incoming, myStations,
+    ally, invites: mineInv, requests: myReq, incoming, sieges, myStations,
     state: S,
     world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches, outposts }
   };

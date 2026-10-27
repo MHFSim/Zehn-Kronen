@@ -3,11 +3,11 @@
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
 import { battle, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf } from './combat.js';
 import {
-  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
+  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
-  settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC
+  settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY
 } from './core.js';
-import { territory, touchesObj, removeOutposts } from './outpost.js';
+import { territory, touchesObj, removeOutposts, auxOf, sumAux, attMultOf, settleAux, releaseAux } from './outpost.js';
 
 const FIELD_K = ['farm', 'wood', 'stone'];
 export const SANCT_NAMES = ['Heiligtum der Felder', 'Heiligtum des Holzes', 'Heiligtum der Steine', 'Heiligtum des Goldes'];
@@ -138,11 +138,38 @@ export function arriveField(ctx, m, o, bt, realT, back) {
 }
 
 
+
+/* ---------- Helfer in der Belagerung: Spieler (auch aus anderen Bündnissen) schicken Truppen auf Seite der Angreifer oder Verteidiger ---------- */
+// Darf der Spieler dieser Belagerung auf der Seite helfen? Gibt die Belagerung zurück oder einen Fehlertext
+export function checkAssist(ctx, me, tid, side, siegeId, defGroupHas) {
+  const w = ctx.match.world;
+  const sm = w.marches.find(g => !g.dead && g.phase === 'siege' && g.tid === String(tid) && (siegeId == null || g.id === Number(siegeId)));
+  if (!sm) return 'Dort läuft gerade keine Belagerung.';
+  if (side !== 'att' && side !== 'def') return 'Wähle eine Seite: Angreifer oder Verteidiger.';
+  const att = byId(ctx.players, sm.owner);
+  if (side === 'att') {
+    if (defGroupHas(me)) return 'Du gehörst zu den Verteidigern.';
+  } else {
+    if (me.id === sm.owner || allied(w, me.id, sm.owner)) return 'Du kannst nicht gegen deinen eigenen Verbündeten verteidigen.';
+  }
+  if (!att) return 'Der Angreifer ist nicht mehr da.';
+  return sm;
+}
+export function arriveAssist(ctx, m, bt, realT, back) {
+  const { match, players } = ctx, w = match.world, P = byId(players, m.owner);
+  const sm = w.marches.find(g => g.id === m.siegeId && !g.dead && g.phase === 'siege' && g.tSiege > bt);
+  if (!sm) { pushReport(P.state, { kind: 'pvp', role: 'att', title: 'Zu spät', win: false, target: { kind: m.tk, id: m.tid }, text: 'Die Belagerung ist schon vorbei. Dein Heer kehrt um.' }, realT); return back(); }
+  sm.aux = sm.aux || []; sm.aux.push({ pid: m.owner, side: m.side, troops: { ...m.troops } });
+  m.dead = true;
+  pushReport(P.state, { kind: 'pvp', role: m.side === 'att' ? 'att' : 'def', title: 'Truppen bei der Belagerung eingetroffen', win: true, target: { kind: m.tk, id: m.tid },
+    text: 'Deine ' + sum(m.troops) + ' Truppen kämpfen auf Seite der ' + (m.side === 'att' ? 'Angreifer' : 'Verteidiger') + ', sobald die Belagerung endet.' }, realT);
+}
+
 // Belagerung: Greift ein Heer eine Burg oder einen Außenposten an, steht es nach der Ankunft SIEGE_TIME davor. Erst danach wird gekämpft.
 // So bleibt dem Gegner Zeit zum Schutz, zum Verstärken und um Verbündete zu rufen. Gibt true zurück, wenn die Belagerung beginnt.
 export function beginSiege(ctx, m, o, bt) {
   const { match, players } = ctx, w = match.world, A = byId(players, m.owner); if (!A) return false;
-  const dur = fmtDur(SIEGE_TIME / match.speed);
+  const dur = fmtDur((m.mode === 'raid' ? SIEGE_OP_TIME : SIEGE_TIME) / match.speed);
   let title, text, who = [];
   if (m.mode === 'attack' && o && o.k === 'start') {
     const D = players.find(p => p.state.slot === o.slot);
@@ -156,7 +183,7 @@ export function beginSiege(ctx, m, o, bt) {
     if (al.members.includes(A.id)) return false;
     for (const id of al.members) note(ctx, id, 'attack', 'Belagerung eures Außenpostens!', A.name + tag(w, A.id) + ' steht mit ' + sum(m.troops) + ' Truppen vor einem Außenposten eures Bündnisses. Der Angriff beginnt in ' + dur + '. Schickt Besatzung hin!');
   } else return false;
-  m.phase = 'siege'; m.sieged = true; m.tSiege = bt + SIEGE_TIME;
+  m.phase = 'siege'; m.sieged = true; m.tStart = bt; m.tSiege = bt + (m.mode === 'raid' ? SIEGE_OP_TIME : SIEGE_TIME);
   return true;
 }
 export function arriveCity(ctx, m, o, bt, realT, back) {
@@ -184,8 +211,13 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   for (const u in homeStart) if (!(homeStart[u] > 0)) delete homeStart[u];
   const total = merge(merge(homeStart, guard), {});
   for (const pid in SD.stationed) Object.assign(total, merge(total, SD.stationed[pid]));
+  const auxA = auxOf(m, 'att'), auxD = auxOf(m, 'def'), attAll = merge({ ...m.troops }, sumAux(auxA));
+  Object.assign(total, merge(total, sumAux(auxD)));
   const startA = { ...m.troops };
-  const r = battle(m.troops, total, wallMult(SD) * forceOf(SD), forceOf(A.state));
+  const r = battle(attAll, total, wallMult(SD) * forceOf(SD), attMultOf(ctx, m, auxA));
+  const fa = {}; for (const u in attAll) fa[u] = attAll[u] ? 1 - (r.attLeft[u] || 0) / attAll[u] : 0;
+  const attScale = t => { const left = {}; for (const u in t) { const n = t[u] - Math.round(t[u] * (fa[u] || 0)); if (n > 0) left[u] = n; } return left; };
+  const ownLeft = attScale(m.troops);
   const frac = {}; for (const u in total) frac[u] = total[u] ? 1 - (r.defLeft[u] || 0) / total[u] : 0;
   const scale = t => { const lost = {}; for (const u in t) { const l = r.win ? t[u] : Math.min(t[u], Math.round(t[u] * (frac[u] || 0))); if (l > 0) lost[u] = l; } return lost; };
   const homeLost = scale(homeStart), hs = settleHome(SD, homeLost);
@@ -201,23 +233,31 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
     }
     if (sum(left)) SD.stationed[pid] = left; else delete SD.stationed[pid];
   }
+  for (const a of auxD) {   // Helfer der Verteidiger
+    const P = byId(players, a.pid), lost = scale(a.troops), left = subTroops(a.troops, lost); allyGroups.push({ label: 'Helfer ' + (P ? P.name : ''), start: a.troops, left });
+    if (P) { settleAux(ctx, a, left, [o.x, o.y], 'start', o.id); pushReport(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen bei ' + D.name + ' haben gekämpft', win: !r.win, target: info, text: 'Du hast ' + sum(lost) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); }
+  }
+  for (const a of auxA) {   // Helfer der Angreifer
+    const P = byId(players, a.pid), left = attScale(a.troops);
+    if (P) { settleAux(ctx, a, left, [o.x, o.y], 'start', o.id); pushReport(P.state, { kind: 'pvp', role: 'att', title: (r.win ? 'Sieg' : 'Niederlage') + ' bei der Belagerung von ' + D.name, win: r.win, target: info, text: 'Du hast ' + (sum(a.troops) - sum(left)) + ' von ' + sum(a.troops) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); }
+  }
   const guardLost = scale(guard);
   groups.push(...allyGroups, { label: 'Stadtwache', start: guard, left: subTroops(guard, guardLost) });
-  const sa = settleAway(A.state, startA, r.attLeft);
-  m.troops = r.attLeft;
+  const sa = settleAway(A.state, startA, ownLeft);
+  m.troops = ownLeft; m.aux = [];
   const killed = sum(homeLost) + sum(guardLost) + allyGroups.reduce((a, g) => a + sum(g.start) - sum(g.left), 0);
   A.state.stats.kills += killed; if (r.win) A.state.stats.wins++;
 
   let fate = null, loot = {};
   if (r.win) {
-    loot = lootFrom(SD, capacityOf(r.attLeft, A.state)); m.load = loot;
+    loot = lootFrom(SD, capacityOf(ownLeft, A.state)); m.load = loot;
     fate = fall(ctx, A, D, bt);
   }
   const fateText = fate === 'out' ? ' Die Burg wurde erobert, ' + D.name + ' ist ausgeschieden.' : fate === 'vassal' ? ' Die Burg wurde erobert, ' + D.name + ' ist jetzt dein Vasall.' : '';
   pushReport(A.state, { kind: 'pvp', role: 'att', title: (r.win ? 'Sieg über die Burg von ' : 'Niederlage vor der Burg von ') + D.name, win: r.win, target: info, fate,
-    att: { start: startA, left: r.attLeft, wounded: sa.wounded, dead: sa.dead }, def: { start: total, left: r.defLeft, groups }, rounds: r.rounds, loot, text: fateText.trim() }, realT);
+    att: { start: startA, left: ownLeft, wounded: sa.wounded, dead: sa.dead }, def: { start: total, left: r.defLeft, groups }, rounds: r.rounds, loot, text: fateText.trim() }, realT);
   pushReport(SD, { kind: 'pvp', role: 'def', title: (r.win ? 'Burg gefallen: ' : 'Angriff abgewehrt: ') + A.name, win: !r.win, target: info, fate,
-    att: { start: startA, left: r.attLeft }, def: { start: total, left: r.defLeft, groups }, rounds: r.rounds, loot,
+    att: { start: startA, left: ownLeft }, def: { start: total, left: r.defLeft, groups }, rounds: r.rounds, loot,
     text: r.win ? (fate === 'out' ? 'Deine Burg ist gefallen. Du bist ausgeschieden.' : 'Deine Burg ist gefallen. Du bist jetzt Vasall von ' + A.name + '.') : 'Deine Verteidiger haben ' + A.name + ' zurückgeschlagen.' }, realT);
   note(ctx, D.id, 'battle', r.win ? (fate === 'out' ? 'Du bist ausgeschieden' : 'Deine Burg ist gefallen') : 'Angriff abgewehrt', A.name + (r.win ? ' hat deine Burg erobert.' : ' wurde zurückgeschlagen.'));
   note(ctx, A.id, 'battle', r.win ? 'Burg erobert' : 'Angriff gescheitert', 'Dein Heer ' + (r.win ? 'hat die Burg von ' + D.name + ' genommen.' : 'wurde vor der Burg von ' + D.name + ' geschlagen.'));
@@ -239,6 +279,7 @@ function fall(ctx, A, D, bt) {
 }
 export function eliminate(ctx, V, by, bt) {
   const { players } = ctx, w = ctx.match.world, S = V.state;
+  for (const m of w.marches) if (m.owner === V.id && m.aux) releaseAux(ctx, m);
   w.marches = w.marches.filter(m => m.owner !== V.id);
   for (const p of players) if (p.state.stationed[V.id]) delete p.state.stationed[V.id];
   for (const oid in w.holds) { const h = w.holds[oid]; if (h.garr[V.id]) { delete h.garr[V.id]; if (!Object.keys(h.garr).length) delete w.holds[oid]; } }
@@ -272,6 +313,7 @@ export function releaseAll(ctx, pid) {
 export function purge(ctx, pid) {
   const { players } = ctx, w = ctx.match.world;
   releaseAll(ctx, pid); removeOutposts(w, pid);
+  for (const m of w.marches) if (m.owner === pid && m.aux) releaseAux(ctx, m);
   w.marches = w.marches.filter(m => m.owner !== pid);
   removeMember(ctx, pid);
   w.pending = w.pending.filter(p => p.pid !== pid);

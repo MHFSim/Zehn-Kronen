@@ -7,7 +7,7 @@ import { N, isWater, roadPaths, setMapRoads, NODE_KINDS, NODE_RES } from './mapg
 import { battle, sum, forceOf } from './combat.js';
 import {
   mapOf, byId, groupOf, groupLabel, allianceOf, pushReport, note, chron, settleAway, sendHome, fmtDur, planFrom, launch,
-  reveal, flushBits, VIEW_CITY, THRONE_HOLD
+  reveal, flushBits, VIEW_CITY, THRONE_HOLD, cellXY
 } from './core.js';
 import { RES, TELEPORT_COOLDOWN } from './rules.js';
 
@@ -123,6 +123,30 @@ export function checkBuild(match, players, me, x, y, troops, gt) {
 }
 export const clanOutposts = (w, alId) => Object.values(w.outposts || {}).filter(o => o.al === alId);
 
+/* ---------- Helfer in der Belagerung ---------- */
+// Spieler (auch aus anderen Bündnissen) schicken Truppen auf Seite der Angreifer oder Verteidiger; sie liegen in m.aux der Belagerung
+export const auxOf = (m, side) => (m.aux || []).filter(a => a.side === side);
+export const sumAux = list => list.reduce((acc, a) => { const r = { ...acc }; for (const u in a.troops) r[u] = (r[u] || 0) + a.troops[u]; return r; }, {});
+// Gemeinsame Angriffskraft: nach Truppenzahl gewichtet
+export function attMultOf(ctx, m, aux) {
+  const A = byId(ctx.players, m.owner); let n = sum(m.troops), f = n * (A ? forceOf(A.state) : 1);
+  for (const a of aux) { const P = byId(ctx.players, a.pid), k = sum(a.troops); n += k; f += k * (P ? forceOf(P.state) : 1); }
+  return n ? f / n : 1;
+}
+// Truppen eines Helfers nach dem Kampf: Verluste buchen, Überlebende heimschicken
+export function settleAux(ctx, a, left, from, tk, tid) {
+  const P = byId(ctx.players, a.pid); if (!P) return null;
+  const sa = settleAway(P.state, a.troops, left);
+  if (sum(left)) sendHome(ctx, P, left, from, tk, tid);
+  return sa;
+}
+// Alle Helfer einer Belagerung nach Hause schicken (Belagerung abgebrochen)
+export function releaseAux(ctx, m) {
+  const [x, y] = cellXY(m.path[m.path.length - 1]);
+  for (const a of m.aux || []) { const P = byId(ctx.players, a.pid); if (P && sum(a.troops)) sendHome(ctx, P, a.troops, [x, y], 'start', undefined); }
+  m.aux = [];
+}
+
 /* ---------- Bündnislager ---------- */
 export function donate(ctx, me, amounts) {
   const w = ctx.match.world, al = allianceOf(w, me.id), S = me.state;
@@ -223,11 +247,19 @@ export function arriveRaid(ctx, m, bt, realT, back) {
   if (why) { pushReport(A.state, { kind: 'outpost', role: 'att', title: 'Angriff abgebrochen', win: false, target: info, text: why + ' Das Heer kehrt um.' }, realT); return back(); }
   const alD = w.alliances[o.al], g = opGuard(), def = { ...g.troops }, mult = o.done > bt ? 1 : g.mult;
   for (const pid in o.garr) for (const u in o.garr[pid]) def[u] = (def[u] || 0) + o.garr[pid][u];
-  const startA = { ...m.troops }, r = battle(m.troops, def, mult, forceOf(A.state)), sa = settleAway(A.state, startA, r.attLeft);
-  m.troops = r.attLeft; A.state.stats.kills += sum(def) - sum(r.defLeft); if (r.win) A.state.stats.wins++;
+  const auxA = auxOf(m, 'att'), auxD = auxOf(m, 'def'), attAll = { ...m.troops };
+  for (const a of auxA) for (const u in a.troops) attAll[u] = (attAll[u] || 0) + a.troops[u];
+  for (const a of auxD) for (const u in a.troops) def[u] = (def[u] || 0) + a.troops[u];
+  const startA = { ...m.troops }, r = battle(attAll, def, mult, attMultOf(ctx, m, auxA));
+  const fa = {}; for (const u in attAll) fa[u] = attAll[u] ? 1 - (r.attLeft[u] || 0) / attAll[u] : 0;
+  const attScale = t => { const left = {}; for (const u in t) { const n = t[u] - Math.round(t[u] * (fa[u] || 0)); if (n > 0) left[u] = n; } return left; };
+  const ownLeft = attScale(m.troops), sa = settleAway(A.state, startA, ownLeft);
+  m.troops = ownLeft; m.aux = []; A.state.stats.kills += sum(def) - sum(r.defLeft); if (r.win) A.state.stats.wins++;
   const lab = alD ? alD.name : 'Bündnis', members = alD ? alD.members : [];
   const frac = {}; for (const u in def) frac[u] = def[u] ? 1 - (r.defLeft[u] || 0) / def[u] : 0;
-  const detail = { att: { start: startA, left: r.attLeft, wounded: sa.wounded, dead: sa.dead }, def: { start: def, left: r.defLeft }, defLabel: 'Außenposten', rounds: r.rounds };
+  for (const a of auxD) { const left = {}; for (const u in a.troops) { const n = r.win ? 0 : a.troops[u] - Math.round(a.troops[u] * (frac[u] || 0)); if (n > 0) left[u] = n; } settleAux(ctx, a, left, [o.x, o.y], 'outpost', o.id); const P = byId(players, a.pid); if (P) pushReport(P.state, { kind: 'outpost', role: 'def', title: 'Belagerung eines Außenpostens', win: !r.win, target: info, text: 'Du hast ' + (sum(a.troops) - sum(left)) + ' von ' + sum(a.troops) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); }
+  for (const a of auxA) { const left = attScale(a.troops); settleAux(ctx, a, left, [o.x, o.y], 'outpost', o.id); const P = byId(players, a.pid); if (P) pushReport(P.state, { kind: 'outpost', role: 'att', title: (r.win ? 'Sieg' : 'Niederlage') + ' bei der Belagerung eines Außenpostens', win: r.win, target: info, text: 'Du hast ' + (sum(a.troops) - sum(left)) + ' von ' + sum(a.troops) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); }
+  const detail = { att: { start: startA, left: ownLeft, wounded: sa.wounded, dead: sa.dead }, def: { start: def, left: r.defLeft }, defLabel: 'Außenposten', rounds: r.rounds };
   if (r.win) {
     let lost = 0;
     for (const pid of Object.keys(o.garr)) { const P = byId(players, Number(pid)); if (P) { const sd = settleAway(P.state, o.garr[pid], {}); lost += sum(o.garr[pid]); note(ctx, P.id, 'attack', 'Außenposten zerstört', A.name + ' hat einen Außenposten von „' + lab + '“ zerstört. Du hast ' + sum(o.garr[pid]) + ' Truppen verloren (' + sum(sd.wounded) + ' verwundet).'); } }

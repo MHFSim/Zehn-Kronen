@@ -915,7 +915,7 @@ function marchState(m) {
   const L = m.arr[m.arr.length - 1], g = gtNow();
   if (m.phase === 'gather') return { moving: false, pct: Math.max(0, Math.min(1, (g - m.tStart) / ((m.tEnd - m.tStart) || 1))) };
   if (m.phase === 'post') return { moving: false, pct: 1 };
-  if (m.phase === 'siege') return { moving: false, pct: Math.max(0, Math.min(1, (g - (m.tSiege - SIEGE_TIME)) / SIEGE_TIME)) };
+  if (m.phase === 'siege') return { moving: false, pct: Math.max(0, Math.min(1, (g - m.tStart) / Math.max(1, m.tSiege - m.tStart))) };
   return { moving: true, pct: Math.max(0, Math.min(1, (g - m.t0) / (L || 1))) };
 }
 function marchLine(m) {
@@ -1034,6 +1034,12 @@ function siteSheet(w) {
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
+function siegeBlock(tid, defName) {
+  const sg = (view.sieges || []).find(x => x.tid === tid); if (!sg || view.match.phase !== 'running') return '';
+  const free = sendFrom || sendFromOp || ownMarches().length < armySlots(S), none = !sum(sendList()) ? 'Wähle Truppen aus.' : !free ? 'Alle Heere sind unterwegs.' : '';
+  return `<div class="block"><h3>⚔ Belagerung · Kampf in ${fmtT(real(Math.max(0, sg.tSiege - gtNow())))}</h3><p class="note">${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(defName)}. Wer rechtzeitig eintrifft, kämpft mit – auch aus anderen Bündnissen.</p>`
+    + `<div class="row"><button class="btn ghost" type="button" data-act="assistD" ${none ? 'disabled' : ''}>Verteidigern helfen</button><button class="btn ghost" type="button" data-act="assistA" ${none ? 'disabled' : ''}>Angreifern helfen</button></div>${none ? `<span class="why">${none}</span>` : ''}</div>`;
+}
 function opSheet(w) {
   const o = (w.outposts || []).find(x => x.id === msel.id); if (!o) return '';
   const gt = gtNow(), ready = opReady(o, gt), g = opGuard(), free = sendFrom || sendFromOp || ownMarches().length < armySlots(S);
@@ -1064,6 +1070,7 @@ function opSheet(w) {
       body += (S.protUntil > gt ? '<p class="why">Wenn du angreifst, endet dein Schutz sofort.</p>' : '') + actionRow(armedKey === 'raid' + o.id ? 'Jetzt wirklich angreifen' : 'Außenposten angreifen', plan, '', free, armedKey === 'raid' + o.id ? 'danger' : '', 'raid');
     }
   }
+  body = siegeBlock(o.id, 'diesen Außenposten') + body;
   return `<div class="sh-head"><h2>Außenposten</h2><span class="lvl">${o.mine ? 'Bündnis' : esc(opOwnerName(o))}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
 function renderMapSheet() {
@@ -1137,6 +1144,7 @@ function renderMapSheet() {
         const al = allyOf(p.id), friend = isAlly(p.id), prot = p.protUntil > gt;
         body = `<dl class="stats"><dt>Rathaus</dt><dd>Stufe ${p.rathaus}</dd><dt>Bündnis</dt><dd>${al ? esc(al.name) + ' [' + esc(al.tag) + ']' + (friend ? ' (deins)' : '') : 'keins'}</dd>
           <dt>Lage</dt><dd>${p.out ? 'ausgeschieden' : p.vassalOf ? 'Vasall von ' + esc(pname(p.vassalOf)) : prot ? 'geschützt, noch ' + fmtT(real(p.protUntil - gt)) : 'angreifbar'}</dd></dl>`;
+        body += siegeBlock(o.id, p.name);
         if (p.out) body += '<p class="note">Diese Burg ist erobert. Der Spieler ist ausgeschieden.</p>';
         else {
           const plan = planFor(o);
@@ -1193,7 +1201,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) { t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); const pr = $('mProg'), st = marchState(m); if (pr) pr.style.width = Math.round(st.pct * 100) + '%'; const gl = $('mGather'); if (gl && m.own) gl.innerHTML = lootHTML({ [m.res]: Math.floor(m.amount * st.pct) }) + ` <span class="note">von ${fmtN(m.amount)}</span>`; } }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'opSend', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'opSend', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt', 'assistA', 'assistD'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -1212,6 +1220,7 @@ function mapAct(act, el) {
   else if (act === 'patk') { const m = view.world.marches.find(x => x.id === msel.id); if (!m) return true; if (!twice('patk' + m.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'attack', target: m.tid, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff.', 'info'); closeSheet(); } }); }
   else if (act === 'opSend') { sendFromOp = msel.id; closeSheet(); syncMoveBar(); }
   else if (act === 'sfStart') { sendFrom = msel.id; closeSheet(); syncMoveBar(); }
+  else if (act === 'assistA' || act === 'assistD') { const tid = msel.type === 'op' ? msel.id : msel.id; command({ type: 'march', mode: 'assist', target: tid, side: act === 'assistA' ? 'att' : 'def', troops: sendList() }).then(ok => { if (ok) { toast('Verstärkung ist unterwegs.', 'info'); closeSheet(); } }); }
   else if (act === 'halt') command({ type: 'halt', id: msel.id }).then(ok => ok && toast('Das Heer bleibt stehen.', 'info'));
   else if (act === 'sfCancel') { sendFrom = 0; sendFromOp = ''; closeSheet(); syncMoveBar(); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });

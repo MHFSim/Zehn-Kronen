@@ -58,7 +58,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
 
 // ---- Schutz, Angriff, Vasall, Ausscheiden ----
 {
-  const { match, players } = mk(3); const [a, b, c] = players;
+  const { match, players } = mk(5); const [a, b, c] = players;
   const map = mapOf(match), cityOf = p => map.objects.find(o => o.k === 'start' && o.slot === p.state.slot);
   // Neulinge sind 4 Tage geschützt
   give(a, { schwert: 400, bogen: 200, speer: 200 }); a.state.train = {};
@@ -76,7 +76,13 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
     adv(match, players, mm.arr[mm.arr.length - 1] + 60);
     assert.equal(mm.phase, 'siege', 'Heer belagert'); assert.ok(b.state.feed.length > feed0 && b.state.feed[0].title.includes('Belagerung'), 'Warnung an den Verteidiger');
     const inc = viewFor(match, players, b, clock).incoming[0]; assert.ok(inc && inc.siege, 'Belagerung in der Anzeige');
-    adv(match, players, 3600); assert.equal(b.state.vassalOf, 0, 'nach 1 h noch kein Kampf'); assert.equal(mm.phase, 'siege');
+    give(b, { speer: 5 }); const cc = players[2], dd = players[3]; cc.state.protUntil = 0; dd.state.protUntil = 0; give(cc, { speer: 40 }); give(dd, { speer: 30 });
+    assert.match(run(match, players, clock, b, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'att', troops: { speer: 1 } }), /Verteidigern/, 'Verteidiger helfen nicht dem Angreifer');
+    assert.match(run(match, players, clock, a, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'def', troops: { speer: 1 } }), /Verbündeten/, 'Angreifer verteidigt nicht');
+    const ra = run(match, players, clock, cc, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'def', troops: { speer: 40 } }); assert.equal(ra, '', 'Fremder hilft den Verteidigern: ' + ra);
+    const rb = run(match, players, clock, dd, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'att', troops: { speer: 30 } }); assert.equal(rb, '', 'Fremder hilft den Angreifern: ' + rb);
+    adv(match, players, 2400); assert.equal(mm.aux.length, 2, 'Helfer sind eingetroffen'); assert.equal(mm.phase, 'siege');
+    adv(match, players, 1200); assert.equal(b.state.vassalOf, 0, 'vor Ablauf noch kein Kampf'); assert.equal(mm.phase, 'siege');
   }
   adv(match, players, 2 * DAY);
   assert.equal(b.state.vassalOf, a.id, 'erster Fall: Vasall');
