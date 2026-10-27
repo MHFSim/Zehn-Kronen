@@ -131,4 +131,14 @@ adv(2 * DAY);
 assert.ok(!w.outposts[target.id], 'zerstört');
 assert.ok(a.state.reports.some(r => r.kind === 'outpost' && !r.win), 'Bericht für Mitglied');
 assert.ok(c.state.reports.some(r => r.kind === 'outpost' && r.win));
+// Felder im Revier füllen das Bündnislager automatisch (50 pro Feld und Stunde)
+{
+  const T = towersOf(map)[5], fid = 'testfarm', alB = w.alliances[1];
+  map.objects.push({ id: fid, k: 'farm', x: T.x + 2, y: T.y + 2, lv: 1 });
+  w.outposts.incometest = { id: 'incometest', al: alB.id, x: T.x, y: T.y, done: 0, by: a.id, garr: {} };
+  const before = storeOf(alB).food, f = viewFor(match, players, a, clock).ally.fields.food; assert.ok(f >= 1, 'Feld im Revier gezählt');
+  adv(3600); const got = storeOf(alB).food - before;
+  assert.ok(Math.abs(got - 50 * f) <= 1, 'je Feld 50 pro Stunde automatisch: ' + got + ' / ' + 50 * f);
+  delete w.outposts.incometest; map.objects.pop();
+}
 console.log('Alle Außenposten-Tests bestanden.');

@@ -3,7 +3,7 @@
 // das gemeinsame Revier. Ein neuer Außenposten muss das Revier des Bündnisses berühren und wird aus dem Bündnislager
 // bezahlt. Bündnismitglieder bewachen ihn mit eigenen Truppen. Heiligtümer und Thron kann nur besetzen, wessen
 // Gruppe sie mit einem Viereck berührt. Feindliche Außenposten kann nur angreifen, wer selbst einen berührenden hat.
-import { N, isWater, roadPaths, setMapRoads } from './mapgen.js';
+import { N, isWater, roadPaths, setMapRoads, NODE_KINDS, NODE_RES } from './mapgen.js';
 import { battle, sum, forceOf } from './combat.js';
 import {
   mapOf, byId, groupOf, groupLabel, allianceOf, pushReport, note, chron, settleAway, sendHome, fmtDur, planFrom, launch,
@@ -21,6 +21,7 @@ export const OP_MIN_TROOPS = 1;                           // jede beliebige Einh
 export const opBuildTime = n => OP_BUILD * Math.pow(Math.min(Math.max(1, n), OP_HELP_MAX), Math.log(OP_BUILD_FAST / OP_BUILD) / Math.log(OP_HELP_MAX));
 export const OP_COST = [400, 1000, 1400];                  // Nahrung, Holz, Stein – aus dem Bündnislager
 export const CLAN_SHARE = 0.25;                           // Anteil, der beim Farmen im Bündnisgebiet zusätzlich ins Bündnislager geht
+export const FIELD_INCOME = 50;                           // pro Feld im Bündnisrevier und Spielstunde automatisch ins Bündnislager
 export const maxOutposts = () => Infinity;   // kein Limit
 export const cityR = rathaus => 3 + Math.ceil(rathaus / 3);
 export const opGuard = () => ({ troops: { speer: 30, bogen: 20 }, mult: 1.3 });   // Wachen ohne Besatzung
@@ -136,6 +137,19 @@ export function clanGather(ctx, m, o, bt) {
   const { match, players } = ctx, w = match.world, al = allianceOf(w, m.owner); if (!al || !m.amount) return;
   if (!inside(territory(match, players, bt), 'a' + al.id, o.x, o.y)) return;
   storeOf(al)[m.res] += Math.floor(m.amount * CLAN_SHARE);
+}
+// Felder (Farm, Wald, Steinbruch) im Revier des Bündnisses: Anzahl je Rohstoff. Jedes bringt FIELD_INCOME pro Stunde ins Bündnislager.
+export function clanFields(match, players, al, gt) {
+  const n = { food: 0, wood: 0, stone: 0 }, rects = territory(match, players, gt), g = 'a' + al.id;
+  for (const o of mapOf(match).objects) if (NODE_KINDS.includes(o.k) && inside(rects, g, o.x, o.y)) n[NODE_RES[o.k]]++;
+  return n;
+}
+export function clanIncome(ctx, dt) {
+  const { match, players } = ctx, w = match.world; if (!(dt > 0)) return;
+  for (const id in (w.alliances || {})) {
+    const al = w.alliances[id], n = clanFields(match, players, al, w.gt), st = storeOf(al); al.acc = al.acc || {};
+    for (const r of RES) { if (!n[r]) continue; al.acc[r] = (al.acc[r] || 0) + n[r] * FIELD_INCOME * dt / 3600; const k = Math.floor(al.acc[r]); if (k > 0) { st[r] += k; al.acc[r] -= k; } }
+  }
 }
 export function refundStore(w, alId, c = OP_COST) { const al = w.alliances[alId]; if (!al) return; const st = storeOf(al); RES.forEach((r, i) => { st[r] += c[i]; }); }
 
