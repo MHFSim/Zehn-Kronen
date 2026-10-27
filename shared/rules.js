@@ -93,7 +93,7 @@ export const timeOf = (id, t) => B[id].time * Math.pow(1.3, t - 1);
 export const capFor = l => Math.round(1500 * Math.pow(1.25, l));
 export const cap = S => capFor(S.lv.lager);
 export const protectedPct = S => S.lv.lager ? Math.min(40, 20 + S.lv.lager) : 20;
-export const prodAt = (id, l) => l <= 0 ? 0 : Math.round(120 * l * Math.pow(1.15, l - 1));
+export const prodAt = (id, l) => l <= 0 ? 0 : Math.round(120 * l * Math.pow(1.04, l - 1));
 export const homeTroops = S => Object.values(S.troops).reduce((a, b) => a + b, 0);
 export const awayTroops = S => Object.values(S.away || {}).reduce((a, b) => a + b, 0);
 export const troopCount = S => homeTroops(S) + awayTroops(S);
