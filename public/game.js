@@ -179,7 +179,7 @@ function renderHud() {
 }
 function statsHTML(id) {
   const L = S.lv[id], b = B[id], n = L + 1, rows = [];
-  const nx = (a, bb) => a + (L < 20 ? ` <span class="up">→ ${bb}</span>` : '');
+  const nx = (a, bb) => a + (L < 30 ? ` <span class="up">→ ${bb}</span>` : '');
   if (b.prod) rows.push(['Produktion', nx(fmtN(prodAt(id, L)) + '/h', fmtN(prodAt(id, n)) + '/h')]);
   if (id === 'rathaus') rows.push(['Gebäude bis Stufe', nx(L, n)], ['Bauschleifen', maxQueues(S)], ['Steuergold', fmtN(rate(S, 'gold')) + '/h']);
   if (id === 'lager') rows.push(['Lagerplatz', nx(fmtN(cap(S)), fmtN(capFor(n)))], ['Plünderschutz', protectedPct(S) + ' %']);
@@ -193,7 +193,7 @@ function upgradeHTML(id) {
   if (q) return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + q.target : 'Wird gebaut'}</h3>
     <div class="row"><div class="prog"><i id="upProg" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" id="upTime">${fmtT(real(q.left))}</span></div>
     <div class="row"><button class="btn" data-speed="build:${id}" type="button">⚡ Beschleunigen</button><button class="btn ghost" data-act="cancel" type="button">Abbrechen (volle Erstattung)</button></div></div>`;
-  if (id === 'rathaus' && L >= 20) return '<div class="block"><h3>Ausbau</h3><p class="note">Höchststufe erreicht.</p></div>';
+  if (id === 'rathaus' && L >= 30) return '<div class="block"><h3>Ausbau</h3><p class="note">Höchststufe erreicht.</p></div>';
   const c = costOf(id, t), why = blocker(S, id), tm = timeOf(id, t);
   return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + t : 'Bauen'}</h3>
     <div class="costs">${costHTML(c)}</div>
@@ -225,11 +225,6 @@ function troopsHTML() {
   const t = Object.keys(U).filter(u => S.troops[u]);
   return `<div class="block"><h3>Deine Truppen</h3>${t.length ? `<div class="troops">${t.map(u => `<span><b>${fmtN(S.troops[u])}</b> ${U[u].name}</span>`).join('')}</div>` : '<p class="note">Noch keine Truppen. Baue die Kaserne (ab Rathaus 2).</p>'}</div>`;
 }
-function matchHTML() {
-  return `<div class="block"><h3>Partie „${esc(match.name)}“</h3>
-    <p class="note">Angemeldet als <b>${esc(me.name)}</b>. Mitspieler: ${match.players.map(p => esc(p.name)).join(', ')}.</p>
-    <div class="row"><button class="btn ghost" type="button" data-act="logout">Abmelden</button></div></div>`;
-}
 function signature() {
   if (msel) return mapSignature();
   if (!sel) return '';
@@ -241,7 +236,7 @@ function renderSheet() {
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
   $('sheetInner').innerHTML = `<img class="sh-img" alt="" src="${imgOf(id)}"><div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${id === 'rathaus' || (b.units && L) ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'akademie' ? researchHTML() : ''}${id === 'rathaus' ? matchHTML() : ''}`;
+    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${b.units && L ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'akademie' ? researchHTML() : ''}`;
   sheetSig = signature();
 }
 function updateSheet() {
@@ -329,7 +324,7 @@ function plateHTML(id) {
   let act;
   if (q) act = `<div class="bprog"><div class="prog"><i data-qprog="${id}" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" data-qtime="${id}">${fmtT(real(q.left))}</span></div>`;
   else if (locked) act = `<span class="why">Rathaus Stufe ${b.unlock} nötig</span>`;
-  else if (id === 'rathaus' && L >= 20) act = '<span class="note">Höchststufe</span>';
+  else if (id === 'rathaus' && L >= 30) act = '<span class="note">Höchststufe</span>';
   else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}<span class="cost bt" title="Bauzeit">⏱ ${fmtT(real(timeOf(id, L + 1)))}</span></span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
   const extra = t ? `<div class="pmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
   return `<article class="plate ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="pimg">${bico(id)}<span class="ribbon">${L || '–'}</span>${q ? '<span class="btag">Bau</span>' : ''}</div>
