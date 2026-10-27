@@ -240,13 +240,27 @@ function buildFarm(lv) {
   return { geo: b.build(), flags: [], h: 1.6, parts, smoke: [] };
 }
 function buildWood(lv) {
-  const b = new MB(), LOGC = [140, 96, 56];
-  b.box(1.2, .75, 1.0, -.2, 0, -.7, [132, 94, 58]); b.gable(1.55, 1.3, .62, -.2, .75, -.7, [92, 70, 44], Math.PI / 2); b.box(.3, .5, .05, -.2, 0, -.18, WOOD_D); b.box(.14, .14, .05, .2, .4, -.18, LIGHT); b.box(.1, .3, .1, .2, .75, -1.0, STONE_D);
-  for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) b.push(new T.CylinderGeometry(.13, .13, 1.1, 7), LOGC, .7 + i * .26 + r * .13, .14 + r * .24, .9, 0, 1, 1, 1, 0, Math.PI / 2);
-  for (const [x, z] of [[-1.2, .3], [-.8, 1.0], [-1.5, 1.0]]) { b.cyl(.16, .18, .22, 7, x, 0, z, [106, 74, 44]); b.cyl(.14, .14, .03, 7, x, .22, z, [216, 182, 130]); }
-  b.box(.04, .5, .5, 1.2, 0, .1, WOOD_D, 0, 0, .3); b.box(.04, .5, .5, 1.5, 0, .1, WOOD_D, 0, 0, -.3);
-  b.cyl(.03, .03, .9, 5, 1.1, .1, -.5, WOOD_D); b.box(.3, .05, .12, 1.1, .85, -.5, IRON); b.box(.06, .05, .5, 1.1, .1, -.5, WOOD_D, .5);                              // Axt im Klotz
-  return { geo: b.build(), flags: [], h: 1.5, smoke: [[-.1, 1.2, -1.0]] };
+  // Nur Holz: zwei geschichtete Stapel und ein paar einzelne Stämme, ohne Gebäude
+  const b = new MB(), LOGC = [[140, 96, 56], [128, 88, 52], [150, 104, 62], [118, 82, 48]], PALE = [214, 180, 128];
+  const log = (x, y, z, len, rad, ry, k) => {
+    b.push(new T.CylinderGeometry(rad, rad, len, 8), LOGC[k % 4], x, y, z, ry, 1, 1, 1, 0, Math.PI / 2);
+    const ex = Math.cos(ry) * len / 2, ez = -Math.sin(ry) * len / 2;
+    for (const sg of [-1, 1]) b.push(new T.CylinderGeometry(rad * .94, rad * .94, .04, 8), PALE, x + sg * ex, y, z + sg * ez, ry, 1, 1, 1, 0, Math.PI / 2, .05);
+  };
+  const pile = (cx, cz, ry, rows, len, rad) => {
+    let k = 0;
+    for (let r = 0; r < rows; r++) {
+      const n = rows - r;
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2) * rad * 2.08, h = rad + r * rad * 1.78;
+        log(cx + Math.sin(ry) * off, h, cz + Math.cos(ry) * off, len, rad, ry, k++);
+      }
+    }
+  };
+  pile(-.5, -.5, .2, 4, 1.7, .17);
+  pile(.9, 1.0, 1.35, 3, 1.5, .16);
+  log(-1.5, .15, .9, 1.2, .15, .6, 1); log(-1.1, .13, 1.5, 1.0, .13, -.4, 2); log(1.6, .14, -.7, 1.1, .14, 1.0, 3); log(-.1, .12, 1.7, .9, .12, .1, 0);
+  return { geo: b.build(), flags: [], h: 1.0, smoke: [] };
 }
 // Felsen entpacken (einmal)
 const ROCK = ROCKS.map(r => {
