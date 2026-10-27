@@ -181,6 +181,15 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   const pid = match.world.marches.find(m => m.owner === a.id).id;
   assert.equal(run(match, players, clock, a, { type: 'recall', id: pid }), '');
   adv(match, players, 2 * DAY); assert.ok(!match.world.marches.some(m => m.owner === a.id), 'Heer wieder daheim'); assert.equal(a.state.troops.speer >= 10, true);
+  // weiterschicken: aufgestelltes Heer zieht von seinem Standort zu einem neuen Platz
+  give(a, { speer: 12 }); assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', x: px, y: py, troops: { speer: 12 } }), '');
+  { const g3 = match.world.marches.find(m => m.owner === a.id); adv(match, players, g3.arr[g3.arr.length - 1] + 30); assert.equal(g3.phase, 'post'); }
+  const pm = match.world.marches.find(m => m.owner === a.id), awayBefore = a.state.away.speer;
+  assert.match(run(match, players, clock, a, { type: 'march', from: 99999, mode: 'post', x: px + 3, y: py, troops: {} }), /nicht auf der Karte/);
+  assert.equal(run(match, players, clock, a, { type: 'march', from: pm.id, mode: 'post', x: px + 3, y: py, troops: {} }), '');
+  const pm2 = match.world.marches.filter(m => m.owner === a.id); assert.equal(pm2.length, 1); assert.equal(pm2[0].phase, 'out'); assert.equal(pm2[0].troops.speer, 12);
+  assert.equal(a.state.away.speer, awayBefore, 'Truppen nicht doppelt verbucht');
+  adv(match, players, pm2[0].arr[pm2[0].arr.length - 1] + 30); assert.equal(pm2[0].phase, 'post'); assert.deepEqual(pm2[0].site, { x: px + 3, y: py });
 }
 
 console.log('Alle Kriegstests bestanden.');

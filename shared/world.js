@@ -8,7 +8,7 @@ import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from
 import {
   DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
-  settleAway, fmtDur, cellXY
+  settleAway, fmtDur, cellXY, planFrom
 } from './core.js';
 import { afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
@@ -228,9 +228,12 @@ export function command(match, players, player, cmd, now) {
     else if (mode === 'garrison' || mode === 'raid') { opx = (w.outposts || {})[String(cmd.target)]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
     if (!o) return 'Dieses Ziel gibt es nicht';
     if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin')) return 'Dieses Ziel gibt es nicht';
-    if (w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
-    const troops = {};
-    for (const u of Object.keys(U)) {
+    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && x.phase === 'post') : null;
+    if (cmd.from != null && !src) return 'Dieses Heer steht nicht auf der Karte';
+    if (!src && w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
+    if (src && mode === 'post' && o.id === src.tid) return 'Das Heer steht schon dort';
+    const troops = src ? { ...src.troops } : {};
+    if (!src) for (const u of Object.keys(U)) {
       const n = Math.floor(Number((cmd.troops || {})[u] || 0));
       if (n < 0 || !Number.isFinite(n)) return 'Ungültige Truppenzahl';
       if (n > (S.troops[u] || 0)) return 'So viele ' + U[u].name + ' hast du nicht zu Hause';
@@ -257,9 +260,10 @@ export function command(match, players, player, cmd, now) {
       target = c.target || null;
     }
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
-    const plan = planMarch(map, S, o, troops);
+    const plan = src ? planFrom(map, cellXY(src.path[src.path.length - 1]), o.x, o.y, troops, S) : planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
-    for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
+    if (src) w.marches.splice(w.marches.indexOf(src), 1);
+    else for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : { tk: o.k, tid: o.id, mode });
     if (mode === 'raid') noteRaid(ctx, player, opx, m);
