@@ -10,13 +10,13 @@ export const forestCostFor = troops => (troops.leicht > 0 || troops.schwer > 0 |
 
 /* ---------- Banditenlager ---------- */
 export function campTroops(lv) {
-  const total = Math.round(8 + 3 * lv * lv);
+  const total = Math.round(4 + 2 * Math.pow(lv, 1.5));   // wächst langsamer als die Beute, damit sich der Angriff lohnt
   const mix = lv >= 7 ? { speer: .25, schwert: .25, bogen: .2, leicht: .15, schwer: .15 }
     : lv >= 4 ? { speer: .3, schwert: .3, bogen: .25, leicht: .15 } : { speer: .4, schwert: .35, bogen: .25 };
   const t = {}; for (const u in mix) t[u] = Math.max(1, Math.round(total * mix[u]));
   return t;
 }
-export const campMult = lv => 1 + 0.10 * (lv - 1);
+export const campMult = lv => 1 + 0.05 * (lv - 1);
 export const campLoot = lv => ({ food: 300 * lv, wood: 300 * lv, stone: 350 * lv, gold: 20 * lv });
 
 /* ---------- Kampf ---------- */
