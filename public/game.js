@@ -444,7 +444,7 @@ function setupCity() {
 
 /* ---------- Partie: Phase, Schutz, Bündnis, Meldungen ---------- */
 const DAY = 86400, THRONE_HOLD = 7 * DAY;
-const SANCT = [['Heiligtum der Felder', 'food'], ['Heiligtum der Wälder', 'wood'], ['Heiligtum der Steine', 'stone'], ['Heiligtum der Erze', 'ore']];
+const SANCT = [['Heiligtum der Felder', 'food'], ['Heiligtum des Holzes', 'wood'], ['Heiligtum der Steine', 'stone'], ['Heiligtum der Erze', 'ore']];
 const pname = id => { const p = match.players.find(x => x.id === id); return p ? p.name : '?'; };
 const allyOf = id => { const p = match.players.find(x => x.id === id); return p && p.ally ? match.alliances.find(a => a.id === p.ally) : null; };
 const isAlly = id => !!(view.ally && id !== me.id && view.ally.members.includes(id));
@@ -852,7 +852,7 @@ function showEnd(force) {
 
 /* ---------- Karte: Bedienung ---------- */
 const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', ore: 'Erzmine', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', tower: 'Turm', start: 'Burg' };
-const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron', tower: 'Turm' };
+const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Holz', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron', tower: 'Turm' };
 const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
 const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
 function marchRemain(m) { const L = m.arr[m.arr.length - 1], g = gtNow(); return m.phase === 'gather' ? m.tEnd - g : m.t0 + L - g; }
@@ -1012,7 +1012,7 @@ function renderMapSheet() {
         const amount = Math.floor(Math.min(plan.capacity, left)), gather = amount ? GATHER_SEC * amount : 0;
         body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Traglast</dt><dd>${fmtN(plan.capacity)}</dd><dt>Ertrag</dt><dd class="costs">${lootHTML({ [res]: amount })}</dd><dt>Sammeln</dt><dd>${fmtT(real(gather))}</dd><dt>Gesamt</dt><dd>${fmtT(real(2 * plan.duration + gather))}</dd></dl>`;
       }
-      body += actionRow('Sammeln', plan, left < 50 ? 'Das Feld ist erschöpft.' : '', free);
+      body += actionRow('Sammeln', plan, left < 50 ? 'Das Feld ist erschöpft.' : (view.world.marches || []).some(m => m.tid === id && !m.mode && m.phase !== 'back') ? 'Hier sammelt schon ein Heer.' : '', free);
       const foes = fieldFoes(id);
       if (foes.length) body += `<div class="block"><h3>Sammler auf dem Feld</h3>${foes.map(m => `<div class="mrow"><div><b>${esc(m.name)}</b><div class="note">${fmtN((m.troops && m.troops.n) || 0)} Truppen · sammelt noch ${fmtT(real(Math.max(0, m.tEnd - gtNow())))}</div></div></div>`).join('')}</div>` + actionRow(armedKey === 'fattack' + id ? 'Wirklich überfallen' : 'Sammler überfallen', plan, '', free, 'danger', 'fattack');
     } else if (k === 'camp') {

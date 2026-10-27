@@ -33,6 +33,10 @@ function onArrive(ctx, m, bt, realT) {
   if (m.mode === 'occupy') return arriveHold(ctx, m, o, bt, realT, back);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
   if (NODE_KINDS.includes(o.k)) {
+    if (w.marches.some(g => g !== m && !g.dead && g.tid === o.id && g.phase === 'gather')) {
+      pushReport(S, { kind: 'gather', title: 'Feld besetzt', win: false, target: info, text: 'Hier sammelt schon ein anderes Heer. Dein Heer kehrt ohne Beute zurück.' }, realT);
+      return back();
+    }
     const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops, S), amount = Math.floor(Math.min(cap, left));
     if (amount < NODE_EMPTY) {
       pushReport(S, { kind: 'gather', title: 'Feld erschöpft', win: false, target: info, text: 'Das Feld ist fast leer. Das Heer kehrt ohne Beute zurück.' }, realT);
@@ -239,6 +243,7 @@ export function command(match, players, player, cmd, now) {
       if (o.k === 'camp' && !campAlive(w, o.id, w.gt)) return 'Dieses Lager ist gerade zerstört';
       if (o.k === 'ruin' && w.ruins[o.id]) return 'Diese Ruine ist schon geplündert';
       if (NODE_KINDS.includes(o.k) && nodeLeft(w, o, w.gt) < NODE_EMPTY) return 'Dieses Feld ist erschöpft';
+      if (NODE_KINDS.includes(o.k) && w.marches.some(g => !g.dead && g.tid === o.id && !g.mode && g.phase !== 'back')) return 'Auf diesem Feld sammelt schon ein Heer (oder ist unterwegs dorthin).';
     } else {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
       const c = checkLaunch(ctx, player, o, mode, troops); if (typeof c === 'string') return c;

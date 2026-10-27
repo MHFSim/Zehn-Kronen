@@ -152,6 +152,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.equal(run(match, players, clock, b, { type: 'march', target: node.id, troops: { speer: 30 } }), '');
   { const g0 = match.world.marches.find(m => m.owner === b.id); adv(match, players, g0.arr[g0.arr.length - 1] + 30); }
   assert.equal(match.world.marches.find(m => m.owner === b.id).phase, 'gather');
+  give(a, { speer: 10 }); assert.match(run(match, players, clock, a, { type: 'march', target: node.id, troops: { speer: 10 } }), /sammelt schon ein Heer/);
   assert.equal(run(match, players, clock, a, { type: 'march', target: node.id, mode: 'attack', troops: { schwert: 300 } }), '');
   adv(match, players, 12 * 3600);
   assert.ok(!match.world.marches.some(m => m.owner === b.id), 'Sammler vernichtet');
