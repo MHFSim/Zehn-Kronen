@@ -153,6 +153,8 @@ export function syncMatch(match, players, now) {
       note(ctx, p.id, 'protect', 'Dein Schutz endet bald', 'Noch ' + fmtDur((S.protUntil - w.gt) / speed) + ', dann können dich andere Spieler angreifen.');
     }
     if (S.slot >= 0 && !S.out) reveal(S, S.pos[0] + .5, S.pos[1] + .5, VIEW_CITY);
+    const al0 = allianceOf(w, p.id);   // Bündnismitglieder sehen die Burgen der anderen samt deren Aufdeck-Radius
+    if (al0) for (const id of al0.members) { if (id === p.id) continue; const q = byId(players, id); if (q && q.state.slot >= 0 && !q.state.out) reveal(S, q.state.pos[0] + .5, q.state.pos[1] + .5, VIEW_CITY); }
   }
   for (const m of w.marches) {
     const p = byId(players, m.owner); if (!p) continue;
