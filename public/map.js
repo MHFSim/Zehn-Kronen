@@ -261,7 +261,7 @@ const STONE_V = [
 ];
 function buildStone(lv, variant = 0) {
   const b = new MB();
-  for (const [ri, sc, x, z, ry] of STONE_V[variant % STONE_V.length]) b.rock(ROCK[ri], sc * 1.25, x * 1.2, 0, z * 1.2, ry);
+  for (const [ri, sc, x, z, ry] of STONE_V[variant % STONE_V.length]) b.rock(ROCK[ri], sc * 1.25, x * 1.2, -ROCK[ri].h * sc * 1.25 * .24, z * 1.2, ry);
   b.box(.5, .3, .4, -.9, 0, -1.3, [188, 182, 168], .3); b.box(.4, .24, .34, -.4, 0, -1.6, [176, 170, 156], -.2);
   return { geo: b.build(), flags: [], h: 2.2 };
 }
