@@ -185,15 +185,15 @@ export function generateMap(seed) {
 
   // Rund um jeden Startplatz: gleich viel Frühspiel
   starts.forEach(s => {
-    NODE_KINDS.forEach(k => tryPlace(k, s.x, s.y, 6, 11, 3, () => 1 + Math.floor(rand() * 2), 60));
-    tryPlace('camp', s.x, s.y, 9, 14, 3, () => 1, 60);
-    tryPlace('camp', s.x, s.y, 13, 19, 3, () => 2, 60);
+    NODE_KINDS.forEach(k => tryPlace(k, s.x, s.y, 6, 12, 6, () => 1 + Math.floor(rand() * 2), 60));
+    tryPlace('camp', s.x, s.y, 9, 15, 6, () => 1, 60);
+    tryPlace('camp', s.x, s.y, 13, 20, 6, () => 2, 60);
   });
   // Rest der Karte
   const scatter = (kind, count, minD, lvf, r0 = 6) => { for (let i = 0; i < count; i++) tryPlace(kind, C, C, r0, C * 0.9, minD, lvf, 80); };
   // Ressourcen: deutlich weniger und nie in Thronnähe
-  scatter('farm', 14, 6, nodeLv, 36); scatter('wood', 14, 6, nodeLv, 36); scatter('stone', 11, 6, nodeLv, 36); scatter('ore', 11, 6, nodeLv, 36);
-  scatter('camp', 14, 7, campLv);
+  scatter('farm', 14, 8, nodeLv, 36); scatter('wood', 14, 8, nodeLv, 36); scatter('stone', 11, 8, nodeLv, 36); scatter('ore', 11, 8, nodeLv, 36);
+  scatter('camp', 14, 8, campLv);
 
   const map = { seed, N, H, F, pass, reach, objects, starts, byId: Object.fromEntries(objects.map(o => [o.id, o])) };
   if (cache.size > 3) cache.clear();
