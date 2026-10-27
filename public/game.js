@@ -601,17 +601,16 @@ function moreHTML() {
       <p class="note">Pro Person ist ein Konto vorgesehen. Mehrfachkonten fallen dem Admin auf und können entfernt werden.</p></div>
     <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
-  const tasks = tutorialHTML(), taskDone = (tasks.match(/class="chk done"/g) || []).length, taskAll = (tasks.match(/class="chk/g) || []).length;
   const SUBS = {
     game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], tasks: ['🎯', 'Erste Schritte', tasks], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter, Beschleuniger (gefunden)', itemN('teleport') + SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('tasks', '🎯', 'Erste Schritte', taskDone + ' von ' + taskAll + ' geschafft')}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('game', '🏁', 'Partie', days || state)}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -805,13 +804,18 @@ function setupModal() {
     else if (act === 'mUse') { const ok = await command({ type: 'useSpeed', item: i, kind: speedCtx.kind, ref: speedCtx.ref }); if (ok) toast('Beschleunigt um ' + ITEMS[i].name.replace('Beschleuniger ', '') + '.', 'info'); refreshSpeed(); }
   });
 }
+function speedupsHTML() {
+  const tot = SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0);
+  return `<p class="note">Speedups findet dein Heer beim Ressourcensammeln: bei 2 Stunden Sammeln im Schnitt je einen 15- und einen 5-Minuten-Speedup. Man kann sie nicht kaufen.</p>
+    <div class="block"><h3>Deine Speedups</h3>${SPEED_IDS.map(id => { const it = ITEMS[id], n = itemN(id); return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div></div><b class="spn">${n}×</b></div>`; }).join('')}
+    <p class="note">Zusammen: <b>${tot ? fmtT(real(tot)) : '0'}</b> Zeitersparnis. Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
+}
 function shopHTML() {
   const tp = ITEMS.teleport, cd = Math.max(0, TELEPORT_COOLDOWN - (gtNow() - S.tpAt));
   const card = (id) => { const it = ITEMS[id]; return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div><div class="note">Im Beutel: <b>${itemN(id)}</b></div></div>
     ${it.price ? `<button class="btn small" type="button" data-act="shopBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>${it.price} 🪙</button>` : ''}</div>`; };
   return `<p class="note">Du hast <b>${fmtN(Math.floor(S.res.gold))} 🪙 Gold</b>. Gold bekommst du aus Heiligtümern, Lagern und Beute.</p>
-    <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte den Button „Teleportieren“ nutzen.'}</p>` : ''}</div>
-    <div class="block"><h3>Beschleuniger (nur gefunden)</h3>${SPEED_IDS.map(card).join('')}<p class="note">Nicht käuflich: Dein Heer findet sie beim Ressourcensammeln, im Schnitt je einen 15- und 5-Minuten-Beschleuniger pro 2 Stunden Sammelzeit. Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
+    <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte den Button „Teleportieren“ nutzen.'}</p>` : ''}</div>`;
 }
 
 /* ---------- Ergebnis ---------- */
