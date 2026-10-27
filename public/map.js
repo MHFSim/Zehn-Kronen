@@ -413,7 +413,7 @@ function horseModel(body, legs, type, tab) {
   };
   leg(true, 1, .085, .22); leg(true, -1, -.085, .22); leg(false, -1, .085, -.22); leg(false, 1, -.085, -.22);
 }
-function buildUnit(type, col) {
+function buildUnit(type, col, full) {
   const legs = [], body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150], tab = col, dk = mul(col, .65);
   const rider = (b, y, scale = 1, plate = false, lance = true) => {
     const m = plate ? [170, 176, 188] : [120, 110, 100];
@@ -433,10 +433,30 @@ function buildUnit(type, col) {
     if (type === 'speer') { body.cyl(.012, .012, 1.25, 5, -.17, .02, .06, WOOD_D); body.cone(.026, .1, 5, -.17, 1.27, .06, IRON); body.push(new T.CylinderGeometry(.15, .15, .025, 10), dk, .2, .4, .02, 0, 1, 1, 1, 0, Math.PI / 2); }
     else if (type === 'schwert') { body.box(.02, .42, .05, -.19, .06, .04, [210, 214, 220]); body.box(.02, .05, .12, -.19, .22, .04, GOLD); body.push(new T.CylinderGeometry(.17, .17, .03, 10), tab, .21, .38, .03, 0, 1, 1, 1, 0, Math.PI / 2); body.push(new T.CylinderGeometry(.04, .04, .045, 6), IRON, .22, .38, .03, 0, 1, 1, 1, 0, Math.PI / 2); }
     else { body.push(new T.TorusGeometry(.26, .012, 4, 10, Math.PI), WOOD, -.2, .42, .06, 0, 1, 1, 1, 0, Math.PI / 2 + Math.PI / 2); body.box(.012, .5, .012, -.2, .17, .06, [220, 214, 200]); body.box(.05, .26, .06, .08, .45, -.12, [110, 78, 48], 0, .3); for (let i = 0; i < 3; i++) body.box(.01, .08, .01, .08 + i * .015, .68, -.14, tab); }
-  } else if (type === 'handkarren') {
-    body.box(.34, .1, .5, 0, .2, 0, [140, 100, 60]); body.box(.02, .14, .5, -.17, .3, 0, WOOD_D); body.box(.02, .14, .5, .17, .3, 0, WOOD_D); body.box(.34, .14, .02, 0, .3, -.25, WOOD_D);
-    for (const x of [-.2, .2]) body.push(new T.CylinderGeometry(.13, .13, .04, 10), WOOD_D, x, .13, 0, 0, 1, 1, 1, 0, Math.PI / 2);
-    body.box(.3, .16, .3, 0, .36, .02, [214, 178, 90]); body.box(.02, .3, .3, 0, .22, .5, WOOD_D);   // Last und Deichsel
+  } else if (type === 'handkarren') {   // Handkarren nach cart.glb: zwei große Speichenräder, offener Kasten in Spielerfarbe, Stahlrahmen, lange Deichsel nach vorn (+z)
+    const k = .21, STEEL = [84, 90, 100], WOODC = [150, 106, 62];
+    const bx = (w, h, d, x, y, z, c, rx = 0) => body.box(w * k, h * k, d * k, x * k, y * k, z * k, c, 0, rx);
+    bx(2.04, .08, 2.6, 0, .46, .04, WOODC);                                                  // Boden
+    bx(.08, .85, 2.6, -1.0, .5, .04, tab, -.04); bx(.08, .85, 2.6, 1.0, .5, .04, tab, -.04);  // Seitenwände
+    bx(2.04, .95, .08, 0, .5, -1.27, tab); bx(2.04, .5, .08, 0, .5, 1.3, tab);                // Rück- und Vorderwand
+    for (const x of [-1.04, 1.04]) { bx(.1, .08, 2.7, x, 1.3, .04, STEEL); bx(.1, .08, 2.7, x, .42, .04, STEEL); }   // Rahmenrohre
+    bx(2.2, .1, .1, 0, .56, 0, STEEL);                                                        // Achse
+    for (const x of [-.9, .9]) { bx(.08, 1.4, .08, x, 1.35, 1.3, STEEL); bx(.08, .08, 1.6, x, 1.45, 2.1, STEEL, .0); }   // Deichsel
+    bx(2.0, .08, .08, 0, 1.45, 2.9, STEEL);                                                   // Griff
+    for (const x of [-.9, .9]) body.push(new T.CylinderGeometry(.03 * 1, .03, .55 * k * 1.9, 5), STEEL, x * k, .2 * k + .06, -1.25 * k, 0, 1, 1, 1, .35, 0);   // Standbeine hinten
+    if (full) {   // beladen: Getreide im Kasten
+      const G1 = [226, 186, 74], G2 = [208, 164, 56], G3 = [236, 202, 96];
+      body.push(new T.SphereGeometry(1, 9, 6), G1, 0, .86 * k, .02 * k, 0, .92 * k, .5 * k, 1.12 * k, 0, 0, .2);
+      body.push(new T.SphereGeometry(1, 8, 5), G3, -.35 * k, 1.1 * k, .5 * k, 0, .5 * k, .3 * k, .55 * k, 0, 0, .2);
+      body.push(new T.SphereGeometry(1, 8, 5), G2, .4 * k, 1.05 * k, -.4 * k, 0, .55 * k, .28 * k, .6 * k, 0, 0, .2);
+    }
+    for (const sx of [-1, 1]) {   // Räder: drehen sich beim Marsch
+      const w = new MB(), R = .6 * k;
+      w.push(new T.TorusGeometry(R, .06 * k, 5, 14), [40, 40, 40], 0, 0, 0, Math.PI / 2, 1, 1, 1, 0, 0);
+      w.push(new T.CylinderGeometry(.14 * k, .14 * k, .22 * k, 6), WOODC, 0, 0, 0, 0, 1, 1, 1, 0, Math.PI / 2);
+      for (let a = 0; a < 4; a++) w.box(.05 * k, 1.1 * k, .05 * k, 0, -.55 * k, 0, WOODC, 0, a * Math.PI / 4);
+      legs.push({ g: w.build(), x: sx * 1.2 * k, y: .61 * k, z: .04 * k, s: 0, spin: true });
+    }
   } else if (type === 'ochsen') {
     horse([120, 84, 56]); body.box(.5, .12, .8, 0, .22, -.75, [140, 100, 60]); body.box(.04, .22, .8, -.25, .34, -.75, WOOD_D); body.box(.04, .22, .8, .25, .34, -.75, WOOD_D);
     for (const x of [-.3, .3]) body.push(new T.CylinderGeometry(.2, .2, .05, 10), WOOD_D, x, .2, -.75, 0, 1, 1, 1, 0, Math.PI / 2);
@@ -903,7 +923,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   }
 
   /* ---------- Heere ---------- */
-  unitGeo(type, col) { const k = type + col; return this.unitGeos[k] || (this.unitGeos[k] = buildUnit(type, hexRGB(col))); }
+  unitGeo(type, col, full) { const k = type + col + (full ? 'F' : ''); return this.unitGeos[k] || (this.unitGeos[k] = buildUnit(type, hexRGB(col), full)); }
   // Beschriftung über dem Heer: Zahl der Einheiten und – wie in Rise of Kingdoms – die Restzeit bzw. der Sammelfortschritt
   badgeTxt(s, gt) {
     const m = s.m, sp = this.view.match.speed || 1; let x = '';
@@ -926,7 +946,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const total = clamp(Math.ceil(n / 25), kinds.length, 8), W = kinds.reduce((a, k) => a + k[1], 0), cntOf = kinds.map(() => 1);
       for (let r = total - kinds.length; r > 0; r--) { let bi = 0, bv = -1; kinds.forEach((k, ki) => { const v = k[1] / W * total - cntOf[ki]; if (v > bv) { bv = v; bi = ki; } }); cntOf[bi]++; }
       const figs = []; kinds.forEach((k, ki) => { for (let c = 0; c < cntOf[ki]; c++) figs.push(k[0]); });
-      const sig = figs.join(',') + col;
+      const loaded = !!(m.own && m.load && Object.values(m.load).some(v => v > 0)), sig = figs.join(',') + col + (loaded ? 'F' : '');
       if (!s) {
         const grp = new T.Group(); this.scene.add(grp);
         const pole = new T.Mesh(new T.CylinderGeometry(.02, .02, 1.5, 5), new T.MeshLambertMaterial({ color: 0x4a3624 })); pole.position.set(0, .75, -.1); grp.add(pole);
@@ -938,11 +958,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         s.sig = sig; for (const u of s.units) s.grp.remove(u.g); s.units = [];
         const rows = []; for (let k = 0; k < figs.length; k += 3) rows.push(figs.slice(k, k + 3));
         rows.forEach((row, r) => row.forEach((type, c) => {
-          const cav = type === 'leicht' || type === 'schwer' || type === 'ochsen', ug = this.unitGeo(type, col), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
+          const cav = type === 'leicht' || type === 'schwer' || type === 'ochsen', ug = this.unitGeo(type, col, type === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
           const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
-          g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
-          s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s }; }) });
+          g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
+          s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
         }));
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
@@ -1136,7 +1156,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.grp.rotation.y = Math.atan2(dx, dz); }
       s.units.forEach((u, k) => {
         const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
-        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.s * sw * 1.1; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
+        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.spin ? (p.still ? 0 : t * 6) : l.s * sw * 1.1; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
       });
       this.waveFlags([s.flag], t);
       if (t - (s.lt || 0) > .5) { s.lt = t; const bt = this.badgeTxt(s, gt); if (bt !== s.bt) { s.bt = bt; this.setBadge(s.lab, bt, 0x2a2f38); } }
