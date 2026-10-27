@@ -7,7 +7,7 @@ import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
 import { ROCKS } from '/public/rockdata.js';
 import { VIKING } from '/public/vikingdata.js';
 import { RIDER } from '/public/riderdata.js';
-import { rectsOf, roadEdgesOf, dockPad, touches, towersOf } from '/shared/outpost.js';
+import { rectsOf, roadEdgesOf, dockPad, dockReach, touches, towersOf } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
 const CH = 20;                // Blockgröße (Felder)
@@ -1041,7 +1041,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     // Andock-Vierecke an Thron und Türmen: verbunden mit einem Bündnisrevier werden sie mit diesem zu einer Fläche (ohne Überlappung), sonst weiß
     const free = [];
     for (const th of this.map.objects.filter(o => o.k === 'throne' || o.k === 'tower' || o.k === 'sanct')) {
-      const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad)), rect = { x0: th.x - pad, y0: th.y - pad, x1: th.x + pad, y1: th.y + pad };
+      const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, dockReach(th))), rect = { x0: th.x - pad, y0: th.y - pad, x1: th.x + pad, y1: th.y + pad };
       if (hit) put(hit, rect); else free.push(rect);
     }
     if (free.length) put({ group: 'free', ready: true, off: true }, free[0]), free.slice(1).forEach(f => put({ group: 'free', ready: true, off: true }, f));

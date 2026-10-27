@@ -39,7 +39,7 @@ export function rectsOf(towers, ops, gt) {
   // Wird einer in der Mitte zerstört, sind alle dahinter inaktiv (weiß), bis das Bündnis die Lücke wieder schließt.
   for (const g of new Set(ops.map(o => o.group))) {
     const built = out.filter(r => r.group === g && r.built);
-    const act = new Set(built.filter(r => towers.some(t => touches([r], g, t.x, t.y, TOWER_PAD)))), q = [...act];
+    const act = new Set(built.filter(r => towers.some(t => touches([r], g, t.x, t.y, TOWER_PAD + 1)))), q = [...act];
     while (q.length) { const r = q.pop(); for (const o of built) if (!act.has(o) && overlaps(r, o, 1)) { act.add(o); q.push(o); } }
     for (const o of built) if (!act.has(o)) { o.ready = false; o.off = true; }
   }
@@ -50,7 +50,9 @@ export const overlaps = (a, b, pad = 0) => a.x0 - pad <= b.x1 && b.x0 - pad <= a
 export const touches = (rects, group, tx, ty, pad = 1) => rects.some(r => r.ready && r.group === group && tx >= r.x0 - pad && tx <= r.x1 + pad && ty >= r.y0 - pad && ty <= r.y1 + pad);
 // Andockzone eines Ortes: bei Thron und Turm ein weißes Viereck (9×9), sonst 1 Feld Rand. Ein Viereck der Gruppe muss sie berühren.
 export const dockPad = o => o.k === 'throne' || o.k === 'tower' ? TOWER_PAD : o.k === 'sanct' ? 3 : 1;
-export const touchesObj = (rects, group, o) => touches(rects, group, o.x, o.y, dockPad(o));
+// Berühren genügt: Auch ein Viereck, das mit seiner Kante direkt am weißen Feld liegt, dockt an
+export const dockReach = o => dockPad(o) + (o.k === 'throne' || o.k === 'tower' || o.k === 'sanct' ? 1 : 0);
+export const touchesObj = (rects, group, o) => touches(rects, group, o.x, o.y, dockReach(o));
 // Liegt das Feld mitten in einem fertigen Viereck der Gruppe?
 export const inside = (rects, group, tx, ty) => rects.some(r => r.ready && r.group === group && tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1);
 // Darf die Gruppe den Außenposten angreifen? Nur wenn ein fertiger eigener Außenposten an ihn angrenzt.
@@ -108,7 +110,7 @@ export function checkSite(match, players, me, x, y, gt) {
   const mineActive = rects.some(r => r.ready && r.group === group);
   if (!mineActive) {
     const zone = t => ({ x0: t.x - TOWER_PAD, y0: t.y - TOWER_PAD, x1: t.x + TOWER_PAD, y1: t.y + TOWER_PAD });
-    if (!towersOf(map).some(t => overlaps(nr, zone(t)))) return 'Der erste Außenposten beginnt an einem der Türme am Rand der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
+    if (!towersOf(map).some(t => overlaps(nr, zone(t), 1))) return 'Der erste Außenposten beginnt an einem der Türme am Rand der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
   } else if (!rects.some(r => r.ready && r.group === group && overlaps(nr, r, 1))) return 'Ein Außenposten muss das Revier deines Bündnisses berühren.';
   return '';
 }
