@@ -590,6 +590,13 @@ function tutorialHTML() {
   const done = steps.filter(x => x[1]).length;
   return `<p class="note">${done} von ${steps.length} geschafft.</p>${steps.map(([t, ok, h]) => `<div class="chk ${ok ? 'done' : ''}"><i>${ok ? '✓' : ''}</i><span><b>${t}</b><br><small class="note">${h}</small></span></div>`).join('')}`;
 }
+function combatRulesHTML() {
+  return `<p class="desc"><b>So wird gekämpft:</b> Der Kampf dauert höchstens 30 Runden, beide Seiten schlagen gleichzeitig zu. Jede Einheit hat Angriff und Abwehr gegen Artillerie, Infanterie und Kavallerie (siehe Ausbildung). Pro Runde fallen auf der Gegenseite: Anzahl × Angriff gegen deren Gattung × 0,25 ÷ Abwehr der Gegenseite gegen deine Gattung, verteilt nach Anteil auf deren Einheiten. Wer keine Einheit mehr hat, verliert, der Sieger behält seine Reste.</p>
+  <p class="desc"><b>Verluste:</b> 30 % der Verluste sind verwundet und kommen ins Lazarett (solange Platz ist), 70 % sind gefallen. Karren greifen nicht an, haben nur Abwehr 10 und werden nicht verwundet. Die Forschung Kriegskunst gibt +4 % pro Stufe auf Angriff und Verteidigung.</p>
+  <p class="desc"><b>Beim Sammeln:</b> Ein Gegner kann dein Heer auf dem Feld überfallen (Schutz und Bündnisse gelten). Es verteidigt allein, ohne Wachen und Bonus. Verlierst du, ist das Heer weg und der Angreifer nimmt mit, was du schon gesammelt hattest (begrenzt durch seine Traglast). Gewinnst du, sammelst du mit den Überlebenden weiter, mit entsprechend weniger Traglast. Auf einem Feld sammelt immer nur ein Heer.</p>
+  <p class="desc"><b>Außenposten:</b> Angreifen können nur Bündnisse, und nur Außenposten, an die ein eigener fertiger Außenposten grenzt. Verteidigt wird mit einer Wache (30 Speerträger, 20 Bogenschützen) plus allen dort stationierten Truppen. Ein fertiger Außenposten gibt der Wache +30 %, ein im Bau befindlicher nichts. Bei einem Sieg wird er zerstört, das Revier dahinter ist dann inaktiv, der Angreifer erbeutet 30 % der Baukosten und die stationierten Truppen sind verloren. Bei einer Niederlage verlieren die Verteidiger nur die gefallenen Truppen.</p>
+  <p class="desc"><b>Burgen:</b> Es verteidigen alle Truppen zu Hause, stationierte Verbündete und die Stadtwache (10 + 8 pro Rathausstufe + 15 pro Mauerstufe Speerträger). Die Mauer gibt +5 % pro Stufe. Siegt der Angreifer, plündert er 40 % der Rohstoffe über dem geschützten Anteil (20 % + 1 % je Lagerstufe, höchstens 40 %) und 25 % des Golds, begrenzt durch seine Traglast. Der Besitzer wird Vasall, beim zweiten Fall scheidet er aus. Unter Schutz sind Burgen nicht angreifbar.</p>`;
+}
 function rulesHTML() {
   return `<p class="desc"><b>Ziel:</b> Wer den <b>Thron</b> in der Mitte 7 Tage hält, gewinnt. Das geht nur über ein Bündnis: Nur Bündnisse können ihr Revier mit Außenposten bis zum weißen Viereck am Thron vergrößern, wer allein spielt, erreicht ihn nicht. Sonst gewinnt am Ende der Partie die Gruppe mit den meisten Punkten, oder die letzte, die übrig bleibt.</p>
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
@@ -597,7 +604,8 @@ function rulesHTML() {
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
   <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der sechs Türme am Kartenrand beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
   <p class="desc"><b>Felder:</b> Ein Heer sammelt dort 20 Rohstoffe pro Minute, begrenzt durch seine Traglast und den Vorrat. Ein geleertes Feld ist 6 Stunden leer und dann wieder voll, ein angebrochenes erneuert sich 6 Stunden nach dem letzten Besuch. Auf dem Feld kann dein Heer von Feinden überfallen werden (Schutzzeit und Bündnisse gelten wie sonst).</p>
-  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Der Thron wird nicht bewacht: Wer dort andockt, hält ihn. Heiligtümer besetzt du mit Truppen, die bleiben, bis du sie zurückrufst.</p>`;
+  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Der Thron wird nicht bewacht: Wer dort andockt, hält ihn. Heiligtümer besetzt du mit Truppen, die bleiben, bis du sie zurückrufst.</p>
+  <div class="row"><button class="btn" type="button" data-act="sub" data-t="combat">⚔️ Kampfregeln</button></div>`;
 }
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
@@ -623,7 +631,7 @@ function moreHTML() {
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
   const SUBS = {
     game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
