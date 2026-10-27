@@ -950,14 +950,14 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       }
       s.m = m; s.col = col;
       if (s.sig !== sig) {
-        s.sig = sig; for (const u of s.units) s.grp.remove(u.g); s.units = [];
+        s.sig = sig; s.dOk = false; for (const u of s.units) s.grp.remove(u.g); s.units = [];
         const rows = []; for (let k = 0; k < figs.length; k += 3) rows.push(figs.slice(k, k + 3));
         rows.forEach((row, r) => row.forEach((type, c) => {
           const cav = type === 'leicht' || type === 'schwer', ug = this.unitGeo(type, col, type === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
           const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
           g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
-          s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
+          s.units.push({ g, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.1 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
         }));
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
@@ -1148,10 +1148,21 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const s = this.marchObjs[id], m = s.m, p = marchPos({ ...m, t0: m.t0 }, gt), y = this.yAt(p.x, p.y);
       s.grp.position.set(p.x, Math.max(0, y), p.y); s.grp.visible = true;
       const ahead = m.path[Math.min(m.path.length - 1, p.i + 1)], [ax, ay] = cellXY(ahead);
-      if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.grp.rotation.y = Math.atan2(dx, dz); }
+      const L = m.path.length - 1, dtc = L > 0 ? m.arr[L] / L : 1;
+      if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.hd = Math.atan2(dx, dz); }
+      if (!s.dOk) { let d = 0; s.units.forEach((u, k) => { if (k) d += (s.units[k - 1].sz + u.sz) / 2; u.dist = d; }); s.dOk = true; }
+      const colm = !p.still && s.units.length > 1;
+      s.grp.rotation.y = colm ? 0 : (s.hd || 0);
+      const y0 = Math.max(0, y);
       s.units.forEach((u, k) => {
         const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
-        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.spin ? (p.still ? 0 : t * 6) : l.s * sw * 1.1; u.g.position.y = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
+        if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.spin ? (p.still ? 0 : t * 6) : l.s * sw * 1.1;
+        let bob = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
+        if (colm) {   // Marschkolonne: jede Figur folgt dem Weg im Abstand hinter dem Vordermann
+          const q = marchPos(m, gt - u.dist * dtc), qa = m.path[Math.min(L, q.i + 1)], [bx, by] = cellXY(qa), ddx = bx + .5 - q.x, ddz = by + .5 - q.y;
+          u.g.position.set(q.x - p.x, Math.max(0, this.yAt(q.x, q.y)) - y0 + bob, q.y - p.y);
+          u.g.rotation.y = Math.hypot(ddx, ddz) > .01 ? Math.atan2(ddx, ddz) : (u.hd || 0); u.hd = u.g.rotation.y;
+        } else { u.g.position.set(u.rx, bob, u.rz); u.g.rotation.y = 0; }
       });
       this.waveFlags([s.flag], t);
       if (t - (s.lt || 0) > .5) { s.lt = t; const bt = this.badgeTxt(s, gt); if (bt !== s.bt) { s.bt = bt; this.setBadge(s.lab, bt, 0x2a2f38); } }
