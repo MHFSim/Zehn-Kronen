@@ -444,6 +444,16 @@ function buildUnit(type, col, full) {
     for (const x of [-.9, .9]) { bx(.08, 1.4, .08, x, 1.35, 1.3, STEEL); bx(.08, .08, 1.6, x, 1.45, 2.1, STEEL, .0); }   // Deichsel
     bx(2.0, .08, .08, 0, 1.45, 2.9, STEEL);                                                   // Griff
     for (const x of [-.9, .9]) body.push(new T.CylinderGeometry(.03 * 1, .03, .55 * k * 1.9, 5), STEEL, x * k, .2 * k + .06, -1.25 * k, 0, 1, 1, 1, .35, 0);   // Standbeine hinten
+    {   // Bauer zieht den Karren: steht zwischen den Deichseln und hält den Griff
+      const fz = .8, tun = [150, 112, 72], hat = [214, 184, 96];
+      body.box(.2, .27, .13, 0, .54, fz, tun); body.box(.21, .04, .14, 0, .42, fz, [70, 52, 40]); body.box(.22, .1, .14, 0, .66, fz, tab);   // Kittel, Gürtel, Schulterpartie in Teamfarbe
+      body.sph(.07, 0, .78, fz, SK, 6); body.push(new T.CylinderGeometry(.13, .13, .02, 9), hat, 0, .84, fz, 0, 1, 1, 1, 0, 0); body.push(new T.CylinderGeometry(.06, .08, .07, 8), hat, 0, .88, fz, 0, 1, 1, 1, 0, 0);
+      for (const sx of [-1, 1]) {
+        body.box(.055, .34, .055, sx * .13, .46, fz - .09, tun, 0, .55); body.sph(.035, sx * .12, .31, fz - .17, SK, 5);   // Arm nach hinten zum Griff
+        const l = new MB(); l.box(.075, .38, .09, 0, -.19, 0, [92, 76, 60]); l.box(.085, .07, .12, 0, -.38, .015, [60, 44, 32]);
+        legs.push({ g: l.build(), x: sx * .055, y: .4, z: fz, s: sx });
+      }
+    }
     if (full) {   // beladen: Getreide im Kasten
       const G1 = [226, 186, 74], G2 = [208, 164, 56], G3 = [236, 202, 96];
       body.push(new T.SphereGeometry(1, 9, 6), G1, 0, .86 * k, .02 * k, 0, .92 * k, .5 * k, 1.12 * k, 0, 0, .2);
@@ -457,6 +467,7 @@ function buildUnit(type, col, full) {
       for (let a = 0; a < 4; a++) w.box(.05 * k, 1.1 * k, .05 * k, 0, -.55 * k, 0, WOODC, 0, a * Math.PI / 4);
       legs.push({ g: w.build(), x: sx * 1.2 * k, y: .61 * k, z: .04 * k, s: 0, spin: true });
     }
+  } else if (type === 'leicht' || type === 'schwer') {
     const heavy = type === 'schwer', steel = [176, 182, 194], boot = heavy ? steel : [70, 52, 40], pant = heavy ? [150, 156, 168] : [110, 90, 70];
     horseModel(body, legs, type, tab); riderTorso(body, type, tab, .64);
     body.push(new T.CylinderGeometry(1, 1.1, .12, 10), tab, 0, .64, -.01, 0, .17, 1, .13);   // Waffenrock
@@ -957,7 +968,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
           const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
           g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
-          s.units.push({ g, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.1 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
+          s.units.push({ g, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.5 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
         }));
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
