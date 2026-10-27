@@ -84,7 +84,9 @@ page = f'''<title>Zehn Kronen Testversion</title>
 /* Testversion: Umschalter und Admin-Ebene */
 .hud{{right:max(112px,env(safe-area-inset-right,0px))}}
 .swap{{position:fixed;z-index:30;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(var(--nav) + 12px);background:var(--panel-2);border:1px solid var(--brass);color:var(--ink);border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px}}
-body.sheet-open:not(.admin-on) .swap{{display:none}}
+body:not(.admin-on) .swap{{display:none}}
+#zkTools{{display:none}}
+body.dev-tools #zkTools{{display:block}}
 #adminView .wrap{{padding-bottom:88px}}
 #adminView .invite code{{flex:1 1 100%}}
 #adminView th,#adminView td{{padding:6px 6px}}

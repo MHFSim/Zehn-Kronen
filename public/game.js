@@ -619,6 +619,11 @@ function rulesHTML() {
   <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses das weiße Viereck um den Ort berühren. Thron und Heiligtümer werden nicht besetzt oder bewacht: Wer dort andockt, hält sie und die Mitglieder bekommen den Bonus.</p>
   <div class="row"><button class="btn" type="button" data-act="sub" data-t="combat">⚔️ Kampfregeln</button></div>`;
 }
+let devOk = false; try { devOk = sessionStorage.getItem('zk-dev') === '1'; } catch {}
+function devHTML() {
+  if (!devOk) return '<div class="field"><label for="devPw">Passwort</label><input id="devPw" type="password" autocomplete="off"></div><div class="row"><button class="btn" type="button" data-act="devUnlock">Freischalten</button><span class="note" id="devMsg"></span></div>';
+  return '<p class="note">Nur für die Testversion.</p><div class="row"><button class="btn" type="button" data-act="devTools">🛠 Testwerkzeuge</button><button class="btn ghost" type="button" data-act="devAdmin">Admin</button></div>';
+}
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
   const state = m.phase === 'lobby' ? 'Lobby (noch nicht gestartet)' : m.phase === 'paused' ? 'pausiert' : m.phase === 'ended' ? 'beendet' : 'läuft';
@@ -642,7 +647,7 @@ function moreHTML() {
     <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
   const SUBS = {
-    game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
+    dev: ['🛠', 'Entwickler', devHTML()], game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
     feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
@@ -650,7 +655,7 @@ function moreHTML() {
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -777,6 +782,9 @@ function setupPanel() {
     if (act === 'train') return void command({ type: 'train', id: d.b, unit: d.u, count: pick[d.u] || 10 });
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
+    if (act === 'devUnlock') { if (val('devPw') === 'Bailey') { devOk = true; try { sessionStorage.setItem('zk-dev', '1'); } catch {} return go(); } const mm = $('devMsg'); if (mm) mm.textContent = 'Falsches Passwort.'; return; }
+    if (act === 'devTools') { closePanel(); document.body.classList.add('dev-tools'); const bx = document.getElementById('zkToolsBox'); if (bx && bx.hidden) document.getElementById('zkToolsBtn').click(); return; }
+    if (act === 'devAdmin') { closePanel(); document.getElementById('swap').click(); return; }
     if (act === 'sub' && d.t === 'reports') return openReports();
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }

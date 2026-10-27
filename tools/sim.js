@@ -149,6 +149,7 @@ window.EventSource = class {
   close() { clearInterval(this.iv); }
 };
 
+window.zkSimMode = true;
 // Test-Hilfen für die Bedienoberfläche
 const pref = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
