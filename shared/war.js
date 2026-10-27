@@ -48,10 +48,8 @@ export function checkLaunch(ctx, me, o, mode, troops) {
     return { target: tp };
   }
   if (mode === 'occupy') {
-    if (o.k === 'throne') return 'Der Thron wird nicht besetzt: Wer mit einem Außenposten am weißen Feld andockt, hält ihn.';
-    if (o.k !== 'sanct') return 'Dieses Ziel gibt es nicht';
-    if (!touchesObj(territory(ctx.match, ctx.players, gt), groupOf(w, me.id), o)) return 'Dein Revier berührt diesen Ort nicht. Nur Bündnisse können ihr Revier mit Außenposten vergrößern: Baue Außenposten in seine Richtung (Karte → freies Feld antippen).';
-    return {};
+    if (o.k === 'throne' || o.k === 'sanct') return (o.k === 'throne' ? 'Der Thron' : 'Ein Heiligtum') + ' wird nicht besetzt: Wer mit einem Außenposten am weißen Feld andockt, hält ihn' + (o.k === 'sanct' ? ' und bekommt den Bonus.' : '.');
+    return 'Dieses Ziel gibt es nicht';
   }
   return 'Unbekannte Marschart';
 }

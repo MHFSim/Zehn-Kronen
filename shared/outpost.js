@@ -49,7 +49,7 @@ export const overlaps = (a, b, pad = 0) => a.x0 - pad <= b.x1 && b.x0 - pad <= a
 // Berührt ein fertiges Viereck der Gruppe das Feld (tx, ty)? (auch schräg angrenzend)
 export const touches = (rects, group, tx, ty, pad = 1) => rects.some(r => r.ready && r.group === group && tx >= r.x0 - pad && tx <= r.x1 + pad && ty >= r.y0 - pad && ty <= r.y1 + pad);
 // Andockzone eines Ortes: bei Thron und Turm ein weißes Viereck (9×9), sonst 1 Feld Rand. Ein Viereck der Gruppe muss sie berühren.
-export const dockPad = o => o.k === 'throne' || o.k === 'tower' ? TOWER_PAD : 1;
+export const dockPad = o => o.k === 'throne' || o.k === 'tower' ? TOWER_PAD : o.k === 'sanct' ? 3 : 1;
 export const touchesObj = (rects, group, o) => touches(rects, group, o.x, o.y, dockPad(o));
 // Liegt das Feld mitten in einem fertigen Viereck der Gruppe?
 export const inside = (rects, group, tx, ty) => rects.some(r => r.ready && r.group === group && tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1);
@@ -301,14 +301,14 @@ export function settleTerritory(ctx) {
     delete w.holds[oid];
     chron(ctx, groupLabel(w, players, h.group) + ' verliert ' + name + ', weil das Revier fehlt.');
   }
-  // Der Thron wird nicht bewacht und nicht besetzt: Wer zuerst mit einem Außenposten am weißen Feld andockt, hält ihn. Ein Gegner muss
+  // Thron und Heiligtümer werden nicht bewacht und nicht besetzt: Wer zuerst mit einem Außenposten am weißen Feld andockt, hält ihn. Ein Gegner muss
   // erst die Außenposten des Halters zerstören (sodass dieser nicht mehr andockt) und dann selbst andocken.
-  for (const o of map.objects) if (o.k === 'throne' && !w.holds[o.id]) {
+  for (const o of map.objects) if ((o.k === 'throne' || o.k === 'sanct') && !w.holds[o.id]) {
     const cand = rects.filter(r => r.k === 'op' && r.ready && r.group[0] === 'a' && touchesObj([r], r.group, o)).sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)))[0];
     if (cand) {
       w.holds[o.id] = { group: cand.group, since: gt, garr: {} };
-      const lab = groupLabel(w, players, cand.group); chron(ctx, lab + ' hält jetzt den Thron.');
-      for (const p of players) if (!p.state.out && groupOf(w, p.id) === cand.group) note(ctx, p.id, 'hold', 'Thron erreicht', 'Euer Außenposten ist am Thron angedockt: ' + lab + ' hält jetzt den Thron.');
+      const lab = groupLabel(w, players, cand.group), nm = o.k === 'throne' ? 'den Thron' : 'ein Heiligtum'; chron(ctx, lab + ' hält jetzt ' + nm + '.');
+      for (const p of players) if (!p.state.out && groupOf(w, p.id) === cand.group) note(ctx, p.id, 'hold', o.k === 'throne' ? 'Thron erreicht' : 'Heiligtum erreicht', 'Euer Außenposten ist angedockt: ' + lab + ' hält jetzt ' + nm + (o.k === 'sanct' ? ' und bekommt den Bonus.' : '.'));
     }
   }
 }

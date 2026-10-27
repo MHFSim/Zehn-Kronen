@@ -594,7 +594,7 @@ function tutorialHTML() {
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
     ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer, an einem der Türme am Kartenrand. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
-    ['Ein Heiligtum besetzen', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Die vier Heiligtümer geben dir und deinem Bündnis +15 % auf einen Rohstoff.']
+    ['Ein Heiligtum andocken', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Ein Außenposten-Viereck deines Bündnisses muss das weiße Viereck um ein Heiligtum berühren. Dann bekommt ihr +15 % auf einen Rohstoff.']
   ];
   const done = steps.filter(x => x[1]).length;
   return `<p class="note">${done} von ${steps.length} geschafft.</p>${steps.map(([t, ok, h]) => `<div class="chk ${ok ? 'done' : ''}"><i>${ok ? '✓' : ''}</i><span><b>${t}</b><br><small class="note">${h}</small></span></div>`).join('')}`;
@@ -613,7 +613,7 @@ function rulesHTML() {
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
   <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der zehn Türme am Kartenrand beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
   <p class="desc"><b>Felder:</b> Ein Heer sammelt dort 20 Rohstoffe pro Minute, begrenzt durch seine Traglast und den Vorrat. Ein geleertes Feld ist 6 Stunden leer und dann wieder voll, ein angebrochenes erneuert sich 6 Stunden nach dem letzten Besuch. Auf dem Feld kann dein Heer von Feinden überfallen werden (Schutzzeit und Bündnisse gelten wie sonst).</p>
-  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Der Thron wird nicht bewacht: Wer dort andockt, hält ihn. Heiligtümer besetzt du mit Truppen, die bleiben, bis du sie zurückrufst.</p>
+  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses das weiße Viereck um den Ort berühren. Thron und Heiligtümer werden nicht besetzt oder bewacht: Wer dort andockt, hält sie und die Mitglieder bekommen den Bonus.</p>
   <div class="row"><button class="btn" type="button" data-act="sub" data-t="combat">⚔️ Kampfregeln</button></div>`;
 }
 function moreHTML() {
@@ -1153,13 +1153,13 @@ function renderMapSheet() {
     } else if (k === 'sanct' || k === 'throne') {
       const hd = (view.match.holds || []).find(x => x.id === id), plan = planFor(o), gt = gtNow(), g = holdGuard(k), sn = k === 'sanct' ? SANCT[o.n] : null;
       const eff = k === 'sanct' ? `+15 % ${RES_DE[sn[1]]} für den Halter und sein Bündnis` : '+25 % Gold für den Halter und sein Bündnis';
-      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron zwei Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sobald ein Außenposten am weißen Viereck um den Thron andockt, gehört er dem Bündnis, ganz ohne Truppen. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
-        <dl class="stats"><dt>Wirkung</dt><dd>${eff}</dd><dt>Halter</dt><dd>${hd ? '<b>' + esc(hd.label) + '</b> seit Tag ' + dayOf(hd.since) : k === 'throne' ? 'frei · ohne Wächter' : 'frei · Wächter: ' + troopsLine(g.troops) + ' (+' + Math.round((g.mult - 1) * 100) + ' %)'}</dd>
+      body = `<p class="desc">${k === 'sanct' ? 'Ein Heiligtum wird nicht besetzt. Sobald ein Außenposten deines Bündnisses am weißen Viereck um das Heiligtum andockt, gehört es dem Bündnis und alle Mitglieder bekommen den Bonus, ganz ohne Truppen.' : k === 'throne' ? 'In der Mitte der Welt. Wer den Thron zwei Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sobald ein Außenposten am weißen Viereck um den Thron andockt, gehört er dem Bündnis, ganz ohne Truppen. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
+        <dl class="stats"><dt>Wirkung</dt><dd>${eff}</dd><dt>Halter</dt><dd>${hd ? '<b>' + esc(hd.label) + '</b> seit Tag ' + dayOf(hd.since) : 'frei · ohne Wächter'}</dd>
         ${k === 'throne' && hd ? `<dt>Sieg in</dt><dd>${fmtT(real(hd.since + THRONE_HOLD - gt))}</dd>` : ''}${hd && !hd.mine && k !== 'throne' ? `<dt>Besatzung</dt><dd>${fmtN(hd.total)} Einheiten</dd>` : ''}</dl>`;
-      if (k !== 'throne' && hd && hd.mine) {
+      if (false) {
         body += `<div class="block"><h3>Eure Besatzung</h3>${Object.keys(hd.garr || {}).map(pid => `<div class="mrow"><div><b>${esc(pname(Number(pid)))}</b><div class="note">${troopsLine(hd.garr[pid])}</div></div>${Number(pid) === me.id ? '<button class="btn ghost small" type="button" data-act="holdRecall">Zurückrufen</button>' : ''}</div>`).join('')}</div>`;
       }
-      if (k === 'throne') body += `<p class="note">Das Bündnis, dessen Außenposten am weißen Feld angedockt ist, hält ihn. Wer ihn übernehmen will, muss erst die Außenposten des Halters zerstören, sodass er nicht mehr andockt, und dann selbst andocken.${hd ? '' : ' Im Moment ist er frei.'}</p>`;
+      if (k === 'throne' || k === 'sanct') body += `<p class="note">Das Bündnis, dessen Außenposten am weißen Feld angedockt ist, hält ihn. Wer ihn übernehmen will, muss erst die Außenposten des Halters zerstören, sodass er nicht mehr andockt, und dann selbst andocken.${hd ? '' : ' Im Moment ist er frei.'}</p>`;
       else if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
       else {
         body += pickerHTML();

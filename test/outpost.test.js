@@ -147,6 +147,11 @@ assert.ok(c.state.reports.some(r => r.kind === 'outpost' && r.win));
   const before = storeOf(alB).food, f = viewFor(match, players, a, clock).ally.fields.food; assert.ok(f >= 1, 'Feld im Revier gezählt');
   adv(3600); const got = storeOf(alB).food - before;
   assert.ok(Math.abs(got - 50 * f) <= 1, 'je Feld 50 pro Stunde automatisch: ' + got + ' / ' + 50 * f);
+  // Heiligtum andocken: kein Besetzen, aber Bonus
+  const sa = { id: 'testsanct', k: 'sanct', x: T.x + 3, y: T.y - 3, n: 0 }; map.objects.push(sa); map.byId[sa.id] = sa;
+  assert.match(run(a, { type: 'march', mode: 'occupy', target: sa.id, troops: { speer: 1 } }), /nicht besetzt/, 'Heiligtum wird nicht besetzt');
+  adv(10); assert.ok(w.holds[sa.id] && w.holds[sa.id].group === 'a' + alB.id, 'Heiligtum durch Andocken gehalten'); assert.equal(a.state.bonus.food, .15, 'Bonus für Mitglieder');
+  delete w.holds[sa.id]; delete map.byId[sa.id]; map.objects.pop();
   delete w.outposts.incometest; map.objects.pop();
 }
 console.log('Alle Außenposten-Tests bestanden.');

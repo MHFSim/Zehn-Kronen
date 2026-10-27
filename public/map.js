@@ -1043,7 +1043,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const free = [];
     for (const th of this.map.objects.filter(o => o.k === 'throne' || o.k === 'tower' || o.k === 'sanct')) {
       const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad)), rect = { x0: th.x - pad, y0: th.y - pad, x1: th.x + pad, y1: th.y + pad };
-      if (hit) put(hit, rect); else if (th.k !== 'sanct') free.push(rect);
+      if (hit) put(hit, rect); else free.push(rect);
     }
     if (free.length) put({ group: 'free', ready: true, off: true }, free[0]), free.slice(1).forEach(f => put({ group: 'free', ready: true, off: true }, f));
     for (const { r, on, rs } of buckets.values()) {
