@@ -98,8 +98,11 @@ assert.equal(match.world.marches.length, 0, 'Heer wieder zuhause');
 assert.ok(p1.state.reports.some(r => r.kind === 'return' && r.loot.gold > 0), 'Beute aus dem Lager');
 
 // Heer-Obergrenze
-for (let i = 0; i < 2; i++) assert.equal(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), '');
-assert.match(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), /Alle Heere/);
+const node2 = mapOf(match).objects.find(o => ['farm', 'wood', 'stone', 'ore'].includes(o.k) && o.id !== myNode.id);
+assert.equal(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), '');
+assert.match(command(match, players, p1, { type: 'march', target: myNode.id, troops: { speer: 1 } }, t), /sammelt schon ein Heer/, 'nur ein Heer pro Feld');
+assert.equal(command(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 1 } }, t), '');
+assert.match(command(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 1 } }, t), /Alle Heere/);
 
 // Sicht: Ben sieht Annas Heer nicht, solange es weit weg ist
 const vb = viewFor(match, players, p2, t);
