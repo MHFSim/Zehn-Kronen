@@ -139,12 +139,16 @@ function tap(sx, sy) { mapTap(sx, sy); }
 /* ---------- Oberfläche ---------- */
 const $ = id => document.getElementById(id);
 let sheetSig = '', busy = false;
+const fmtK = n => { n = Math.floor(n); const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: a >= 1e7 ? 0 : 1 }) + ' Mio';
+  if (a >= 1e5) return Math.round(n / 1e3).toLocaleString('de-DE') + 'k';
+  return fmtN(n); };
 function renderTop() {
   const c = cap(S);
   $('res').innerHTML = [...RES, 'gold'].map(r => {
     const v = S.res[r], rt = rate(S, r), pct = r === 'gold' ? 0 : Math.min(100, v / c * 100);
-    return `<div class="res-cell" title="${RES_DE[r]}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtN(v)}</div>
-      <div class="res-rate ${rt < 0 ? 'neg' : ''}">${rt >= 0 ? '+' : ''}${fmtN(rt)}/h</div>
+    return `<div class="res-cell" title="${RES_DE[r]}: ${fmtN(v)}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtK(v)}</div>
+      <div class="res-rate ${rt < 0 ? 'neg' : ''}">${rt >= 0 ? '+' : ''}${fmtK(rt)}/h</div>
       <div class="res-bar">${r === 'gold' ? '' : `<i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i>`}</div></div>`;
   }).join('');
   $('speed').className = 'speed' + (live ? '' : ' off');
