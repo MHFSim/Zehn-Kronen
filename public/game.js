@@ -480,7 +480,7 @@ let allyTab = '', moreSub = '', repTab = 'all';
 function revierHTML() {
   const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow(), al0 = view.ally, st = al0 ? al0.store : null;
   const revier = !al0 ? '<p class="note">Außenposten, Bündnislager und gemeinsames Revier gibt es nur im Bündnis. Gründe eines oder tritt einem bei (Tab Bündnis).</p>' : `
-    <p class="note">Das Revier gehört dem Bündnis: Jeder Außenposten beansprucht ein Viereck, die Kette beginnt an einem der vier Türme am Kartenrand. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} Außenposten (ohne Limit).</p>
+    <p class="note">Das Revier gehört dem Bündnis: Jeder Außenposten beansprucht ein Viereck, die Kette beginnt an einem der sechs Türme am Kartenrand. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} Außenposten (ohne Limit).</p>
     <div class="block"><div class="store"><h2>🏛 Bündnislager</h2><p class="stock-sub">Aktueller Stand</p>
       <div class="stock">${RES.map((r, k) => `<div class="stk ${st[r] >= OP_COST[k] ? 'ok' : 'low'}"><i class="r r-${r}"></i><b>${fmtN(st[r])}</b><span>${RES_DE[r]}</span><small>${st[r] >= OP_COST[k] ? '✓ genug' : 'noch ' + fmtN(OP_COST[k] - st[r])}</small></div>`).join('')}</div>
       <p class="stock-sub">${OP_COST.every((c, k) => st[RES[k]] >= c) ? '✅ Das Lager reicht für einen neuen Außenposten.' : '⏳ Für den nächsten Außenposten fehlt noch etwas.'}</p></div>
@@ -576,15 +576,15 @@ function rulesHTML() {
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
-  <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der vier Türme am Kartenrand beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut; den ersten baut der Gründer an seine Burg, danach entfällt das Burg-Viereck. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
-  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
+  <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der sechs Türme am Kartenrand beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
+  <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Der Thron wird nicht bewacht: Wer dort andockt, hält ihn. Heiligtümer besetzt du mit Truppen, die bleiben, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
   const state = m.phase === 'lobby' ? 'Lobby (noch nicht gestartet)' : m.phase === 'paused' ? 'pausiert' : m.phase === 'ended' ? 'beendet' : 'läuft';
   const days = m.phase === 'lobby' ? `${m.weeks} Wochen geplant` : m.phase === 'ended' ? '' : `Tag ${dayOf(gt)} von ${m.weeks * 7} · Ende in ${fmtT(real(m.endGt - gt))}`;
   const th = (m.holds || []).find(h => h.id === 'throne1');
-  const info = `<dl class="stats"><dt>Partie</dt><dd>${esc(m.name)} · ${state}</dd>${days ? `<dt>Zeit</dt><dd>${days}</dd>` : ''}<dt>Thron</dt><dd>${th ? esc(th.label) + ' (noch ' + fmtT(real(th.since + THRONE_HOLD - gt)) + ')' : 'frei, von Wächtern bewacht'}</dd>
+  const info = `<dl class="stats"><dt>Partie</dt><dd>${esc(m.name)} · ${state}</dd>${days ? `<dt>Zeit</dt><dd>${days}</dd>` : ''}<dt>Thron</dt><dd>${th ? esc(th.label) + ' (noch ' + fmtT(real(th.since + THRONE_HOLD - gt)) + ')' : 'frei'}</dd>
     <dt>Bündnisgröße</dt><dd>höchstens ${m.cap}</dd><dt>Tempo</dt><dd>×${m.speed}</dd></dl>${m.result ? `<div class="row"><button class="btn" data-act="showEnd" type="button">Ergebnis ansehen</button></div>` : ''}`;
   const rank = `<table class="rank"><thead><tr><th>#</th><th>Spieler</th><th>Punkte</th><th></th></tr></thead><tbody>${rk.players.map((r, i) => `<tr class="${r.id === me.id ? 'me' : ''}"><td>${i + 1}</td><td>${r.tag ? '<span class="tag">' + esc(r.tag) + '</span> ' : ''}${esc(r.name)}</td><td>${fmtN(r.score)}</td><td>${r.out ? '✖' : r.vassalOf ? 'Vasall' : ''}</td></tr>`).join('')}</tbody></table>
     ${rk.groups.some(g => g.members.length > 1) ? `<h3 style="margin-top:12px">Gruppen</h3><table class="rank"><tbody>${rk.groups.map((g, i) => `<tr><td>${i + 1}</td><td>${esc(g.label)}</td><td>${fmtN(g.score)}</td></tr>`).join('')}</tbody></table>` : ''}
@@ -1024,7 +1024,7 @@ function renderMapSheet() {
       if (k !== 'throne' && hd && hd.mine) {
         body += `<div class="block"><h3>Eure Besatzung</h3>${Object.keys(hd.garr || {}).map(pid => `<div class="mrow"><div><b>${esc(pname(Number(pid)))}</b><div class="note">${troopsLine(hd.garr[pid])}</div></div>${Number(pid) === me.id ? '<button class="btn ghost small" type="button" data-act="holdRecall">Zurückrufen</button>' : ''}</div>`).join('')}</div>`;
       }
-      if (k === 'throne') body += `<p class="note">Der Thron wird nicht bewacht und es gibt keine Truppen dort. Das Bündnis, dessen Außenposten am weißen Feld angedockt ist, hält ihn. Wer ihn übernehmen will, muss erst die Außenposten des Halters zerstören, sodass er nicht mehr andockt, und dann selbst andocken.${hd ? '' : ' Im Moment ist er frei.'}</p>`;
+      if (k === 'throne') body += `<p class="note">Das Bündnis, dessen Außenposten am weißen Feld angedockt ist, hält ihn. Wer ihn übernehmen will, muss erst die Außenposten des Halters zerstören, sodass er nicht mehr andockt, und dann selbst andocken.${hd ? '' : ' Im Moment ist er frei.'}</p>`;
       else if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
       else {
         body += pickerHTML();
