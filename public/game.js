@@ -946,7 +946,7 @@ function selectMap(hit, keepSend) {
   sel = null; msel = hit; wm.select(hit);
   if (sendFromOp) send = sendOpAll();
   else if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); send = sm ? { ...sm.troops } : {}; }
-  else if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; autoSend(hit); }
+  else if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; autoSend(hit); const ob = hit.type === 'obj' ? wm.map.byId[hit.id] : null; if (!ob || !['farm', 'wood', 'stone'].includes(ob.k)) delete send.handkarren; }   // Handkarren nur beim Farmen automatisch dabei
   document.body.classList.add('sheet-open');
   if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; revealMap(o.x + .5, o.y + .5); }
   else if (hit.type === 'op') { const o = (view.world.outposts || []).find(x => x.id === hit.id); if (o) revealMap(o.x + .5, o.y + .5); }
