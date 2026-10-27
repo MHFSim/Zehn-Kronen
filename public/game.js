@@ -311,7 +311,7 @@ function plateHTML(id) {
   if (q) act = `<div class="bprog"><div class="prog"><i data-qprog="${id}" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" data-qtime="${id}">${fmtT(real(q.left))}</span></div>`;
   else if (locked) act = `<span class="why">Rathaus Stufe ${b.unlock} nötig</span>`;
   else if (id === 'rathaus' && L >= 20) act = '<span class="note">Höchststufe</span>';
-  else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}</span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
+  else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}<span class="cost bt" title="Bauzeit">⏱ ${fmtT(real(timeOf(id, L + 1)))}</span></span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
   const extra = t ? `<div class="pmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
   return `<article class="plate ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="pimg">${bico(id)}<span class="ribbon">${L || '–'}</span>${q ? '<span class="btag">Bau</span>' : ''}</div>
     <div class="ptext"><div class="pname">${b.name}</div><div class="pmeta">${cityMeta(id)}</div>${extra}</div><div class="pact">${act}</div></article>`;
