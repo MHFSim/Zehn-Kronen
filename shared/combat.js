@@ -26,7 +26,7 @@ const TI = { art: 0, inf: 1, kav: 2 };
 const KAMPF = 0.25, RUNDEN = 30, TRANS_DEF = 10;
 const meanAt = u => (u.at[0] + u.at[1] + u.at[2]) / 3;
 const atkVs = (g, th) => g.at ? (th === 'trans' ? meanAt(g) : g.at[TI[th]]) * g.m : 0;
-const defVs = (h, tg) => h.df ? h.df[TI[tg]] * h.m : TRANS_DEF * h.m;
+const defVs = (h, tg) => h.df ? (tg === 'trans' ? (h.df[0] + h.df[1] + h.df[2]) / 3 : h.df[TI[tg]]) * h.m : TRANS_DEF * h.m;   // Karren greifen nicht an (Angriff 0), brauchen aber eine gültige Abwehr als Nenner
 // Zählt der Angreifer a gegen die Einheit d? (für Anzeige)
 export const countersOf = (a, d) => !!(U[a].strong || []).includes(d) || !!(U[a].good || []).includes(d);
 const grp = (t, m) => Object.keys(t).filter(u => t[u] > 0).map(u => ({ u, n: t[u], g: U[u].g, at: U[u].at, df: U[u].df, m }));

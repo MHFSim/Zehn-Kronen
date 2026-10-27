@@ -39,3 +39,8 @@ assert.ok(S.res.wood <= cap(S) + 1e-9, 'Holz bleibt unter der Lagergrenze');
   assert.ok(armySpeed({ speer: 10, handkarren: 1 }) < armySpeed({ speer: 10 }), 'Karren machen das Heer langsamer');
 }
 console.log('Alle Regeltests bestanden.');
+{ // Karren im Heer dürfen die Kampfrechnung nicht verfälschen (früher: NaN, das ganze Heer war „tot“)
+  const { battle, campTroops } = await import('../shared/combat.js');
+  const a = battle({ speer: 60 }, campTroops(1), 1, 1), b = battle({ speer: 60, handkarren: 2 }, campTroops(1), 1, 1);
+  assert.ok(a.win && b.win, 'Sieg auch mit Karren'); assert.equal(b.attLeft.handkarren, 2); assert.equal(b.attLeft.speer, a.attLeft.speer);
+}

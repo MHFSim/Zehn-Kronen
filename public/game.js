@@ -1119,7 +1119,7 @@ function renderMapSheet() {
         body += pickerHTML();
         if (plan && !plan.error) {
           const r = battle(sel_, def, mult, forceOf(S)), lost = sum(sel_) - sum(r.attLeft);
-          body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(lost)} von ${fmtN(sum(sel_))}` : 'Niederlage · dein Heer wird aufgerieben'}</dd></dl>`;
+          body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(lost)} von ${fmtN(sum(sel_))} (rund 30 % davon kommen verwundet ins Lazarett, wenn dort Platz ist)` : 'Niederlage · dein Heer wird aufgerieben'}</dd></dl>`;
         }
         body += actionRow('Angreifen', plan, '', free);
       }
