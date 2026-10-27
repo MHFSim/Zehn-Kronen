@@ -288,13 +288,14 @@ export function noteRaid(ctx, me, o, m) {
 }
 
 /* ---------- Teleporter ---------- */
-export function checkTeleport(match, players, me, x, y, gt) {
+export function checkTeleport(match, players, me, x, y, gt, free) {
   const map = mapOf(match), w = match.world, al = allianceOf(w, me.id), S = me.state;
-  if (!al) return 'Teleportieren geht nur im Gebiet deines Bündnisses. Tritt einem bei.';
+  if (free === undefined) free = (S.startTp || 0) > 0;   // der Start-Teleporter geht überallhin, auch ohne Revier
+  if (!al && !free) return 'Teleportieren geht nur im Gebiet deines Bündnisses. Tritt einem bei.';
   if (!BASE_OK(map, x, y)) return 'Dort kann deine Burg nicht stehen (Wasser, Fels oder Kartenrand).';
   if (map.objects.some(o => Math.abs(o.x - x) <= 2 && Math.abs(o.y - y) <= 2)) return 'Zu nah an einem anderen Ort.';
-  const group = 'a' + al.id, rects = territory(match, players, gt);
-  if (!inside(rects, group, x, y)) return 'Du kannst nur ins Gebiet deines Bündnisses teleportieren.';
+  const group = al ? 'a' + al.id : 'p' + me.id, rects = territory(match, players, gt);
+  if (!free && !inside(rects, group, x, y)) return 'Du kannst nur ins Gebiet deines Bündnisses teleportieren.';
   const r = cityR(S.lv.rathaus), nr = { x0: x - r, y0: y - r, x1: x + r, y1: y + r };
   for (const q of rects) if (q.group !== group && overlaps(nr, q)) return 'Das Viereck deiner Burg würde das Revier von ' + groupLabel(w, players, q.group) + ' überlappen.';
   for (const p of players) if (p.id !== me.id && !p.state.out && p.state.slot >= 0 && Math.abs(p.state.pos[0] - x) <= 4 && Math.abs(p.state.pos[1] - y) <= 4) return 'Zu nah an der Burg von ' + p.name + '.';
@@ -303,16 +304,18 @@ export function checkTeleport(match, players, me, x, y, gt) {
 }
 export function teleport(ctx, me, x, y) {
   const { match, players } = ctx, w = match.world, S = me.state;
-  if (!((S.items || {}).teleport > 0)) return 'Du hast keinen Teleporter. Im Shop (Mehr) bekommst du einen.';
-  if (w.gt - S.tpAt < TELEPORT_COOLDOWN) return 'Der Teleporter lädt noch: ' + fmtDur((TELEPORT_COOLDOWN - (w.gt - S.tpAt)) / match.speed) + '.';
+  const free = (S.startTp || 0) > 0;
+  if (!free && !((S.items || {}).teleport > 0)) return 'Du hast keinen Teleporter. Im Shop (Mehr) bekommst du einen.';
+  if (!free && w.gt - S.tpAt < TELEPORT_COOLDOWN) return 'Der Teleporter lädt noch: ' + fmtDur((TELEPORT_COOLDOWN - (w.gt - S.tpAt)) / match.speed) + '.';
   const map = mapOf(match);
   if (w.marches.some(m => m.mode === 'attack' && m.phase === 'out' && map.byId[m.tid] && map.byId[m.tid].slot === S.slot)) return 'Feindliche Heere sind zu dir unterwegs. Jetzt kannst du nicht fliehen.';
   x = Math.floor(Number(x)); y = Math.floor(Number(y));
-  const why = checkTeleport(match, players, me, x, y, w.gt); if (why) return why;
-  S.items.teleport--; S.tpAt = w.gt; S.pos = [x, y];
+  const why = checkTeleport(match, players, me, x, y, w.gt, free); if (why) return why;
+  if (free) S.startTp = 0; else { S.items.teleport--; S.tpAt = w.gt; }
+  S.pos = [x, y];
   reveal(S, x + .5, y + .5, VIEW_CITY); flushBits(S);
   const al = allianceOf(w, me.id);
-  for (const pid of al.members) if (pid !== me.id) note(ctx, pid, 'ally', 'Burg versetzt', me.name + ' hat die Burg per Teleporter an einen neuen Ort im Bündnisgebiet versetzt.');
+  if (al) for (const pid of al.members) if (pid !== me.id) note(ctx, pid, 'ally', 'Burg versetzt', me.name + ' hat die Burg per Teleporter an einen neuen Ort versetzt.');
   chron(ctx, me.name + ' versetzt die Burg mit einem Teleporter.');
   return '';
 }

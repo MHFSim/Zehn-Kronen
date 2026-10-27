@@ -103,6 +103,7 @@ if (node) {
 }
 
 // Teleporter und Shop
+a.state.startTp = 0;   // der Start-Teleporter hat eigene Regeln (unten)
 assert.match(run(a, { type: 'teleport', x: cx + 2, y: cy }), /Teleporter/);
 assert.equal(run(a, { type: 'buy', item: 'teleport', n: 1 }), ''); assert.equal(a.state.items.teleport, 1);
 assert.match(run(a, { type: 'teleport', x: 5, y: 5 }), /Gebiet|Rand|Wasser/);
@@ -112,6 +113,18 @@ assert.ok(spot, 'ein Teleportziel im Bündnisgebiet');
 assert.equal(run(a, { type: 'teleport', x: spot[0], y: spot[1] }), '');
 assert.deepEqual(a.state.pos, spot); assert.equal(a.state.items.teleport, 0);
 assert.equal(run(a, { type: 'buy', item: 'teleport', n: 1 }), ''); assert.match(run(a, { type: 'teleport', x: spot[0], y: spot[1] + 1 }), /lädt/);
+
+// Start-Teleporter: einmalig, überallhin, auch ohne Revier und ohne Cooldown
+{
+  a.state.startTp = 1; a.state.items.teleport = 0;
+  let far = null;
+  for (let x = 20; x < 260 && !far; x += 7) for (let y = 20; y < 260 && !far; y += 7) if (!checkTeleport(match, players, a, x, y, gt(), true) && checkTeleport(match, players, a, x, y, gt(), false)) far = [x, y];
+  assert.ok(far, 'ein Ziel außerhalb des Reviers');
+  assert.equal(run(a, { type: 'teleport', x: far[0], y: far[1] }), '');
+  assert.deepEqual(a.state.pos, far); assert.equal(a.state.startTp, 0);
+  assert.match(run(a, { type: 'teleport', x: far[0] + 7, y: far[1] }), /Teleporter/, 'nur einmal');
+  a.state.items.teleport = 1; a.state.tpAt = -1e9;
+}
 
 // Speedups
 a.state.res.food = a.state.res.wood = a.state.res.stone = 9999;

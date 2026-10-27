@@ -863,19 +863,19 @@ function placeInfo(t) {
     + (cnt.sanct ? `<span title="Heiligtum">✨ ${cnt.sanct}</span>` : '') + (cnt.throne ? '<span title="Thron">👑</span>' : '');
 }
 function placeStep() {
-  const show = mode === 'map' && view && view.ally && !msel && view.match.phase === 'running';
-  $('placeBtn').hidden = !show || !!placing; $('tpBtn').hidden = !show || !!placing;
+  const show = mode === 'map' && view && (view.ally || S.startTp > 0) && !msel && view.match.phase === 'running';
+  $('placeBtn').hidden = !show || !!placing || !view.ally; $('tpBtn').hidden = !show || !!placing;
   $('placeBar').hidden = !(show && placing); $('placeInfo').hidden = !(show && placing === 'build');
   if (!placing || !show) { if (placing && !show) placing = false; return; }
-  const t = placeTile(), key = placing + t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60) + itemN('teleport');
+  const t = placeTile(), key = placing + t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60) + itemN('teleport') + 's' + (S.startTp || 0);
   if (key === placeKey) return; placeKey = key;
   const { mt, pls } = siteCtx(), el = $('placeTxt');
   $('placeGo').hidden = placing !== 'build'; $('placeTp').hidden = placing !== 'tp';
   if (placing === 'tp') {
-    const why = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus } } }, t.x, t.y, gtNow()), cd = TELEPORT_COOLDOWN - (gtNow() - S.tpAt), has = itemN('teleport') > 0;
+    const why = checkTeleport(mt, pls, { id: me.id, state: { lv: { rathaus: S.lv.rathaus }, startTp: S.startTp } }, t.x, t.y, gtNow()), free = S.startTp > 0, cd = free ? 0 : TELEPORT_COOLDOWN - (gtNow() - S.tpAt), has = free || itemN('teleport') > 0;
     const r = cityR(S.lv.rathaus); wm.setPreview({ x: t.x, y: t.y, r, ok: !why, ghost: true });
     const msg = !has ? 'Du hast keinen Teleporter (Mehr → Shop).' : cd > 0 ? 'Der Teleporter lädt noch ' + fmtT(real(cd)) + '.' : why;
-    el.className = 'pl-txt ' + (msg ? 'bad' : 'ok'); el.textContent = msg || 'Deine Burg zieht hierher um (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
+    el.className = 'pl-txt ' + (msg ? 'bad' : 'ok'); el.textContent = msg || (free ? 'Start-Teleporter (einmalig, überallhin): ' : '') + 'Deine Burg zieht hierher um (' + t.x + ' | ' + t.y + '). Verschiebe die Karte, bis der Ort stimmt.';
     $('placeTp').disabled = !!msg; return;
   }
   placeInfo(t);
@@ -936,7 +936,7 @@ function shopHTML() {
   const card = (id) => { const it = ITEMS[id]; return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div><div class="note">Im Beutel: <b>${itemN(id)}</b></div></div>
     ${it.price ? `<button class="btn small" type="button" data-act="shopBuy" data-i="${id}" ${S.res.gold >= it.price ? '' : 'disabled'}>${it.price} 🪙</button>` : ''}</div>`; };
   return `<p class="note">Du hast <b>${fmtN(Math.floor(S.res.gold))} 🪙 Gold</b>. Gold bekommst du aus Heiligtümern, Lagern und Beute.</p>
-    <div class="block"><h3>Teleporter</h3>${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte den Button „Teleportieren“ nutzen.'}</p>` : ''}</div>`;
+    <div class="block"><h3>Teleporter</h3>${S.startTp > 0 ? '<p class="note"><b>Start-Teleporter bereit:</b> einmalig, bringt deine Burg überallhin – auch außerhalb eines Reviers. Auf der Karte den Teleporter-Knopf antippen.</p>' : ''}${card('teleport')}${itemN('teleport') ? `<p class="note">${cd > 0 ? 'Lädt noch ' + fmtT(real(cd)) + '.' : 'Bereit. Auf der Karte den Button „Teleportieren“ nutzen.'}</p>` : ''}</div>`;
 }
 
 /* ---------- Ergebnis ---------- */
