@@ -175,12 +175,11 @@ export function setSpeed(match, players, speed, now) { syncMatch(match, players,
 export function setWeeks(match, players, weeks, now) {
   syncMatch(match, players, now); const w = match.world;
   w.weeks = Math.max(1, Math.min(52, Math.round(weeks) || 10));
-  if (w.phase !== 'lobby') w.endGt = w.startGt + w.weeks * 7 * DAY;
 }
 export function startMatch(match, players, now) {
   syncMatch(match, players, now); const w = match.world, ctx = mkCtx(match, players, now);
   if (w.phase !== 'lobby') return 'Die Partie läuft schon.';
-  w.phase = 'running'; w.startGt = w.gt; w.endGt = w.gt + w.weeks * 7 * DAY; w.at = now;
+  w.phase = 'running'; w.startGt = w.gt; w.endGt = 0; w.at = now;
   for (const p of players) { p.state.at = now; protectNew(p.state, w.gt); }
   chron(ctx, 'Die Partie beginnt.');
   for (const p of players) note(ctx, p.id, 'start', 'Die Partie beginnt', 'Dein Schutz vor Angriffen dauert ' + fmtDur(4 * DAY / match.speed) + '.');

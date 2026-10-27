@@ -4,7 +4,7 @@ Browser-Strategiespiel für bis zu 10 Spieler auf einer gemeinsamen Weltkarte (2
 
 **Spielregeln in Kürze**
 
-- **Ziel:** Wer (allein oder als Bündnis) den Thron 7 Tage hält, gewinnt. Sonst gewinnt am Ende der Zeit die Gruppe mit den meisten Punkten, oder die letzte, die übrig bleibt.
+- **Ziel:** Wer (allein oder als Bündnis) den Thron 2 Tage hält, gewinnt, oder wer zuerst alle Feinde ausgeschaltet hat. Es gibt kein Zeitlimit.
 - **Schutz:** Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst angreift, verliert den Schutz sofort.
 - **Fall einer Burg:** Das erste Mal wird der Besiegte Vasall (7 Tage, 20 % der Erträge gehen an den Sieger, danach 12 Stunden Schutz). Das zweite Mal scheidet er aus. Der Herr kann seinen Vasallen nicht selbst ausschalten, das können nur andere.
 - **Bündnisse:** höchstens die Hälfte der Spieler plus eins (bei 10 Spielern 6). Verbündete gewinnen gemeinsam, können sich nicht angreifen und Truppen in die Burg des anderen legen (60 je Rathausstufe). Jeder darf jederzeit austreten (danach 24 Stunden Angriffssperre gegen die früheren Verbündeten), neu gründen oder allein in einem Bündnis sein.
@@ -34,7 +34,7 @@ ADMIN_PASSWORD=mein-geheimes-passwort npm start
 Dann im Browser:
 
 1. `http://localhost:3000/admin` öffnen und mit dem Admin-Passwort anmelden.
-2. Eine Partie erstellen (Tempo 1 = echte Spielzeiten, für Tests z. B. 100; Länge in Wochen). Sie startet in der **Lobby**.
+2. Eine Partie erstellen (Tempo 1 = echte Spielzeiten, für Tests z. B. 100). Sie startet in der **Lobby**.
 3. Den Einladungslink kopieren und verschicken. Dort wählt jeder Spieler Name und Passwort.
 4. Wenn alle da sind, im Admin **Partie starten**. Ab jetzt läuft die Zeit, und der 4-Tage-Schutz beginnt.
 5. Später meldet man sich einfach unter `http://localhost:3000` mit Name und Passwort an.

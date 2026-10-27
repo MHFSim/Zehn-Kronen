@@ -407,7 +407,7 @@ export function checkEnd(ctx, t, force) {
     const win = groupMembers(w, players, th.group).filter(p => !p.state.out);
     if (win.length) { finish(ctx, 'throne', win, groupLabel(w, players, th.group), t); return true; }
   }
-  if (force || (w.endGt && t >= w.endGt)) {
+  if (force) {
     const g = best(); if (!g) return false;
     finish(ctx, force ? 'admin' : 'time', g.members.map(id => byId(players, id)).filter(p => !p.state.out), g.label, t); return true;
   }

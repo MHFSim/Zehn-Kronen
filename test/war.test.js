@@ -136,11 +136,11 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.match(run(match, players, clock, a, { type: 'build', id: 'farm' }), /beendet/);
 }
 
-// ---- Spielende nach Zeit und durch den Admin ----
+// ---- Kein Zeitlimit, Spielende durch den Admin ----
 {
   const { match, players } = mk(2, { weeks: 1 });
-  clock = T0; adv(match, players, 8 * DAY);
-  assert.equal(match.world.phase, 'ended'); assert.equal(match.world.result.kind, 'time');
+  clock = T0; adv(match, players, 80 * DAY);
+  assert.equal(match.world.phase, 'running', 'kein Zeitlimit');
   const m2 = mk(2); assert.equal(endMatch(m2.match, m2.players, T0 + 10), ''); assert.equal(m2.match.world.result.kind, 'admin');
 }
 // ---- Überfall auf Sammler ----

@@ -17,7 +17,7 @@ export const FALL_PROTECT = 12 * 3600;   // Schutz nach dem Fall der Burg
 export const VASSAL_TIME = 7 * DAY;      // so lange bleibt ein Vasall Vasall
 export const TRIBUTE = 0.2;              // Anteil der Erzeugung, den ein Vasall abgibt
 export const LEAVE_LOCK = 24 * 3600;     // nach dem Austritt keine Angriffe auf die früheren Verbündeten
-export const THRONE_HOLD = 7 * DAY;      // so lange muss der Thron gehalten werden
+export const THRONE_HOLD = 2 * DAY;      // so lange muss der Thron gehalten werden
 export const SANCT_BONUS = 0.15;         // Produktionsbonus je gehaltenem Heiligtum
 export const THRONE_GOLD = 0.25;         // Goldbonus für den Halter des Throns
 export const SPY_COST = 50;              // Gold je Spähbericht
@@ -32,7 +32,7 @@ export const cellXY = c => { const x = c % N; return [x, (c - x) / N]; };
 export function newWorld(now, o = {}) {
   const phase = o.phase || 'running', weeks = o.weeks || 10;
   return { ver: 2, n: N, gt: 0, at: now, nodes: {}, camps: {}, ruins: {}, marches: [], nextId: 1,
-    phase, weeks, startGt: 0, endGt: phase === 'running' ? weeks * 7 * DAY : 0,
+    phase, weeks, startGt: 0, endGt: 0,
     alliances: {}, nextAl: 1, pending: [], nextPend: 1, holds: {}, outposts: {}, nextOp: 1, chron: [], result: null };
 }
 export function ensureWorld(w) {
@@ -40,7 +40,7 @@ export function ensureWorld(w) {
   if (!w.alliances) w.alliances = {}; if (!w.nextAl) w.nextAl = 1;
   if (!w.pending) w.pending = []; if (!w.nextPend) w.nextPend = 1;
   if (!w.holds) w.holds = {}; if (!w.chron) w.chron = []; if (!w.outposts) w.outposts = {}; if (!w.nextOp) w.nextOp = 1;
-  if (w.weeks == null) w.weeks = 10; if (w.startGt == null) w.startGt = 0; if (w.endGt == null) w.endGt = 0;
+  if (w.weeks == null) w.weeks = 10; if (w.startGt == null) w.startGt = 0; w.endGt = 0;
   if (w.result === undefined) w.result = null;
   return w;
 }

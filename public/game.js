@@ -441,7 +441,7 @@ function setupCity() {
 
 
 /* ---------- Partie: Phase, Schutz, Bündnis, Meldungen ---------- */
-const DAY = 86400, THRONE_HOLD = 7 * DAY;
+const DAY = 86400, THRONE_HOLD = 2 * DAY;
 const SANCT = [['Heiligtum der Felder', 'food'], ['Heiligtum des Holzes', 'wood'], ['Heiligtum der Steine', 'stone'], ['Heiligtum des Goldes', 'gold']];
 const pname = id => { const p = match.players.find(x => x.id === id); return p ? p.name : '?'; };
 const allyOf = id => { const p = match.players.find(x => x.id === id); return p && p.ally ? match.alliances.find(a => a.id === p.ally) : null; };
@@ -596,7 +596,7 @@ function combatRulesHTML() {
   <p class="desc"><b>Burgen:</b> Es verteidigen alle Truppen zu Hause, stationierte Verbündete und die Stadtwache (10 + 8 pro Rathausstufe + 15 pro Mauerstufe Speerträger). Die Mauer gibt +5 % pro Stufe. Siegt der Angreifer, plündert er 40 % der Rohstoffe über dem geschützten Anteil (20 % + 1 % je Lagerstufe, höchstens 40 %) und 25 % des Golds, begrenzt durch seine Traglast. Der Besitzer wird Vasall, beim zweiten Fall scheidet er aus. Unter Schutz sind Burgen nicht angreifbar.</p>`;
 }
 function rulesHTML() {
-  return `<p class="desc"><b>Ziel:</b> Wer den <b>Thron</b> in der Mitte 7 Tage hält, gewinnt. Das geht nur über ein Bündnis: Nur Bündnisse können ihr Revier mit Außenposten bis zum weißen Viereck am Thron vergrößern, wer allein spielt, erreicht ihn nicht. Sonst gewinnt am Ende der Partie die Gruppe mit den meisten Punkten, oder die letzte, die übrig bleibt.</p>
+  return `<p class="desc"><b>Ziel:</b> Das Bündnis, das den <b>Thron</b> in der Mitte 2 Tage hält, gewinnt. Es gibt kein Zeitlimit. Das geht nur über ein Bündnis: Nur Bündnisse können ihr Revier mit Außenposten bis zum weißen Viereck am Thron vergrößern, wer allein spielt, erreicht ihn nicht. Außerdem gewinnt, wer als Erste alle Feinde ausgeschaltet hat.</p>
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
@@ -608,7 +608,7 @@ function rulesHTML() {
 function moreHTML() {
   const m = match, gt = gtNow(), rk = m.ranking || { players: [], groups: [] };
   const state = m.phase === 'lobby' ? 'Lobby (noch nicht gestartet)' : m.phase === 'paused' ? 'pausiert' : m.phase === 'ended' ? 'beendet' : 'läuft';
-  const days = m.phase === 'lobby' ? `${m.weeks} Wochen geplant` : m.phase === 'ended' ? '' : `Tag ${dayOf(gt)} von ${m.weeks * 7} · Ende in ${fmtT(real(m.endGt - gt))}`;
+  const days = m.phase === 'lobby' ? '' : m.phase === 'ended' ? '' : `Tag ${dayOf(gt)}`;
   const th = (m.holds || []).find(h => h.id === 'throne1');
   const info = `<dl class="stats"><dt>Partie</dt><dd>${esc(m.name)} · ${state}</dd>${days ? `<dt>Zeit</dt><dd>${days}</dd>` : ''}<dt>Thron</dt><dd>${th ? esc(th.label) + ' (noch ' + fmtT(real(th.since + THRONE_HOLD - gt)) + ')' : 'frei'}</dd>
     <dt>Bündnisgröße</dt><dd>höchstens ${m.cap}</dd><dt>Tempo</dt><dd>×${m.speed}</dd></dl>${m.result ? `<div class="row"><button class="btn" data-act="showEnd" type="button">Ergebnis ansehen</button></div>` : ''}`;
@@ -888,7 +888,7 @@ function showEnd(force) {
   const r = match.result; if (!r || (endShown && !force)) return; endShown = true;
   const won = r.winners.some(w => w.id === me.id), rk = r.ranking || { players: [] };
   $('modalIn').innerHTML = `<div class="crown">${won ? '👑' : '🏁'}</div><h2>${won ? 'Ihr habt gewonnen!' : 'Die Partie ist beendet'}</h2>
-    <p class="desc">Sieger: <b>${esc(r.label)}</b> – ${{ throne: 'der Thron wurde sieben Tage gehalten', last: 'alle anderen sind ausgeschieden', time: 'die Zeit ist abgelaufen', admin: 'der Admin hat die Partie beendet' }[r.kind] || ''}.</p>
+    <p class="desc">Sieger: <b>${esc(r.label)}</b> – ${{ throne: 'der Thron wurde zwei Tage gehalten', last: 'alle anderen sind ausgeschieden', time: 'die Zeit ist abgelaufen', admin: 'der Admin hat die Partie beendet' }[r.kind] || ''}.</p>
     <table class="rank"><thead><tr><th>#</th><th>Spieler</th><th>Punkte</th></tr></thead><tbody>${rk.players.slice(0, 10).map((p, i) => `<tr class="${p.id === me.id ? 'me' : ''}"><td>${i + 1}</td><td>${p.tag ? '<span class="tag">' + esc(p.tag) + '</span> ' : ''}${esc(p.name)}${r.winners.some(w => w.id === p.id) ? ' 👑' : ''}</td><td>${fmtN(p.score)}</td></tr>`).join('')}</tbody></table>
     <div class="row" style="margin-top:14px"><button class="btn" id="modalClose" type="button">Weiter ansehen</button></div>`;
   $('modal').hidden = false; $('modalClose').onclick = () => { $('modal').hidden = true; };
@@ -1120,7 +1120,7 @@ function renderMapSheet() {
     } else if (k === 'sanct' || k === 'throne') {
       const hd = (view.match.holds || []).find(x => x.id === id), plan = planFor(o), gt = gtNow(), g = holdGuard(k), sn = k === 'sanct' ? SANCT[o.n] : null;
       const eff = k === 'sanct' ? `+15 % ${RES_DE[sn[1]]} für den Halter und sein Bündnis` : '+25 % Gold für den Halter und sein Bündnis';
-      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron sieben Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sobald ein Außenposten am weißen Viereck um den Thron andockt, gehört er dem Bündnis, ganz ohne Truppen. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
+      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron zwei Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sobald ein Außenposten am weißen Viereck um den Thron andockt, gehört er dem Bündnis, ganz ohne Truppen. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
         <dl class="stats"><dt>Wirkung</dt><dd>${eff}</dd><dt>Halter</dt><dd>${hd ? '<b>' + esc(hd.label) + '</b> seit Tag ' + dayOf(hd.since) : k === 'throne' ? 'frei · ohne Wächter' : 'frei · Wächter: ' + troopsLine(g.troops) + ' (+' + Math.round((g.mult - 1) * 100) + ' %)'}</dd>
         ${k === 'throne' && hd ? `<dt>Sieg in</dt><dd>${fmtT(real(hd.since + THRONE_HOLD - gt))}</dd>` : ''}${hd && !hd.mine && k !== 'throne' ? `<dt>Besatzung</dt><dd>${fmtN(hd.total)} Einheiten</dd>` : ''}</dl>`;
       if (k !== 'throne' && hd && hd.mine) {

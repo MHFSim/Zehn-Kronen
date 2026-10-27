@@ -45,10 +45,9 @@ th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;le
       <form id="createForm" class="inline" novalidate>
         <div class="field"><label for="mName">Name</label><input id="mName" maxlength="40" placeholder="z. B. Herbstfeldzug"></div>
         <div class="field" style="flex:0 0 110px;min-width:110px"><label for="mSpeed">Tempo</label><input id="mSpeed" type="number" min="1" max="1000" value="1"></div>
-        <div class="field" style="flex:0 0 110px;min-width:110px"><label for="mWeeks">Wochen</label><input id="mWeeks" type="number" min="1" max="52" value="10"></div>
         <button class="btn" type="submit">Erstellen</button>
       </form>
-      <p class="note">Tempo 1 = echte Spielzeiten, Wochen = Länge der Partie in Spielzeit (8 bis 12 empfohlen). Neue Partien starten in der Lobby; du startest sie, wenn alle da sind. Für Tests z. B. Tempo 10 oder 100.</p>
+      <p class="note">Tempo 1 = echte Spielzeiten. Die Partie hat kein Zeitlimit: Sieger ist das Bündnis, das den Thron 2 Tage hält oder zuerst alle Feinde ausschaltet. Neue Partien starten in der Lobby; du startest sie, wenn alle da sind. Für Tests z. B. Tempo 10 oder 100.</p>
       <div class="inline"><button class="btn ghost small" id="backupBtn" type="button">Datensicherung jetzt</button><span class="note" id="backupInfo"></span></div>
     </section>
     <div id="matches" style="display:flex;flex-direction:column;gap:16px"></div>
@@ -80,7 +79,7 @@ async function load() {
     const link = location.origin + '/?einladung=' + m.invite;
     return `<section class="block match">
       <div class="row" style="justify-content:space-between"><h2>${esc(m.name)}</h2><span class="note">${PHASE[m.phase] || m.phase} · ${m.players.length} von ${m.max_players} Spielern · Tempo ×${m.speed}</span></div>
-      <p class="note">${m.phase === 'running' || m.phase === 'paused' ? 'Spielzeit: Tag ' + Math.floor((m.gt - m.startGt) / 86400 + 1) + ' von ' + (m.weeks * 7) : m.phase === 'ended' ? 'Sieger: ' + esc(m.result ? m.result.label : '–') : 'Länge: ' + m.weeks + ' Wochen'}</p>
+      <p class="note">${m.phase === 'running' || m.phase === 'paused' ? 'Spielzeit: Tag ' + Math.floor((m.gt - m.startGt) / 86400 + 1) : m.phase === 'ended' ? 'Sieger: ' + esc(m.result ? m.result.label : '–') : 'Wartet auf den Start'}</p>
       <div class="inline">${m.phase === 'lobby' ? '<button class="btn" data-act="start" data-id="' + m.id + '" type="button">Partie starten</button>' : ''}${m.phase === 'running' ? '<button class="btn ghost" data-act="pause" data-id="' + m.id + '" type="button">Pausieren</button>' : ''}${m.phase === 'paused' ? '<button class="btn" data-act="resume" data-id="' + m.id + '" type="button">Fortsetzen</button>' : ''}${m.phase === 'running' || m.phase === 'paused' ? '<button class="btn ' + (armed['e' + m.id] ? 'danger' : 'ghost') + '" data-act="end" data-id="' + m.id + '" type="button">' + (armed['e' + m.id] ? 'Wirklich beenden' : 'Beenden') + '</button>' : ''}</div>
       <div class="invite"><code>${esc(link)}</code><button class="btn small" data-act="copy" data-link="${esc(link)}" type="button">Kopieren</button><button class="btn ghost small" data-act="invite" data-id="${m.id}" type="button">Neuer Link</button></div>
       ${m.players.length ? `<div class="tbl"><table><thead><tr><th>Spieler</th><th>Rathaus</th><th>Truppen</th><th>Status</th><th>Zuletzt da</th><th></th></tr></thead><tbody>
@@ -90,8 +89,6 @@ async function load() {
       <div class="inline">
         <div class="field" style="flex:0 0 110px;min-width:110px"><label for="sp${m.id}">Tempo</label><input id="sp${m.id}" type="number" min="1" max="1000" value="${m.speed}"></div>
         <button class="btn ghost" data-act="speed" data-id="${m.id}" type="button">Tempo setzen</button>
-        <div class="field" style="flex:0 0 90px;min-width:90px"><label for="wk${m.id}">Wochen</label><input id="wk${m.id}" type="number" min="1" max="52" value="${m.weeks}"></div>
-        <button class="btn ghost" data-act="weeks" data-id="${m.id}" type="button">Länge setzen</button>
         <button class="btn ${armed['d' + m.id] ? 'danger' : 'ghost'}" data-act="delete" data-id="${m.id}" type="button" style="margin-left:auto">${armed['d' + m.id] ? 'Partie wirklich löschen' : 'Partie löschen'}</button>
       </div>
       <details class="cheats" data-id="${m.id}" ${cheatOpen[m.id] ? 'open' : ''}><summary>🛠 Cheats</summary>
@@ -144,7 +141,7 @@ $('loginForm').addEventListener('submit', async e => {
 $('backupBtn').addEventListener('click', async () => { const r = await api('/api/admin/match', { action: 'backup' }); $('backupInfo').textContent = r.ok ? 'Gesichert: ' + r.data.file : 'Fehler'; });
 $('createForm').addEventListener('submit', async e => {
   e.preventDefault();
-  await api('/api/admin/match', { action: 'create', name: $('mName').value, speed: $('mSpeed').value, weeks: $('mWeeks').value });
+  await api('/api/admin/match', { action: 'create', name: $('mName').value, speed: $('mSpeed').value });
   $('mName').value = ''; load();
 });
 $('matches').addEventListener('click', async e => {
