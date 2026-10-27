@@ -88,7 +88,7 @@ export function freshState(now) {
 }
 
 const round5 = n => Math.max(0, Math.round(n / 5) * 5);
-export const costOf = (id, t) => B[id].base.map(c => round5(c * Math.pow(1.3, t - 1)));
+export const costOf = (id, t) => B[id].base.map(c => round5(c * 0.85 * Math.pow(1.27, t - 1)));
 export const timeOf = (id, t) => B[id].time * Math.pow(1.3, t - 1);
 export const capFor = l => Math.round(1500 * Math.pow(1.25, l));
 export const cap = S => capFor(S.lv.lager);
@@ -101,7 +101,7 @@ export const woundedCount = S => Object.values(S.wounded || {}).reduce((a, b) =>
 export const lazarettCap = S => 200 * S.lv.lazarett;
 export const armySlots = S => 2 + (S.lv.rathaus >= 8 ? 1 : 0) + (S.lv.rathaus >= 14 ? 1 : 0);
 export const queuedTroops = S => Object.values(S.train).flat().reduce((a, o) => a + o.count, 0);
-export const maxQueues = S => S.lv.rathaus >= 10 ? 2 : 1;
+export const maxQueues = S => S.lv.rathaus >= 5 ? 2 : 1;
 export const inQueue = (S, id) => S.queue.find(q => q.id === id);
 export const afford = (S, c) => c.every((v, i) => S.res[RES[i]] >= v);
 export const unitTime = (S, u, bid) => U[u].t * Math.pow(0.95, Math.max(0, S.lv[bid] - 1));
