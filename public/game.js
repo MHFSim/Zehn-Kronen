@@ -1018,13 +1018,14 @@ function renderMapSheet() {
     } else if (k === 'sanct' || k === 'throne') {
       const hd = (view.match.holds || []).find(x => x.id === id), plan = planFor(o), gt = gtNow(), g = holdGuard(k), sn = k === 'sanct' ? SANCT[o.n] : null;
       const eff = k === 'sanct' ? `+15 % ${RES_DE[sn[1]]} für den Halter und sein Bündnis` : '+25 % Gold für den Halter und sein Bündnis';
-      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron sieben Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sie müssen ihr Revier mit Außenposten bis zum weißen Viereck um den Thron vergrößern. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
-        <dl class="stats"><dt>Wirkung</dt><dd>${eff}</dd><dt>Halter</dt><dd>${hd ? '<b>' + esc(hd.label) + '</b> seit Tag ' + dayOf(hd.since) : 'frei · Wächter: ' + troopsLine(g.troops) + ' (+' + Math.round((g.mult - 1) * 100) + ' %)'}</dd>
-        ${k === 'throne' && hd ? `<dt>Sieg in</dt><dd>${fmtT(real(hd.since + THRONE_HOLD - gt))}</dd>` : ''}${hd && !hd.mine ? `<dt>Besatzung</dt><dd>${fmtN(hd.total)} Einheiten</dd>` : ''}</dl>`;
-      if (hd && hd.mine) {
+      body = `<p class="desc">${k === 'throne' ? 'In der Mitte der Welt. Wer den Thron sieben Tage ohne Unterbrechung hält, gewinnt die Partie. Nur Bündnisse können ihn erreichen: Sobald ein Außenposten am weißen Viereck um den Thron andockt, gehört er dem Bündnis, ganz ohne Truppen. Spieler ohne Bündnis können das nicht.' : 'Ein altes Heiligtum an den vier Wegen zum Thron.'}</p>
+        <dl class="stats"><dt>Wirkung</dt><dd>${eff}</dd><dt>Halter</dt><dd>${hd ? '<b>' + esc(hd.label) + '</b> seit Tag ' + dayOf(hd.since) : k === 'throne' ? 'frei · ohne Wächter' : 'frei · Wächter: ' + troopsLine(g.troops) + ' (+' + Math.round((g.mult - 1) * 100) + ' %)'}</dd>
+        ${k === 'throne' && hd ? `<dt>Sieg in</dt><dd>${fmtT(real(hd.since + THRONE_HOLD - gt))}</dd>` : ''}${hd && !hd.mine && k !== 'throne' ? `<dt>Besatzung</dt><dd>${fmtN(hd.total)} Einheiten</dd>` : ''}</dl>`;
+      if (k !== 'throne' && hd && hd.mine) {
         body += `<div class="block"><h3>Eure Besatzung</h3>${Object.keys(hd.garr || {}).map(pid => `<div class="mrow"><div><b>${esc(pname(Number(pid)))}</b><div class="note">${troopsLine(hd.garr[pid])}</div></div>${Number(pid) === me.id ? '<button class="btn ghost small" type="button" data-act="holdRecall">Zurückrufen</button>' : ''}</div>`).join('')}</div>`;
       }
-      if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
+      if (k === 'throne') body += `<p class="note">Der Thron wird nicht bewacht und es gibt keine Truppen dort. Das Bündnis, dessen Außenposten am weißen Feld angedockt ist, hält ihn. Wer ihn übernehmen will, muss erst die Außenposten des Halters zerstören, sodass er nicht mehr andockt, und dann selbst andocken.${hd ? '' : ' Im Moment ist er frei.'}</p>`;
+      else if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
       else {
         body += pickerHTML();
         if (plan && !plan.error) {

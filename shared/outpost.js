@@ -287,6 +287,16 @@ export function settleTerritory(ctx) {
     delete w.holds[oid];
     chron(ctx, groupLabel(w, players, h.group) + ' verliert ' + name + ', weil das Revier fehlt.');
   }
+  // Der Thron wird nicht bewacht und nicht besetzt: Wer zuerst mit einem Außenposten am weißen Feld andockt, hält ihn. Ein Gegner muss
+  // erst die Außenposten des Halters zerstören (sodass dieser nicht mehr andockt) und dann selbst andocken.
+  for (const o of map.objects) if (o.k === 'throne' && !w.holds[o.id]) {
+    const cand = rects.filter(r => r.k === 'op' && r.ready && r.group[0] === 'a' && touchesObj([r], r.group, o)).sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)))[0];
+    if (cand) {
+      w.holds[o.id] = { group: cand.group, since: gt, garr: {} };
+      const lab = groupLabel(w, players, cand.group); chron(ctx, lab + ' hält jetzt den Thron.');
+      for (const p of players) if (!p.state.out && groupOf(w, p.id) === cand.group) note(ctx, p.id, 'hold', 'Thron erreicht', 'Euer Außenposten ist am Thron angedockt: ' + lab + ' hält jetzt den Thron.');
+    }
+  }
 }
 // Außenposten eines ausgeschiedenen Spielers: seine Besatzung ist weg, der Posten bleibt dem Bündnis
 export function removeOutposts(w, pid) { for (const id in (w.outposts || {})) delete w.outposts[id].garr[pid]; }

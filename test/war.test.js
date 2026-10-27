@@ -106,9 +106,10 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.equal(run(match, players, clock, b, { type: 'stationDismiss', owner: a.id }), '');
   assert.equal(b.state.stationed[a.id], undefined);
   assert.match(run(match, players, clock, a, { type: 'march', target: cityB.id, mode: 'attack', troops: { speer: 10 } }), /Verbündete/);
-  // Thron besetzen (braucht Revier: ohne Außenposten geht es nicht)
+  // Der Thron wird nicht besetzt oder bewacht: Andocken mit einem Außenposten genügt
   give(a, { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 });
-  assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /Revier/);
+  assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /nicht besetzt/);
+  assert.ok(!match.world.holds.throne1, 'frei, solange niemand angedockt hat');
   // Kette von Außenposten vom nächsten Turm bis zum Thron (jeder berührt den vorigen)
   const alId = Object.values(match.world.alliances)[0].id, tw = towersOf(mapOf(match)).sort((p, q) => Math.hypot(p.x - 137, p.y - 137) - Math.hypot(q.x - 137, q.y - 137))[0], sp = [tw.x, tw.y], chain = [];
   { const n = Math.ceil(Math.hypot(137 - sp[0], 137 - sp[1]) / 9);
@@ -118,10 +119,12 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
     const rs = territory(match, players, clock), off = rs.filter(r => r.off).map(r => r.id);
     assert.ok(off.length > 0 && off.every(id => chain.indexOf(id) > chain.indexOf(mid)), 'Außenposten hinter der Lücke sind inaktiv');
     assert.ok(rs.filter(r => r.k === 'op' && !r.off).every(r => chain.indexOf(r.id) < chain.indexOf(mid)), 'davor bleiben aktiv');
-    assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /Revier/);
+    adv(match, players, 60); assert.ok(!match.world.holds.throne1, 'Kette unterbrochen: kein Andocken am Thron');
     match.world.outposts[mid] = saved;
     assert.equal(territory(match, players, clock).filter(r => r.off).length, 0, 'Lücke geschlossen: alles wieder aktiv'); }
-  assert.equal(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 } }), '');
+  adv(match, players, 60);
+  assert.ok(match.world.holds.throne1 && match.world.holds.throne1.group === 'a' + alId, 'Thron gehört dem Bündnis, sobald ein Außenposten andockt');
+  assert.equal(Object.keys(match.world.holds.throne1.garr).length, 0, 'keine Truppen am Thron');
   adv(match, players, 3 * DAY);
   assert.ok(match.world.holds.throne1, 'Thron gehalten');
   assert.ok(a.state.bonus.gold > 0 && b.state.bonus.gold > 0, 'Goldbonus für das ganze Bündnis');
