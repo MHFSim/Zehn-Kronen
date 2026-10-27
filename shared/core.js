@@ -7,7 +7,8 @@ import { forestCostFor, armySpeed, capacityOf, sum } from './combat.js';
 /* ---------- Regeln der Welt (alle Zeiten in Spielsekunden) ---------- */
 export const DAY = 86400;
 export const PLAYER_COLORS = ['#c8372d', '#2f6fd1', '#e2b02e', '#3f9d4c', '#8a4bc4', '#e0782b', '#27a7a1', '#d9609c', '#9aa5b1', '#b9d03a'];
-export const NODE_REGEN = 0.01;          // Anteil des Höchstvorrats pro Spielstunde
+export const NODE_REFILL = 6 * 3600;      // Ein Feld ist 6 Stunden nach dem letzten Kontakt (oder der Leerung) wieder voll
+export const NODE_EMPTY = 50;             // darunter gilt ein Feld als leer
 export const CAMP_RESPAWN = 6 * 3600;    // bis ein Lager wiederkommt
 export const GATHER_SEC = 3;             // Sammeln: 20 Rohstoffe pro Minute, unabhängig von der Truppenzahl (die Traglast begrenzt nur die Menge)
 export const VIEW_CITY = 11, VIEW_ARMY = 6;
@@ -59,8 +60,8 @@ export const cityId = S => 'start' + (S.slot + 1);
 /* ---------- Felder und Lager ---------- */
 export function nodeLeft(w, o, gt) {
   const max = NODE_MAX(o.lv), n = w.nodes[o.id];
-  if (!n) return max;
-  return Math.min(max, n.left + max * NODE_REGEN * Math.max(0, gt - n.t) / 3600);
+  if (!n || gt - n.t >= NODE_REFILL) return max;
+  return n.left < NODE_EMPTY ? 0 : n.left;
 }
 export const campAlive = (w, id, gt) => !(w.camps[id] && w.camps[id].dead > gt);
 

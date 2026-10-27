@@ -6,7 +6,7 @@ import { N, startSpot, SLOTS, NODE_RES, NODE_KINDS } from './mapgen.js';
 import { U, freshState, advanceTo, applyCommand, armySlots } from './rules.js';
 import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from './combat.js';
 import {
-  DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, campAlive,
+  DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur
 } from './core.js';
@@ -33,7 +33,7 @@ function onArrive(ctx, m, bt, realT) {
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
   if (NODE_KINDS.includes(o.k)) {
     const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops, S), amount = Math.floor(Math.min(cap, left));
-    if (amount < 50) {
+    if (amount < NODE_EMPTY) {
       pushReport(S, { kind: 'gather', title: 'Feld erschöpft', win: false, target: info, text: 'Das Feld ist fast leer. Das Heer kehrt ohne Beute zurück.' }, realT);
       return back();
     }
@@ -73,7 +73,7 @@ function onGatherEnd(ctx, m, bt, realT) {
   if (!p) { m.dead = true; return; }
   advanceTo(p.state, realT, match.speed);
   const n = w.nodes[o.id] || { left: nodeLeft(w, o, bt), t: bt };
-  w.nodes[o.id] = { left: Math.max(0, n.left - m.amount), t: bt };
+  { const rest = n.left - m.amount; w.nodes[o.id] = { left: rest < NODE_EMPTY ? 0 : rest, t: bt }; }
   m.load = { [m.res]: m.amount };
   clanGather(ctx, m, o, bt);
   const found = gatherFinds(p.state, m.id, m.tEnd - m.tStart); if (Object.keys(found).length) note(ctx, p.id, 'gather', 'Beschleuniger gefunden', 'Beim Sammeln hat dein Heer ' + findsText(found) + ' gefunden.');
@@ -237,7 +237,7 @@ export function command(match, players, player, cmd, now) {
     } else if (mode === 'normal') {
       if (o.k === 'camp' && !campAlive(w, o.id, w.gt)) return 'Dieses Lager ist gerade zerstört';
       if (o.k === 'ruin' && w.ruins[o.id]) return 'Diese Ruine ist schon geplündert';
-      if (NODE_KINDS.includes(o.k) && nodeLeft(w, o, w.gt) < 50) return 'Dieses Feld ist erschöpft';
+      if (NODE_KINDS.includes(o.k) && nodeLeft(w, o, w.gt) < NODE_EMPTY) return 'Dieses Feld ist erschöpft';
     } else {
       if (!sum(troops)) return 'Keine Truppen ausgewählt';
       const c = checkLaunch(ctx, player, o, mode, troops); if (typeof c === 'string') return c;
@@ -261,7 +261,7 @@ export function command(match, players, player, cmd, now) {
     if (m.phase === 'gather') {
       const o = mapOf(match).byId[m.tid], frac = Math.max(0, Math.min(1, (w.gt - m.tStart) / (m.tEnd - m.tStart || 1)));
       const amount = Math.floor(m.amount * frac), n = w.nodes[o.id] || { left: nodeLeft(w, o, w.gt), t: w.gt };
-      w.nodes[o.id] = { left: Math.max(0, n.left - amount), t: w.gt };
+      { const rest = n.left - amount; w.nodes[o.id] = { left: rest < NODE_EMPTY ? 0 : rest, t: w.gt }; }
       m.load = amount > 0 ? { [m.res]: amount } : {};
       gatherFinds(player.state, m.id, (w.gt - m.tStart));
       m.phase = 'back'; m.t0 = w.gt; reversed(m);

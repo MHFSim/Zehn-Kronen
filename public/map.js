@@ -279,6 +279,16 @@ function buildRuin(dead) {
   if (!dead) { b.box(.5, .28, .34, .1, 0, .3, [120, 84, 52]); b.box(.52, .05, .36, .1, .28, .3, GOLD); }
   return { geo: b.build(), flags: [], h: 1.5 };
 }
+const NODE_K = ['farm', 'wood', 'stone', 'ore'];
+function buildDepleted() {
+  const b = new MB(), D = [112, 92, 66];
+  b.cyl(1.5, 1.7, .14, 14, 0, 0, 0, D, .2); b.cyl(1.0, 1.25, .1, 12, .1, .14, -.05, mul(D, .88), .25);
+  for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28 + .3; b.box(.07, .03, .9 + hash(i, 4) * .5, Math.cos(a) * .6, .24, Math.sin(a) * .6, mul(D, .55), a + 1.57); }
+  for (let i = 0; i < 6; i++) b.ico(.1 + hash(i, 6) * .08, -1.2 + hash(i, 1) * 2.4, .16, -1.1 + hash(i, 2) * 2.2, [124, 118, 104], .7);
+  b.cyl(.14, .2, .32, 7, -.7, .1, .5, [96, 70, 44]); b.cyl(.1, .14, .22, 7, .8, .1, -.6, [90, 66, 42]);
+  b.cone(.04, .22, 4, .3, .14, .9, [128, 118, 70]); b.cone(.04, .18, 4, -.2, .14, -.9, [124, 114, 68]); b.cone(.03, .16, 4, 1.1, .14, .4, [120, 112, 66]);
+  return { geo: b.build(), flags: [], h: .5 };
+}
 function buildOutpost() {
   const b = new MB(), flags = [], S = [158, 150, 134];
   b.cyl(1.05, 1.2, 1.7, 12, 0, -1.4, 0, mul(S, .72)); b.cyl(.62, .8, 2.5, 12, 0, .3, 0, S); b.cyl(.66, .66, .06, 12, 0, 1.4, 0, mul(S, 1.1)); b.cyl(.88, .8, .28, 12, 0, 2.7, 0, mul(S, 1.06)); b.cyl(.9, .9, .1, 12, 0, 2.98, 0, WOOD_D);
@@ -599,7 +609,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   /* ---------- Objekte ---------- */
   buildObjects(map) {
     this.models = {}; const M = this.models;
-    M.slot = buildSlot(); M.throne = buildThrone(); M.tower = buildTower(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true);
+    M.slot = buildSlot(); M.throne = buildThrone(); M.tower = buildTower(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true); M.depleted = buildDepleted();
     for (const k of ['farm', 'wood', 'stone', 'ore']) M[k] = { farm: buildFarm, wood: buildWood, stone: buildStone, ore: buildOre }[k]();
     this.unitGeos = {}; this.castleCache = {}; this.smokeList = [];
     this.flagGeo = new T.PlaneGeometry(.7, .42, 6, 2); this.flagGeo.translate(.35, 0, 0);
@@ -616,6 +626,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else if (o.k === 'ruin') { hd.alive = mesh(M.ruin); hd.deadM = mesh(M.ruinDone); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); }
       else {
         const mdl = M[o.k]; hd.main = mesh(mdl); g.add(hd.main);
+        if (NODE_K.includes(o.k)) { hd.emptyM = mesh(M.depleted); hd.emptyM.visible = false; g.add(hd.emptyM); }
         if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { const k = .95 + .05 * o.lv; g.scale.setScalar(k); }
         if (o.k === 'sanct') { hd.glow = new T.Mesh(new T.OctahedronGeometry(.42), this.glowMat); hd.glow.position.set(0, 2.9, 0); g.add(hd.glow); }
         if (o.k === 'tower') { this.attachParts(hd, M.tower); hd.smokeOffs = M.tower.smoke; }
@@ -672,7 +683,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const h = this.obj[id], o = h.o;
       if (o.k === 'camp') { const dead = (view.world.camps[id] || 0) > gt; h.isDead = dead; h.alive.visible = !dead; h.deadM.visible = dead; for (const f of h.flames) f.visible = !dead; h.smokeOn = !dead; }
       if (o.k === 'ruin') { const done = !!view.world.ruins[id]; h.isDead = done; h.alive.visible = !done; h.deadM.visible = done; }
-      if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { const max = 3000 * o.lv, left = view.world.nodes[id] == null ? max : view.world.nodes[id]; h.frac = left / max; const k = (.95 + .05 * o.lv) * (.62 + .38 * Math.min(1, h.frac * 2)); h.grp.scale.set(k, k, k); }
+      if (NODE_K.includes(o.k)) { const max = 3000 * o.lv, left = view.world.nodes[id] == null ? max : view.world.nodes[id], empty = left < 50; h.frac = left / max; h.empty = empty; h.main.visible = !empty; h.emptyM.visible = empty; if (o.k === 'wood') h.smokeOn = !empty; const k = (.95 + .05 * o.lv) * (empty ? 1 : (.62 + .38 * Math.min(1, h.frac * 2))); h.grp.scale.set(k, k, k); }
     }
     this.rebuildLabels(view);
     this.syncOutposts(view);
@@ -738,7 +749,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         else if (pl.protUntil > gt) txt = '🛡 ' + txt;
         if (h.castle) h.castle.visible = true;
       }
-      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = String(o.lv); col = RES_COL[o.k]; up = 2.0; }
+      else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = h.empty ? 'leer' : String(o.lv); col = h.empty ? 0x7a6a55 : RES_COL[o.k]; up = h.empty ? 1.2 : 2.0; }
       else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = 0x8a2b24; up = 2.4; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; up = 2.2; }
       else if (o.k === 'tower') { txt = 'Turm'; col = 0x5a6070; up = 19; }

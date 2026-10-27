@@ -1,7 +1,7 @@
 // Zehn Kronen – Spiel im Browser. Der Server ist maßgeblich; hier wird nur angezeigt
 // und zwischen zwei Server-Antworten mit denselben Regeln flüssig weitergerechnet.
 import {
-  RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
+  RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, techLv, techReq, techCost, techTime, techBlocker, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
@@ -138,11 +138,26 @@ function tap(sx, sy) { mapTap(sx, sy); }
 
 /* ---------- Oberfläche ---------- */
 const $ = id => document.getElementById(id);
+// Mengenwahl: Regler plus Zahlenfeld (und − / +). kind: 'pick' (Ausbildung) oder 'send' (Heer), mdn/pl = Aktionen der Knöpfe
+function qtyHTML(kind, u, val, min, max, mdn, pl) {
+  max = Math.max(min, max); val = Math.max(min, Math.min(max, val));
+  return `<div class="qty"><div class="stepper"><button type="button" data-act="${mdn}" data-u="${u}" aria-label="Weniger">−</button><input class="qn" type="number" inputmode="numeric" min="${min}" max="${max}" value="${val}" data-q="${kind}" data-u="${u}" aria-label="Anzahl"><button type="button" data-act="${pl}" data-u="${u}" aria-label="Mehr">+</button></div><input class="qr" type="range" min="${min}" max="${max}" value="${val}" data-q="${kind}" data-u="${u}" aria-label="Regler"></div>`;
+}
 let sheetSig = '', busy = false;
 const fmtK = n => { n = Math.floor(n); const a = Math.abs(n);
   if (a >= 1e6) return (n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: a >= 1e7 ? 0 : 1 }) + ' Mio';
   if (a >= 1e5) return Math.round(n / 1e3).toLocaleString('de-DE') + 'k';
   return fmtN(n); };
+document.addEventListener('input', e => {            // beim Ziehen des Reglers nur die Zahl nachführen
+  const t = e.target; if (!t.dataset || !t.dataset.q || t.type !== 'range') return;
+  const n = t.parentNode.querySelector('.qn'); if (n) n.value = t.value;
+});
+document.addEventListener('change', e => {           // beim Loslassen / Bestätigen übernehmen
+  const t = e.target; if (!t.dataset || !t.dataset.q) return;
+  const u = t.dataset.u, lo = Number(t.min), hi = Number(t.max), v = Math.max(lo, Math.min(hi, Math.floor(Number(t.value) || 0)));
+  if (t.dataset.q === 'send') { send[u] = v; renderSheet(); }
+  else { pick[u] = v; if (t.closest('#sidePanelInner')) renderPanel(true); else renderSheet(); }
+});
 function renderTop() {
   const c = cap(S);
   $('res').innerHTML = [...RES, 'gold'].map(r => {
@@ -192,7 +207,7 @@ function unitsHTML(id) {
     const d = U[u], ok = L >= d.req, n = pick[u] || 10, total = d.cost.map(c => c * n);
     return `<div class="unit">
       <div><div class="unit-name">${d.name}</div><div class="unit-stats ustats">${unitStatsHTML(u)}<span>⏱ ${fmtT(real(unitTime(S, u, id)))} je Einheit</span></div></div>
-      ${ok ? `<div class="stepper"><button type="button" data-act="minus" data-u="${u}" aria-label="Weniger">−</button><output>${n}</output><button type="button" data-act="plus" data-u="${u}" aria-label="Mehr">+</button></div>` : `<span class="note">ab ${b.name} Stufe ${d.req}</span>`}
+      ${ok ? `${qtyHTML('pick', u, n, 1, MAX_TRAIN_COUNT, 'minus', 'plus')}` : `<span class="note">ab ${b.name} Stufe ${d.req}</span>`}
       ${ok ? `<div class="row" style="grid-column:1"><span class="costs">${costHTML(total)}</span><button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && (S.train[id] || []).length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div>` : ''}
     </div>`;
   }).join('');
@@ -264,7 +279,7 @@ function setupSheet() {
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
     if (act === 'plus' || act === 'minus') {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
-      pick[u] = Math.max(5, Math.min(1000, act === 'plus' ? n + step : n - step)); renderSheet();
+      pick[u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); renderSheet();
     }
     if (act === 'heal') return command({ type: 'heal', unit: u, count: Math.min(S.wounded[u] || 0, Number(el.dataset.n) || 1e9) });
     if (act === 'logout') { await api('/api/logout', {}); location.href = '/'; }
@@ -648,7 +663,7 @@ function trainHTML() {
       const d = U[u], ok = L >= d.req, n = pick[u] || 10, total = d.cost.map(c => c * n), home = S.troops[u] || 0;
       return `<div class="ucard ${ok ? '' : 'locked'}"><div class="uhead"><div><b>${d.name}</b><small>${fmtN(home)} daheim</small></div><span class="utime">${fmtT(real(unitTime(S, u, tab)))} je Einheit</span></div>
         <div class="ustats">${unitStatsHTML(u)}</div>
-        ${ok ? `<div class="uact"><div class="stepper"><button type="button" data-act="minus" data-u="${u}" aria-label="Weniger">−</button><output>${n}</output><button type="button" data-act="plus" data-u="${u}" aria-label="Mehr">+</button></div>
+        ${ok ? `<div class="uact">${qtyHTML('pick', u, n, 1, MAX_TRAIN_COUNT, 'minus', 'plus')}
           <button class="btn" type="button" data-act="train" data-u="${u}" ${afford(S, total) && q.length < MAX_TRAIN_ORDERS ? '' : 'disabled'}>Ausbilden</button></div><div class="costs">${costHTML(total)}</div>` : `<p class="note">Ab ${b.name} Stufe ${d.req}</p>`}</div>`;
     }).join('');
     const list = q.map((o, i) => `<div class="train-row"><span>${o.count}× ${U[o.unit].name}</span>${i === 0 ? `<div class="prog"><i data-tp style="width:${(1 - o.left / o.per) * 100}%"></i></div><span class="time" data-tt>${fmtT(real(o.left + (o.count - 1) * o.per))}</span><button class="spd" type="button" data-speed="train:${tab}" aria-label="Beschleunigen">⚡</button>` : '<span class="time">wartet</span>'}</div>`).join('');
@@ -696,7 +711,7 @@ function setupPanel() {
     if (act === 'ttab') { trainTab = d.t; return go(); }
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
     if (act === 'train') return void command({ type: 'train', id: trainBuilding(), unit: d.u, count: pick[d.u] || 10 });
-    if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(5, Math.min(1000, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
+    if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }
@@ -866,13 +881,29 @@ function mapTap(sx, sy) {
 function selectMap(hit, keepSend) {
   placing = false; 
   sel = null; msel = hit; wm.select(hit);
-  if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; }
+  if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; autoSend(hit); }
   document.body.classList.add('sheet-open');
   if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; revealMap(o.x + .5, o.y + .5); }
   else if (hit.type === 'op') { const o = (view.world.outposts || []).find(x => x.id === hit.id); if (o) revealMap(o.x + .5, o.y + .5); }
   else if (hit.type === 'site') revealMap(hit.x + .5, hit.y + .5);
   else { const m = view.world.marches.find(x => x.id === hit.id); if (m) { const p = marchPos(m, gtNow()); revealMap(p.x, p.y); } }
   renderSheet();
+}
+// Bei Ressourcenfeldern wird die Truppenzahl so vorgewählt, dass das Feld damit geleert werden kann (mehr geht immer)
+function autoSend(hit) {
+  const o = hit.type === 'obj' ? wm.map.byId[hit.id] : null;
+  if (!o || !['farm', 'wood', 'stone', 'ore'].includes(o.k)) return;
+  const left = view.world.nodes[o.id] == null ? NODE_MAX(o.lv) : view.world.nodes[o.id];
+  if (left < 50) return;
+  const us = Object.keys(S.troops).filter(u => S.troops[u] > 0).sort((a, b) => U[b].c - U[a].c), pick_ = {};
+  let cap = 0;
+  for (const u of us) {
+    if (cap >= left) break;
+    const per = capacityOf({ [u]: 1000 }, S) / 1000; if (per <= 0) continue;
+    const n = Math.min(S.troops[u], Math.ceil((left - cap) / per));
+    pick_[u] = n; cap += n * per;
+  }
+  if (Object.keys(pick_).length) send = pick_;
 }
 function mapSignature() {
   const w = view.world, id = msel.id;
@@ -889,7 +920,7 @@ function pickerHTML() {
   const us = Object.keys(U).filter(u => S.troops[u] > 0);
   if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
   return `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => `<div class="unit"><div><div class="unit-name">${U[u].name}</div><div class="unit-stats">daheim ${fmtN(S.troops[u])} · trägt ${U[u].c}</div></div>
-    <div class="stepper"><button type="button" data-act="sminus" data-u="${u}" aria-label="Weniger">−</button><output>${fmtN(send[u] || 0)}</output><button type="button" data-act="splus" data-u="${u}" aria-label="Mehr">+</button></div></div>`).join('')}</div>`;
+    ${qtyHTML('send', u, send[u] || 0, 0, S.troops[u], 'sminus', 'splus')}</div>`).join('')}</div>`;
 }
 
 /* ---------- Revier: Bauplatz und Außenposten (gehören dem Bündnis) ---------- */
