@@ -226,18 +226,28 @@ function buildSanct() {
   return { geo: b.build(), flags: [], h: 3, glow: true, parts };
 }
 function buildFarm(lv) {
-  const b = new MB(), cols = [[214, 178, 64], [196, 160, 56], [138, 160, 62]], parts = [];
-  [[-1.1, -.9, 1.7, 1.2], [.7, -1.1, 1.5, 1.1], [-.9, .6, 1.7, 1.1]].forEach(([x, z, w, d], k) => {
-    b.box(w, .06, d, x, 0, z, mul(cols[k], .6));
-    for (let i = 0; i < 8; i++) { b.box(w * .08, .09, d * .86, x - w / 2 + w * (i + .5) / 8, .05, z, mul(cols[k], .95 + (i % 2) * .25)); if (k < 2) for (let j = 0; j < 3; j++) b.cone(.03, .12, 4, x - w / 2 + w * (i + .5) / 8, .12, z - d * .3 + j * d * .3, [230, 196, 90]); }
-    for (let i = 0; i <= 4; i++) b.box(.04, .22, .04, x - w / 2 + w * i / 4, 0, z + d / 2 + .04, WOOD_D);      // Zaun
-    b.box(w, .04, .03, x, .16, z + d / 2 + .04, WOOD);
-  });
-  b.box(1.05, .8, .85, 1.0, 0, .75, WOOD); b.gable(1.35, 1.1, .6, 1.0, .8, .75, [150, 70, 50], Math.PI / 2); b.box(.3, .5, .05, 1.0, 0, 1.19, WOOD_D); b.box(.55, .3, .05, 1.0, .5, 1.19, WOOD_D);
-  b.cyl(.28, .3, .8, 10, 1.9, 0, -.2, [196, 190, 176]); b.cone(.34, .35, 10, 1.9, .8, -.2, [150, 70, 50]);                      // Silo
-  b.cyl(.2, .2, .26, 8, .0, 0, 1.4, [204, 170, 72]); b.cyl(.2, .2, .26, 8, -.5, 0, 1.5, [204, 170, 72]); b.cone(.26, .45, 8, -1.4, 0, 1.55, [214, 180, 80]);
-  b.cyl(.025, .025, .6, 4, .5, 0, 1.6, WOOD_D); b.box(.4, .04, .04, .5, .45, 1.6, WOOD_D); b.sph(.07, .5, .68, 1.6, [190, 160, 90], 6); b.cone(.1, .12, 6, .5, .72, 1.6, [60, 50, 40]);   // Vogelscheuche
-  return { geo: b.build(), flags: [], h: 1.6, parts, smoke: [] };
+  // Nur Feld: reifes Getreide in Reihen, Heuballen, Garben und eine Vogelscheuche, ohne Gebäude
+  const b = new MB(), parts = [], SOIL = [96, 70, 44], GOLD2 = [[226, 190, 70], [214, 176, 58], [236, 202, 88], [200, 164, 52]];
+  const field = (x, z, w, d, rows, ripe) => {
+    b.box(w, .06, d, x, 0, z, SOIL);
+    for (let r = 0; r < rows; r++) {
+      const rz = z - d / 2 + d * (r + .5) / rows, n = Math.round(w / .26);
+      b.box(w, .03, d / rows * .28, x, .06, rz, mul(SOIL, .78));          // Furche
+      for (let t = 0; t < n; t++) {
+        const tx = x - w / 2 + w * (t + .5) / n, hh = .42 + hash(t, r, 4) * .22, c = ripe ? GOLD2[(t + r) % 4] : [122, 164, 62], lean = (hash(t, r, 5) - .5) * .25;
+        for (let k = -1; k <= 1; k++) { b.box(.025, hh, .025, tx + k * .045, .06, rz + (hash(t, k, r) - .5) * .06, ripe ? [188, 156, 70] : [96, 140, 54], 0, lean, lean * .6); b.cone(.04, ripe ? .17 : .1, 5, tx + k * .045 + lean * hh * .5, .06 + hh - .02, rz, c); }
+      }
+    }
+  };
+  field(-.9, -.8, 2.5, 1.6, 6, true); field(1.1, -.9, 1.5, 1.4, 5, false);
+  // Heuballen: zwei unten, einer oben
+  const bale = (x, y, z, ry) => { b.push(new T.CylinderGeometry(.3, .3, .55, 10), [214, 180, 84], x, y, z, ry, 1, 1, 1, 0, Math.PI / 2, .18); for (const o of [-.14, .14]) b.push(new T.CylinderGeometry(.31, .31, .04, 10), [150, 112, 56], x + Math.cos(ry) * o, y, z - Math.sin(ry) * o, ry, 1, 1, 1, 0, Math.PI / 2, .05); };
+  bale(-.5, .3, 1.15, .15); bale(.2, .3, 1.3, -.2); bale(-.15, .85, 1.2, .1);
+  // Garben
+  for (const [x, z] of [[1.2, .8], [1.6, .55], [1.5, 1.2]]) { b.cone(.2, .62, 7, x, .0, z, [218, 182, 78]); b.cyl(.2, .2, .04, 7, x, .22, z, [140, 98, 52], .05); }
+  // Vogelscheuche
+  b.cyl(.025, .025, .85, 4, -1.9, 0, .5, WOOD_D); b.box(.55, .04, .04, -1.9, .6, .5, WOOD_D); b.sph(.09, -1.9, .92, .5, [200, 170, 100], 6); b.cone(.13, .16, 6, -1.9, .96, .5, [70, 54, 40]); b.box(.2, .3, .08, -1.9, .3, .5, [120, 84, 60]);
+  return { geo: b.build(), flags: [], h: 1.0, parts, smoke: [] };
 }
 function buildWood(lv) {
   // Nur Holz: zwei geschichtete Stapel und ein paar einzelne Stämme, ohne Gebäude
