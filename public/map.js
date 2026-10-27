@@ -6,6 +6,7 @@ import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoad
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
 import { ROCKS } from '/public/rockdata.js';
 import { VIKING } from '/public/vikingdata.js';
+import { RIDER } from '/public/riderdata.js';
 import { rectsOf, roadEdgesOf, dockPad, touches, towersOf } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
@@ -370,6 +371,24 @@ function vikingParts(body, la, lb, tab) {
     for (const q of v) { b.p.push(q[0], q[1], q[2]); b.n.push(n[0], n[1], n[2]); b.c.push(cr, cg, cb); }
   }
 }
+// Reiter entpacken (einmal)
+const RID = (() => { const u8 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0)), pb = u8(RIDER.p); return { n: RIDER.n, P: new Int16Array(pb.buffer, 0, pb.length / 2), C: u8(RIDER.c) }; })();
+const RIDER_LOOK = {
+  leicht: [[124, 88, 58], [120, 108, 96], [150, 156, 166], null, [60, 44, 34], null],
+  schwer: [[62, 58, 58], [176, 182, 194], [190, 196, 208], null, [36, 32, 32], null]
+};
+function riderParts(body, type, tab) {
+  const COLS = RIDER_LOOK[type].map(c => c || tab);
+  for (let t = 0; t < RID.n; t++) {
+    const col = COLS[RID.C[t]], v = [];
+    for (let q = 0; q < 3; q++) { const i = (t * 3 + q) * 3; v.push([RID.P[i] / 1000, RID.P[i + 1] / 1000, RID.P[i + 2] / 1000]); }
+    const a = [v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], c = [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]];
+    let n = [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2], a[0] * c[1] - a[1] * c[0]];
+    const l = Math.hypot(n[0], n[1], n[2]) || 1; n = [n[0] / l, n[1] / l, n[2] / l];
+    const f = 1 + (hash(body.tri++, 9, 3) - .5) * .1, cr = LIN(Math.min(255, col[0] * f)), cg = LIN(Math.min(255, col[1] * f)), cb = LIN(Math.min(255, col[2] * f));
+    for (const q of v) { body.p.push(q[0], q[1], q[2]); body.n.push(n[0], n[1], n[2]); body.c.push(cr, cg, cb); }
+  }
+}
 function buildUnit(type, col) {
   const body = new MB(), la = new MB(), lb = new MB(), SK = [226, 190, 150], tab = col, dk = mul(col, .65);
   const rider = (b, y, scale = 1, plate = false, lance = true) => {
@@ -398,10 +417,16 @@ function buildUnit(type, col) {
     horse([120, 84, 56]); body.box(.5, .12, .8, 0, .22, -.75, [140, 100, 60]); body.box(.04, .22, .8, -.25, .34, -.75, WOOD_D); body.box(.04, .22, .8, .25, .34, -.75, WOOD_D);
     for (const x of [-.3, .3]) body.push(new T.CylinderGeometry(.2, .2, .05, 10), WOOD_D, x, .2, -.75, 0, 1, 1, 1, 0, Math.PI / 2);
     body.box(.44, .26, .6, 0, .46, -.75, [214, 178, 90]); body.box(.04, .04, .5, 0, .34, -.3, WOOD_D);
-  } else if (type === 'leicht') {
-    horse([150, 108, 66]); rider(body, .5, 1, false, true);
-  } else {   // schwer
-    horse([66, 60, 58], tab); rider(body, .56, 1.15, true, true); body.box(.2, .04, .5, 0, .62, 0, dk);
+  } else if (type === 'leicht' || type === 'schwer') {
+    riderParts(body, type, tab);
+    if (type === 'leicht') {   // Lanzenreiter: lange Lanze mit Wimpel
+      const th = 1.15, d = [0, Math.cos(th), Math.sin(th)], hx = -.13, hy = .6, hz = .08;
+      body.push(new T.CylinderGeometry(.012, .016, 1.4, 5), WOOD_D, hx + d[0] * .25, hy + d[1] * .25, hz + d[2] * .25, 0, 1, 1, 1, th, 0);
+      body.push(new T.ConeGeometry(.03, .14, 5), IRON, hx + d[0] * .99, hy + d[1] * .99, hz + d[2] * .99, 0, 1, 1, 1, th, 0);
+      body.push(new T.BoxGeometry(.01, .1, .2), tab, hx + d[0] * .85, hy + d[1] * .85 - .04, hz + d[2] * .85 - .1, 0, 1, 1, 1, th, 0);
+    } else {   // Panzerreiter: Kurzschwert
+      body.box(.02, .4, .05, -.16, .46, .06, [210, 214, 220], 0, .3); body.box(.02, .05, .12, -.16, .6, .05, GOLD);
+    }
   }
   const fin = b => { const g = b.build(); return g; };
   return { body: fin(body), la: la.p.length ? fin(la) : null, lb: lb.p.length ? fin(lb) : null, hip: VIK_FOOT.includes(type) ? VIK.hip : type === 'leicht' || type === 'schwer' || type === 'ochsen' ? .3 : .12, cav: type === 'leicht' || type === 'schwer' || type === 'ochsen' };
@@ -873,7 +898,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         for (let i = 0; i < cnt; i++) {
           const g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
-          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav });
+          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.15 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav });
         }
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
