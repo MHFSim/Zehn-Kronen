@@ -26,32 +26,25 @@ export const opReady = (o, gt) => gt >= o.done;
 
 /* ---------- Vierecke ---------- */
 // cities: [{ pid, x, y, rathaus, group }], ops: [{ id, owner (Anführer, für die Farbe), x, y, done, group }]. Rein rechnerisch, läuft auch im Browser.
-export function rectsOf(cities, ops, gt) {
+export const TOWER_PAD = 4;                                // Andockzone um Türme und Thron: weißes Viereck 9×9
+export function rectsOf(towers, ops, gt) {
   const out = [];
-  for (const c of cities) { const r = cityR(c.rathaus); out.push({ k: 'city', id: 'c' + c.pid, owner: c.pid, group: c.group, x: c.x, y: c.y, r, x0: c.x - r, y0: c.y - r, x1: c.x + r, y1: c.y + r, ready: true }); }
   for (const o of ops) out.push({ k: 'op', id: o.id, owner: o.owner, group: o.group, x: o.x, y: o.y, r: OP_R, x0: o.x - OP_R, y0: o.y - OP_R, x1: o.x + OP_R, y1: o.y + OP_R, ready: gt >= o.done, built: gt >= o.done, done: o.done });
-  // Verbindung: Nur Außenposten, die über eine Kette sich berührender Vierecke bis zur Burg (bzw. zum ersten Außenposten) reichen, sind aktiv.
-  // Wird ein Außenposten in der Mitte zerstört, sind alle dahinter inaktiv (weiß), bis das Bündnis die Lücke wieder schließt.
-  const drop = new Set();
+  // Die Kette beginnt an einem Turm: Aktiv sind nur Außenposten, die über sich berührende Vierecke bis zu einem Turm reichen.
+  // Wird einer in der Mitte zerstört, sind alle dahinter inaktiv (weiß), bis das Bündnis die Lücke wieder schließt.
   for (const g of new Set(ops.map(o => o.group))) {
-    const mem = out.filter(r => r.group === g), built = mem.filter(r => r.k === 'op' && r.built);
-    if (!built.length) continue;
-    let roots = mem.filter(r => r.k === 'city');
-    if (!roots.length) roots = [built.slice().sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)))[0]];
-    const act = new Set(roots), q = [...roots];
+    const built = out.filter(r => r.group === g && r.built);
+    const act = new Set(built.filter(r => towers.some(t => touches([r], g, t.x, t.y, TOWER_PAD)))), q = [...act];
     while (q.length) { const r = q.pop(); for (const o of built) if (!act.has(o) && overlaps(r, o, 1)) { act.add(o); q.push(o); } }
-    let off = false;
-    for (const o of built) if (!act.has(o)) { o.ready = false; o.off = true; off = true; }
-    // Die Burg zählt nur noch, solange das Revier nicht vollständig aus Außenposten besteht
-    if (!off) for (const r of mem) if (r.k === 'city') drop.add(r);
+    for (const o of built) if (!act.has(o)) { o.ready = false; o.off = true; }
   }
-  return out.filter(r => !drop.has(r));
+  return out;
 }
 export const overlaps = (a, b, pad = 0) => a.x0 - pad <= b.x1 && b.x0 - pad <= a.x1 && a.y0 - pad <= b.y1 && b.y0 - pad <= a.y1;
 // Berührt ein fertiges Viereck der Gruppe das Feld (tx, ty)? (auch schräg angrenzend)
 export const touches = (rects, group, tx, ty, pad = 1) => rects.some(r => r.ready && r.group === group && tx >= r.x0 - pad && tx <= r.x1 + pad && ty >= r.y0 - pad && ty <= r.y1 + pad);
-// Andockzone eines Ortes: beim Thron ein weißes Viereck (9×9), sonst 1 Feld Rand. Ein Viereck der Gruppe muss sie berühren.
-export const dockPad = o => o.k === 'throne' ? 4 : 1;
+// Andockzone eines Ortes: bei Thron und Turm ein weißes Viereck (9×9), sonst 1 Feld Rand. Ein Viereck der Gruppe muss sie berühren.
+export const dockPad = o => o.k === 'throne' || o.k === 'tower' ? TOWER_PAD : 1;
 export const touchesObj = (rects, group, o) => touches(rects, group, o.x, o.y, dockPad(o));
 // Liegt das Feld mitten in einem fertigen Viereck der Gruppe?
 export const inside = (rects, group, tx, ty) => rects.some(r => r.ready && r.group === group && tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1);
@@ -62,23 +55,23 @@ const leaderOf = al => al ? al.leader : 0;
 export const opView = (w, o) => ({ ...o, group: 'a' + o.al, owner: leaderOf(w.alliances[o.al]) });
 // Städte und Außenposten einer laufenden Partie
 export function territory(match, players, gt) {
-  const w = match.world, cities = [], ops = [];
-  // Die Burg des Gründers ist die Wurzel des Reviers; rectsOf blendet sie aus, sobald Außenposten sie ersetzen
-  for (const p of players) if (!p.state.out && p.state.slot >= 0 && (al => al && al.leader === p.id)(allianceOf(w, p.id))) cities.push({ pid: p.id, x: p.state.pos[0], y: p.state.pos[1], rathaus: p.state.lv.rathaus, group: groupOf(w, p.id) });
+  const w = match.world, ops = [];
   for (const id in (w.outposts || {})) { const o = w.outposts[id]; if (w.alliances[o.al]) ops.push(opView(w, o)); }
-  return rectsOf(cities, ops, gt);
+  return rectsOf(towersOf(mapOf(match)), ops, gt);
 }
+export const towersOf = map => map.objects.filter(o => o.k === 'tower');
 const BASE_OK = (map, x, y) => Number.isInteger(x) && Number.isInteger(y) && x >= 3 && y >= 3 && x <= N - 4 && y <= N - 4 && map.pass[y * N + x];
 
-/* ---------- Wege: von der Burg des Gründers zum ersten Außenposten, jeder weitere zum nächsten bestehenden Punkt ---------- */
-export function roadEdgesOf(alliances, posOf, ops, gt) {
+/* ---------- Wege: vom Turm zum ersten Außenposten, jeder weitere zum nächsten bestehenden Punkt ---------- */
+export function roadEdgesOf(alliances, towers, ops, gt) {
   const edges = [];
   for (const al of alliances) {
-    const pos = posOf(al.leader); if (!pos) continue;
     const mine = ops.filter(o => o.al === al.id && gt >= o.done).sort((a, b) => a.done - b.done || String(a.id).localeCompare(String(b.id)));
-    const nodes = [[pos[0], pos[1]]];
+    const nodes = [];
     for (const o of mine) {
-      let best = nodes[0], bd = 1e9; for (const q of nodes) { const d = Math.hypot(q[0] - o.x, q[1] - o.y); if (d < bd) { bd = d; best = q; } }
+      const src = nodes.length ? nodes : towers.map(t => [t.x, t.y]);
+      let best = null, bd = 1e9; for (const q of src) { const d = Math.hypot(q[0] - o.x, q[1] - o.y); if (d < bd) { bd = d; best = q; } }
+      if (!best) continue;
       edges.push([best[0], best[1], o.x, o.y]); nodes.push([o.x, o.y]);
     }
   }
@@ -87,7 +80,7 @@ export function roadEdgesOf(alliances, posOf, ops, gt) {
 // Server: Wege der Karte auf den Stand der Partie bringen (vor jeder Wegplanung aufrufen)
 export function refreshRoads(match, players, gt) {
   const w = match.world, map = mapOf(match);
-  const edges = roadEdgesOf(Object.values(w.alliances || {}), id => { const p = byId(players, id); return p && p.state.pos; }, Object.values(w.outposts || {}), gt);
+  const edges = roadEdgesOf(Object.values(w.alliances || {}), towersOf(map), Object.values(w.outposts || {}), gt);
   const sig = JSON.stringify(edges); if (map._roadSig === sig) return;
   map._roadSig = sig; setMapRoads(map, roadPaths(map, edges));
 }
@@ -106,7 +99,12 @@ export function checkSite(match, players, me, x, y, gt) {
     if (r.group !== group && overlaps(nr, r)) return 'Das Viereck würde das Revier von ' + groupLabel(w, players, r.group) + ' überlappen.';
     if (r.k === 'op' && Math.abs(r.x - x) <= 1 && Math.abs(r.y - y) <= 1) return 'Hier steht schon ein Außenposten.';
   }
-  if (!rects.some(r => r.ready && r.group === group && overlaps(nr, r, 1))) return 'Ein Außenposten muss das Revier deines Bündnisses berühren.';
+  for (const p of players) if (p.id !== me.id && !p.state.out && p.state.slot >= 0 && !al.members.includes(p.id)) { const cr = cityR(p.state.lv.rathaus); if (overlaps(nr, { x0: p.state.pos[0] - cr, y0: p.state.pos[1] - cr, x1: p.state.pos[0] + cr, y1: p.state.pos[1] + cr })) return 'Das Viereck würde die Burg von ' + p.name + ' überlappen.'; }
+  const mineActive = rects.some(r => r.ready && r.group === group);
+  if (!mineActive) {
+    const zone = t => ({ x0: t.x - TOWER_PAD, y0: t.y - TOWER_PAD, x1: t.x + TOWER_PAD, y1: t.y + TOWER_PAD });
+    if (!towersOf(map).some(t => overlaps(nr, zone(t)))) return 'Der erste Außenposten beginnt an einem der Türme in den Ecken der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
+  } else if (!rects.some(r => r.ready && r.group === group && overlaps(nr, r, 1))) return 'Ein Außenposten muss das Revier deines Bündnisses berühren.';
   return '';
 }
 export function checkBuild(match, players, me, x, y, troops, gt) {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command, viewFor } from '../shared/world.js';
 import { newWorld, mapOf, DAY } from '../shared/core.js';
 import { NODE_KINDS } from '../shared/mapgen.js';
-import { checkSite, checkTeleport, territory, touches, inside, cityR, OP_R, OP_BUILD, OP_COST, storeOf } from '../shared/outpost.js';
+import { checkSite, checkTeleport, territory, touches, inside, cityR, towersOf, OP_R, OP_BUILD, OP_COST, storeOf } from '../shared/outpost.js';
 
 const T0 = 1_000_000_000_000;
 const match = { id: 1, name: 'T', speed: 100, seed: 4242, world: newWorld(T0) }, players = [];
@@ -28,12 +28,15 @@ assert.equal(run(a, { type: 'allyCreate', name: 'Rote', tag: 'ROT' }), '');
 assert.equal(run(a, { type: 'allyInvite', name: 'P2' }), ''); assert.equal(run(b, { type: 'allyAnswer', id: viewFor(match, players, b, clock).invites[0].id, accept: true }), '');
 assert.equal(run(c, { type: 'allyCreate', name: 'Blaue', tag: 'BLA' }), '');
 const al = w.alliances[1];
-assert.ok(touches(territory(match, players, 0), 'a1', cx + R + 1, cy), 'Burg-Viereck samt Rand');
-const site = findSite(a, [cx, cy], [R + OP_R, R + OP_R - 2, R + 2]); assert.ok(site, 'Bauplatz nahe der Burg');
-assert.match(checkSite(match, players, a, ...toward(cx, cy, 45), gt()), /berühren|Wasser|Zu nah/);
+assert.equal(territory(match, players, 0).length, 0, 'die Burg ist kein Revier mehr');
+// Der erste Außenposten beginnt an einem Turm in der Ecke – nicht an der Burg
+const tw = towersOf(map).sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy))[0]; assert.equal(towersOf(map).length, 4, 'vier Türme');
+{ const near = findSite(a, [cx, cy], [R + OP_R, R + 2, 12, 20]); if (near) assert.match(checkSite(match, players, a, near[0], near[1], gt()), /Turm/); }
+let site = null; for (let dx = -2 * OP_R; dx <= 2 * OP_R && !site; dx += 2) for (let dy = -2 * OP_R; dy <= 2 * OP_R && !site; dy += 2) if (!checkSite(match, players, a, tw.x + dx, tw.y + dy, gt())) site = [tw.x + dx, tw.y + dy];
+assert.ok(site, 'Bauplatz am Turm');
+assert.match(checkSite(match, players, a, ...toward(cx, cy, 45), gt()), /Turm|Wasser|Zu nah/);
 
 assert.match(checkSite(match, players, b, site[0], site[1], gt()), /Gründer/, 'den ersten baut der Gründer');
-assert.equal(territory(match, players, 0).filter(r => r.k === 'city' && r.group === 'a1').length, 1, 'nur die Burg des Gründers');
 assert.equal(run(b, { type: 'allyColor', color: '#112233' }), 'Nur der Anführer kann die Farbe wählen.');
 assert.equal(run(a, { type: 'allyColor', color: '#112233' }), ''); assert.equal(al.color, '#112233');
 // Bündnislager: ohne Rohstoffe geht nichts, Einzahlen füllt es
@@ -48,17 +51,15 @@ assert.match(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troo
 // Bauen aus dem Lager
 assert.equal(run(a, { type: 'march', mode: 'build', x: site[0], y: site[1], troops: { speer: 60 } }), '');
 assert.equal(storeOf(al).wood, 2000 - OP_COST[1]);
-assert.equal(territory(match, players, gt()).filter(r => r.k === 'city' && r.group === 'a1').length, 1, 'Burg-Viereck bleibt, bis der Posten fertig ist');
 adv(DAY);
 const op = Object.values(w.outposts)[0]; assert.ok(op); assert.equal(op.al, 1); assert.equal(op.garr[a.id].speer, 60);
 adv(OP_BUILD); assert.ok(territory(match, players, gt()).some(r => r.id === op.id && r.ready));
 assert.equal(viewFor(match, players, c, clock).world.outposts[0].garr, undefined, 'Besatzung ist geheim');
 assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].speer, 60);
 
-assert.equal(territory(match, players, gt()).filter(r => r.k === 'city' && r.group === 'a1').length, 0, 'danach entfällt das Burg-Viereck');
 // Auf Wegen läuft man 30 % schneller
 { const { planFrom } = await import('../shared/core.js'), { ROAD_SPEED } = await import('../shared/mapgen.js');
-  const from = [a.state.pos[0], a.state.pos[1]], saved = map.roads;
+  const from = [tw.x, tw.y], saved = map.roads;
   assert.ok(map.roads && map.roads.some(Boolean), 'Weg zum Außenposten existiert');
   const withRoad = planFrom(map, from, op.x, op.y, { speer: 10 }, a.state); map.roads = null;
   const without = planFrom(map, from, op.x, op.y, { speer: 10 }, a.state); map.roads = saved;
@@ -120,8 +121,8 @@ adv(5 * DAY);
 assert.match(run(c, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 100 } }), /angrenzt/);
 const sideX = target.x + 2 * OP_R + 1;
 { // Kette von der Burg des Bündnisleiters bis neben das Ziel (inaktive, getrennte Außenposten könnten nicht angreifen)
-  const lead = players.find(p => p.id === cAl.leader), sp = lead.state.pos, n = Math.ceil(Math.hypot(sideX - sp[0], target.y - sp[1]) / 9);
-  for (let i = 1; i <= n; i++) { const id = i === n ? 'opC' : 'opC' + i; w.outposts[id] = { id, al: cAl.id, by: c.id, x: Math.round(sp[0] + (sideX - sp[0]) * i / n), y: Math.round(sp[1] + (target.y - sp[1]) * i / n), done: 0, garr: {} }; } }
+  const sp = [towersOf(map)[1].x, towersOf(map)[1].y], n = Math.ceil(Math.hypot(sideX - sp[0], target.y - sp[1]) / 9);
+  for (let i = 0; i <= n; i++) { const id = i === n ? 'opC' : 'opC' + i; w.outposts[id] = { id, al: cAl.id, by: c.id, x: Math.round(sp[0] + (sideX - sp[0]) * i / n), y: Math.round(sp[1] + (target.y - sp[1]) * i / n), done: 0, garr: {} }; } }
 assert.equal(run(d, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 100 } }), 'Nur Bündnisse kämpfen um Außenposten. Gründe eines oder tritt einem bei.');
 assert.equal(run(c, { type: 'march', target: target.id, mode: 'raid', troops: { schwert: 800, speer: 400 } }), '');
 adv(2 * DAY);

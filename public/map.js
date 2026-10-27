@@ -4,7 +4,7 @@
 // Die Kamera schwebt schräg über dem Boden: ziehen = verschieben, zwei Finger = zoomen und drehen.
 import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoads } from '/shared/mapgen.js';
 import { PLAYER_COLORS, marchPos, cellXY } from '/shared/core.js';
-import { rectsOf, roadEdgesOf, dockPad, touches } from '/shared/outpost.js';
+import { rectsOf, roadEdgesOf, dockPad, touches, towersOf } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
 const CH = 20;                // Blockgröße (Felder)
@@ -188,6 +188,19 @@ function buildThrone() {
   const geo = b.build(); geo.scale(1, 4, 1);                                                          // Thron 4× so hoch wie ursprünglich
   return { geo, flags: [], h: 25, parts, smoke: [[-1.4, 7.2, 2.2], [1.4, 7.2, 2.2], [0, 24.6, 0]] };
 }
+function buildTower() {
+  const b = new MB(), S = [176, 170, 156], D = mul(S, .78), parts = [];
+  b.cyl(3.0, 3.4, .9, 18, 0, -.3, 0, D); b.cyl(2.5, 2.9, .5, 18, 0, .6, 0, S);                         // Sockel
+  b.cyl(1.55, 2.0, 12, 16, 0, 1.1, 0, S); b.cyl(1.35, 1.55, 12, 16, 0, 13.1, 0, mul(S, 1.04));      // zwei Schaftstücke
+  b.cyl(1.2, 1.35, 12, 16, 0, 25.1, 0, mul(S, 1.08));
+  for (const y of [6, 13, 20, 27]) b.cyl(1.7 - y * .016, 1.7 - y * .016, .3, 16, 0, y, 0, D);        // Bänder
+  for (const y of [4, 10, 16, 22, 30]) for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + y; b.box(.14, .6, .1, Math.cos(a) * 1.45, y, Math.sin(a) * 1.45, [40, 36, 34], -a); }   // Schießscharten
+  b.cyl(2.4, 1.3, 1.1, 16, 0, 37.1, 0, mul(S, .9)); b.cyl(2.6, 2.6, .35, 16, 0, 38.0, 0, GOLD);   // Plattform
+  for (let i = 0; i < 10; i++) { const a = i / 10 * 6.2832; b.box(.7, .7, .45, Math.cos(a) * 2.35, 38.35, Math.sin(a) * 2.35, S, -a); }   // Zinnen
+  b.cyl(.55, .3, .34, 12, 0, 38.3, 0, IRON); b.cyl(.62, .55, .1, 12, 0, 38.6, 0, GOLD);
+  parts.push({ k: 'flame', pos: [0, 39.4, 0], s: 2.2 });
+  return { geo: b.build(), flags: [], h: 40, parts, smoke: [[0, 40.5, 0]] };
+}
 function buildSanct() {
   const b = new MB(), parts = [];
   b.cyl(2.0, 2.3, 1.0, 16, 0, -.8, 0, [150, 146, 134]); b.cyl(1.9, 2.0, .2, 16, 0, 0, 0, [214, 210, 196]); b.cyl(1.4, 1.5, .2, 16, 0, .2, 0, [226, 222, 208]); b.cyl(.6, .75, .35, 12, 0, .4, 0, [200, 200, 190]);
@@ -364,7 +377,7 @@ void main(){
 }`;
 
 const SKIRT = { farm: [[132, 108, 66], 2.2], wood: [[104, 84, 54], 1.9], stone: [[140, 134, 120], 2.0], ore: [[96, 90, 82], 2.1], camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
-const KIND_R = { start: 2.8, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, ore: 1.7, camp: 1.9, ruin: 1.7 };
+const KIND_R = { start: 2.8, tower: 2.4, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, ore: 1.7, camp: 1.9, ruin: 1.7 };
 
 export class WorldMap {
   constructor(THREE, host) {
@@ -434,7 +447,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), nor = new Float32Array(n * 3);
     const at = (x, y) => H[clamp(y, 0, G - 1) * G + clamp(x, 0, G - 1)];
     const C = { sand: [220, 202, 148], g1: [104, 152, 64], g2: [78, 126, 52], olive: [136, 142, 72], rock: [132, 122, 106], rock2: [98, 92, 86], snow: [240, 244, 250], forest: [44, 86, 44], dirt: [156, 128, 90], dsand: [150, 150, 120], dwater: [38, 90, 112] };
-    const pads = { start: [[118, 104, 78], 2.3, .6], camp: [[112, 94, 68], 2.2, .7], ruin: [[112, 106, 90], 1.9, .55], sanct: [[205, 200, 184], 2.4, .8], throne: [[190, 180, 150], 3.4, .8],
+    const pads = { start: [[118, 104, 78], 2.3, .6], camp: [[112, 94, 68], 2.2, .7], ruin: [[112, 106, 90], 1.9, .55], sanct: [[205, 200, 184], 2.4, .8], throne: [[190, 180, 150], 3.4, .8], tower: [[170, 164, 148], 3.0, .8],
       farm: [[150, 126, 70], 1.9, .5], wood: [[98, 82, 52], 1.7, .55], stone: [[150, 144, 130], 1.9, .6], ore: [[100, 92, 82], 2.1, .6] };
     const pre = new Float32Array(n * 3), nz3 = new Float32Array(n), ao = new Float32Array(n);
     this.tv = { pre, nz3, ao, col, C, pads, map };
@@ -512,7 +525,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   buildTrees(map) {
     const seed = map.seed, blocked = new Uint8Array(N * N);
     for (const o of map.objects) {
-      const r = o.k === 'throne' ? 4 : o.k === 'start' ? 5.5 : o.k === 'sanct' ? 3 : 1.9;
+      const r = o.k === 'throne' ? 4 : o.k === 'tower' ? 4 : o.k === 'start' ? 5.5 : o.k === 'sanct' ? 3 : 1.9;
       for (let y = Math.floor(o.y - r); y <= o.y + r; y++) for (let x = Math.floor(o.x - r); x <= o.x + r; x++) { if (x < 0 || y < 0 || x >= N || y >= N) continue; if (Math.hypot(x - o.x, y - o.y) <= r) blocked[y * N + x] = 1; }
     }
     const lists = {};   // "kind|chunk" -> [[x,y,s,rot,cell,variant]]
@@ -579,7 +592,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   /* ---------- Objekte ---------- */
   buildObjects(map) {
     this.models = {}; const M = this.models;
-    M.slot = buildSlot(); M.throne = buildThrone(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true);
+    M.slot = buildSlot(); M.throne = buildThrone(); M.tower = buildTower(); M.sanct = buildSanct(); M.outpost = buildOutpost(); M.campAlive = buildCamp(false); M.campDead = buildCamp(true); M.ruin = buildRuin(false); M.ruinDone = buildRuin(true);
     for (const k of ['farm', 'wood', 'stone', 'ore']) M[k] = { farm: buildFarm, wood: buildWood, stone: buildStone, ore: buildOre }[k]();
     this.unitGeos = {}; this.castleCache = {}; this.smokeList = [];
     this.flagGeo = new T.PlaneGeometry(.7, .42, 6, 2); this.flagGeo.translate(.35, 0, 0);
@@ -589,8 +602,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.mesh = mesh;
     for (const o of map.objects) {
       const hd = { o, grp: new T.Group(), flags: [], vis: true }; this.obj[o.id] = hd;
-      const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' ? 2.5 : o.k === 'start' ? 2 : 1.0);
-      g.position.set(o.x + .5, y, o.y + .5); g.rotation.y = ['start', 'throne', 'sanct'].includes(o.k) ? 0 : hash(o.x, o.y, 3) * .5 - .25;
+      const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' || o.k === 'tower' ? 2.5 : o.k === 'start' ? 2 : 1.0);
+      g.position.set(o.x + .5, y, o.y + .5); g.rotation.y = ['start', 'throne', 'sanct', 'tower'].includes(o.k) ? 0 : hash(o.x, o.y, 3) * .5 - .25;
       if (o.k === 'start') { hd.slot = mesh(M.slot); g.add(hd.slot); hd.castle = null; }
       else if (o.k === 'camp') { hd.alive = mesh(M.campAlive); hd.deadM = mesh(M.campDead); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); this.attachParts(hd, M.campAlive); hd.smokeOffs = M.campAlive.smoke; }
       else if (o.k === 'ruin') { hd.alive = mesh(M.ruin); hd.deadM = mesh(M.ruinDone); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); }
@@ -598,6 +611,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         const mdl = M[o.k]; hd.main = mesh(mdl); g.add(hd.main);
         if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { const k = .95 + .05 * o.lv; g.scale.setScalar(k); }
         if (o.k === 'sanct') { hd.glow = new T.Mesh(new T.OctahedronGeometry(.42), this.glowMat); hd.glow.position.set(0, 2.9, 0); g.add(hd.glow); }
+        if (o.k === 'tower') { this.attachParts(hd, M.tower); hd.smokeOffs = M.tower.smoke; }
         if (o.k === 'throne') { this.addFlags(hd, M.throne.flags, 0xe9c860); this.attachParts(hd, M.throne); hd.smokeOffs = M.throne.smoke; }
         if (o.k === 'wood') hd.smokeOffs = M.wood.smoke;
       }
@@ -666,7 +680,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     if (h.lab) { h.lab.el.style.display = 'none'; }
     this.terrDirty = true; this.dirtyLabels = true;
   }
-  roadEdges(view) { return roadEdgesOf(view.match.alliances || [], id => { const p = view.match.players.find(x => x.id === id); return p && p.pos; }, view.world.outposts || [], this.gtNow()); }
+  roadEdges(view) { return roadEdgesOf(view.match.alliances || [], towersOf(this.map), view.world.outposts || [], this.gtNow()); }
   setRoads(edges) {
     const map = this.map, mask = new Float32Array(G * G), paths = roadPaths(map, edges);
     const splat = (x, y) => {
@@ -720,6 +734,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else if (['farm', 'wood', 'stone', 'ore'].includes(o.k)) { txt = String(o.lv); col = RES_COL[o.k]; up = 2.0; }
       else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = 0x8a2b24; up = 2.4; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; up = 2.2; }
+      else if (o.k === 'tower') { txt = 'Turm'; col = 0x5a6070; up = 34; }
       else if (o.k === 'sanct' || o.k === 'throne') {
         const hd = (view.match.holds || []).find(x => x.id === id);
         txt = (o.k === 'sanct' ? 'Heiligtum' : 'Der Thron') + (hd ? ' · ' + hd.label : '');
@@ -744,7 +759,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const dist = this.cam.dist, sb = clamp(70 / dist, .55, 1.2);
     for (const id in this.obj) {
       const h = this.obj[id]; if (!h.lab || !h.labOn) continue;
-      const o = h.o, show = dist < 78 || o.k === 'start' || o.k === 'throne';
+      const o = h.o, show = dist < 78 || o.k === 'start' || o.k === 'throne' || o.k === 'tower';
       if (!show) { h.lab.el.style.display = 'none'; h.lab.vis = false; continue; }
       place(h.lab, o.x + .5, h.grp.position.y + h.lab.up * h.grp.scale.y, o.y + .5, sb);
     }
@@ -792,10 +807,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 
   /* ---------- Revier und Außenposten ---------- */
   rectList() {
-    const v = this.view, gt = this.gtNow(), grp = p => p.ally ? 'a' + p.ally : 'p' + p.id;
-    const ops = v.world.outposts || [], leaders = new Set((v.match.alliances || []).map(a => a.leader));
-    const cities = v.match.players.filter(p => leaders.has(p.id) && !p.out && p.slot >= 0 && p.pos).map(p => ({ pid: p.id, x: p.pos[0], y: p.pos[1], rathaus: p.rathaus, group: grp(p) }));
-    return rectsOf(cities, ops, gt);
+    const v = this.view, gt = this.gtNow(), ops = v.world.outposts || [];
+    return rectsOf(towersOf(this.map), ops, gt);
   }
   allyColor(alId, owner) { const a = (this.view.match.alliances || []).find(x => x.id === alId); return a && a.color ? parseInt(a.color.slice(1), 16) : this.ownerColor(owner); }
   ownerColor(pid) { const p = this.view.match.players.find(x => x.id === pid); return parseInt(PLAYER_COLORS[((p && p.slot) || 0) % 10].slice(1), 16); }
@@ -826,10 +839,10 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const col = r.off ? 0xffffff : r.group[0] === 'a' ? this.allyColor(Number(r.group.slice(1)), r.owner) : this.ownerColor(r.owner), me = r.group === myG;
       const g = this.rectMesh(r.x0, r.y0, r.x1, r.y1, col, r.ready || r.off ? (me ? .2 : .14) : .07, r.ready || r.off ? .95 : .5, me ? .32 : .24); this.territory.add(g); this.terrObjs.push(g);
     }
-    // Weißes Andock-Viereck am Thron; sobald ein Bündnis-Außenposten angedockt hat, in dessen Farbe
-    const th = this.map && this.map.objects.find(o => o.k === 'throne');
-    if (th) {
-      const pad = dockPad(th), rl = this.rectList(), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad));
+    // Weiße Andock-Vierecke an Thron und Türmen; sobald ein Bündnis-Außenposten angedockt hat, in dessen Farbe
+    const rl = this.rectList();
+    for (const th of this.map.objects.filter(o => o.k === 'throne' || o.k === 'tower')) {
+      const pad = dockPad(th), hit = rl.find(r => r.ready && r.group[0] === 'a' && touches([r], r.group, th.x, th.y, pad));
       const col = hit ? this.allyColor(Number(hit.group.slice(1)), hit.owner) : 0xffffff;
       const g = this.rectMesh(th.x - pad, th.y - pad, th.x + pad, th.y + pad, col, hit ? .26 : .3, .98, .4); this.territory.add(g); this.terrObjs.push(g);
     }
@@ -1040,7 +1053,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const id in this.opObjs) { const q = this.opObjs[id]; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
     if (best) return best;
     for (const id in this.obj) {
-      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 8 : 1;
+      const h = this.obj[id], o = h.o, k = KIND_R[o.k] || 1.7, hh = o.k === 'start' ? (h.h || 2) * .45 : o.k === 'throne' ? 8 : o.k === 'tower' ? 12 : 1;
       test('obj', id, o.x + .5, h.grp.position.y + hh, o.y + .5, k);
     }
     return best;

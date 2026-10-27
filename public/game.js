@@ -480,7 +480,7 @@ let allyTab = '', moreSub = '', repTab = 'all';
 function revierHTML() {
   const myOps = (view.world.outposts || []).filter(o => o.mine), gt2 = gtNow(), al0 = view.ally, st = al0 ? al0.store : null;
   const revier = !al0 ? '<p class="note">Außenposten, Bündnislager und gemeinsames Revier gibt es nur im Bündnis. Gründe eines oder tritt einem bei (Tab Bündnis).</p>' : `
-    <p class="note">Das Revier gehört dem Bündnis: Jede Burg und jeder Außenposten beansprucht ein Viereck. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} Außenposten (ohne Limit).</p>
+    <p class="note">Das Revier gehört dem Bündnis: Jeder Außenposten beansprucht ein Viereck, die Kette beginnt an einem der vier Türme in den Kartenecken. Außenposten baut ihr nur gemeinsam aus dem <b>Bündnislager</b> und nur an euer eigenes Revier. Ihr haltet ${myOps.length} Außenposten (ohne Limit).</p>
     <div class="block"><div class="store"><h2>🏛 Bündnislager</h2><p class="stock-sub">Aktueller Stand</p>
       <div class="stock">${RES.map((r, k) => `<div class="stk ${st[r] >= OP_COST[k] ? 'ok' : 'low'}"><i class="r r-${r}"></i><b>${fmtN(st[r])}</b><span>${RES_DE[r]}</span><small>${st[r] >= OP_COST[k] ? '✓ genug' : 'noch ' + fmtN(OP_COST[k] - st[r])}</small></div>`).join('')}</div>
       <p class="stock-sub">${OP_COST.every((c, k) => st[RES[k]] >= c) ? '✅ Das Lager reicht für einen neuen Außenposten.' : '⏳ Für den nächsten Außenposten fehlt noch etwas.'}</p></div>
@@ -564,7 +564,7 @@ function tutorialHTML() {
     ['Ein Heer zu einem Feld schicken', rp.some(r => r.kind === 'gather' || r.kind === 'return'), 'Karte → Feld antippen, Truppen wählen, Sammeln.'],
     ['Ein Banditenlager besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Stufe 1 und 2 sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
-    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
+    ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer, an einem der Türme in den Kartenecken. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
     ['Ein Heiligtum besetzen', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Die vier Heiligtümer geben dir und deinem Bündnis +15 % auf einen Rohstoff.']
   ];
@@ -576,7 +576,7 @@ function rulesHTML() {
   <p class="desc"><b>Schutz:</b> Neue Spieler sind 4 Tage vor Angriffen sicher. Wer selbst einen Spieler angreift, verliert den Schutz sofort.</p>
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
-  <p class="desc"><b>Revier:</b> Jede Burg und jeder Außenposten beansprucht ein Viereck auf der Karte. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut; den ersten baut der Gründer an seine Burg, danach entfällt das Burg-Viereck. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
+  <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der vier Türme in den Kartenecken beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut; den ersten baut der Gründer an seine Burg, danach entfällt das Burg-Viereck. Mitglieder bewachen sie mit Truppen und können diese jederzeit abziehen. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
   <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Besatzungen bleiben dort, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {
@@ -812,8 +812,8 @@ function showEnd(force) {
 }
 
 /* ---------- Karte: Bedienung ---------- */
-const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', ore: 'Erzmine', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', start: 'Burg' };
-const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron' };
+const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', ore: 'Erzmine', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', tower: 'Turm', start: 'Burg' };
+const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Wald', stone: 'Bruch', ore: 'Mine', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron', tower: 'Turm' };
 const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
 const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
 function marchRemain(m) { const L = m.arr[m.arr.length - 1], g = gtNow(); return m.phase === 'gather' ? m.tEnd - g : m.t0 + L - g; }
@@ -901,7 +901,7 @@ function opSheet(w) {
   wm.setPreview(null);
   const names = id => pname(id);
   let body = `<dl class="stats"><dt>Gehört</dt><dd>${esc(opOwnerName(o))}</dd><dt>Revier</dt><dd>${2 * OP_R + 1}×${2 * OP_R + 1} Felder</dd>
-    <dt>Zustand</dt><dd>${ready ? ((wm.rectList().find(r => r.id === o.id) || {}).off ? '<b>inaktiv</b> – keine Verbindung zur Burg. Schließe die Lücke mit einem neuen Außenposten.' : 'fertig') : 'im Bau, noch ' + fmtT(real(o.done - gt))}</dd><dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>`;
+    <dt>Zustand</dt><dd>${ready ? ((wm.rectList().find(r => r.id === o.id) || {}).off ? '<b>inaktiv</b> – keine Verbindung zum Turm. Schließe die Lücke mit einem neuen Außenposten.' : 'fertig') : 'im Bau, noch ' + fmtT(real(o.done - gt))}</dd><dt>Wachen</dt><dd>${troopsLine(g.troops)} (+${Math.round((g.mult - 1) * 100)} %)</dd>`;
   if (o.mine) {
     const gr = o.garr || {}, ids = Object.keys(gr).filter(k => sum(gr[k]) > 0);
     body += `<dt>Besatzung</dt><dd>${ids.length ? ids.map(k => `<div><b>${esc(names(Number(k)))}</b>${Number(k) === me.id ? ' (du)' : ''}: ${troopsLine(gr[k])}</div>`).join('') : 'niemand'}</dd></dl>`;
@@ -947,7 +947,9 @@ function renderMapSheet() {
     const title = k === 'start' ? ((view.match.players.find(p => p.slot === o.slot) || {}).name ? 'Burg von ' + esc(view.match.players.find(p => p.slot === o.slot).name) : 'Freier Burgplatz') : k === 'sanct' ? SANCT[o.n][0] : OBJ_NAME[k];
     const lv = o.lv ? `<span class="lvl">Stufe ${o.lv}</span>` : '';
     let body = '';
-    if (['farm', 'wood', 'stone', 'ore'].includes(k)) {
+    if (k === 'tower') {
+      body = `<p class="desc">Startpunkt für Außenposten. Ein Bündnis beginnt hier seine Kette: Der erste Außenposten muss das weiße Feld um den Turm berühren, jeder weitere das Revier davor. Reißt die Kette in der Mitte ab, sind alle Außenposten dahinter inaktiv, bis die Lücke wieder geschlossen ist. Der Turm selbst kann nicht zerstört werden.</p>`;
+    } else if (['farm', 'wood', 'stone', 'ore'].includes(k)) {
       const max = NODE_MAX(o.lv), left = w.nodes[id] == null ? max : w.nodes[id], res = { farm: 'food', wood: 'wood', stone: 'stone', ore: 'ore' }[k], plan = planFor(o);
       body = `<dl class="stats"><dt>Vorrat</dt><dd>${fmtN(left)} von ${fmtN(max)} ${RES_DE[res]}</dd></dl>${pickerHTML()}`;
       if (plan && !plan.error) {
@@ -1019,7 +1021,7 @@ function renderMapSheet() {
     }
     h = `<div class="sh-head"><h2>${title}</h2>${lv}<button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
   }
-  const MI = { farm: '🌾', wood: '🪵', stone: '🪨', ore: '⛏️', camp: '⚔️', ruin: '🏛️', sanct: '✨', throne: '👑', start: '🏰' };
+  const MI = { farm: '🌾', wood: '🪵', stone: '🪨', ore: '⛏️', camp: '⚔️', ruin: '🏛️', sanct: '✨', throne: '👑', tower: '🗼', start: '🏰' };
   const ico = msel.type === 'march' ? '🚩' : msel.type === 'site' ? '🏗️' : msel.type === 'op' ? '🗼' : MI[(wm.map.byId[msel.id] || {}).k] || '📍';
   h = h.replace('<div class="sh-head">', `<div class="sh-head"><span class="sh-ico">${ico}</span>`).replace('data-act="close">Schließen</button>', 'data-act="close" aria-label="Schließen">✕</button>');
   $('sheet').classList.add('popup');

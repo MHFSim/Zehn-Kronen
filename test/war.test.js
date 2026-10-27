@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command, viewFor, startMatch, pauseMatch, resumeMatch, endMatch } from '../shared/world.js';
 import { newWorld, mapOf, DAY, allianceCap, byId } from '../shared/core.js';
-import { territory } from '../shared/outpost.js';
+import { territory, towersOf } from '../shared/outpost.js';
 
 const T0 = 1_000_000_000_000;
 const mk = (n, o = {}) => {
@@ -109,10 +109,10 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   // Thron besetzen (braucht Revier: ohne Außenposten geht es nicht)
   give(a, { schwert: 3000, bogen: 2000, speer: 2000, schwer: 1500 });
   assert.match(run(match, players, clock, a, { type: 'march', target: 'throne1', mode: 'occupy', troops: { schwert: 10 } }), /Revier/);
-  // Kette von Außenposten von der Burg bis zum Thron (jeder berührt den vorigen)
-  const alId = Object.values(match.world.alliances)[0].id, sp = a.state.pos, chain = [];
+  // Kette von Außenposten vom nächsten Turm bis zum Thron (jeder berührt den vorigen)
+  const alId = Object.values(match.world.alliances)[0].id, tw = towersOf(mapOf(match)).sort((p, q) => Math.hypot(p.x - 137, p.y - 137) - Math.hypot(q.x - 137, q.y - 137))[0], sp = [tw.x, tw.y], chain = [];
   { const n = Math.ceil(Math.hypot(137 - sp[0], 137 - sp[1]) / 9);
-    for (let i = 1; i <= n; i++) { const id = 'opT' + i; match.world.outposts[id] = { id, al: alId, by: a.id, x: Math.round(sp[0] + (137 - sp[0]) * i / n), y: Math.round(sp[1] + (137 - sp[1]) * i / n), done: 0, garr: {} }; chain.push(id); } }
+    for (let i = 0; i <= n; i++) { const id = 'opT' + i; match.world.outposts[id] = { id, al: alId, by: a.id, x: Math.round(sp[0] + (137 - sp[0]) * i / n), y: Math.round(sp[1] + (137 - sp[1]) * i / n), done: 0, garr: {} }; chain.push(id); } }
   // Wird ein Außenposten in der Mitte zerstört, sind alle dahinter inaktiv: der Thron ist nicht mehr erreichbar
   { const mid = chain[Math.floor(chain.length / 2)], saved = match.world.outposts[mid]; delete match.world.outposts[mid];
     const rs = territory(match, players, clock), off = rs.filter(r => r.off).map(r => r.id);
