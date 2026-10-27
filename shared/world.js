@@ -10,7 +10,7 @@ import {
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur
 } from './core.js';
-import { afterLaunch, applyBonuses, arriveCity, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText } from './rules.js';
@@ -28,6 +28,7 @@ function onArrive(ctx, m, bt, realT) {
   if (m.mode === 'build') return arriveBuild(ctx, m, bt, realT, back);
   if (m.mode === 'garrison') return arriveGarrison(ctx, m, bt, realT, back);
   if (m.mode === 'raid') return arriveRaid(ctx, m, bt, realT, back);
+  if (m.mode === 'attack' && NODE_KINDS.includes(o.k)) return arriveField(ctx, m, o, bt, realT, back);
   if (m.mode === 'attack' || m.mode === 'station') return arriveCity(ctx, m, o, bt, realT, back);
   if (m.mode === 'occupy') return arriveHold(ctx, m, o, bt, realT, back);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };

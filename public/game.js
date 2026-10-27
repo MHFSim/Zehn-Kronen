@@ -596,6 +596,7 @@ function rulesHTML() {
   <p class="desc"><b>Fall einer Burg:</b> Das erste Mal wird der Besiegte <b>Vasall</b> (7 Tage, 20 % seiner Erträge gehen an den Sieger, danach 12 Stunden Schutz). Fällt die Burg ein zweites Mal, <b>scheidet</b> der Spieler aus.</p>
   <p class="desc"><b>Bündnisse:</b> Höchstens die Hälfte der Spieler plus eins. Verbündete siegen gemeinsam und helfen sich mit Truppen in der Burg.</p>
   <p class="desc"><b>Revier:</b> Jeder Außenposten beansprucht ein Viereck auf der Karte. Der erste muss an einem der sechs Türme am Kartenrand beginnen (nicht an der Burg), jeder weitere das Revier berühren. Ohne Bündnis gibt es kein Revier. Außenposten gehören dem Bündnis, haben eine Stufe, werden aus dem Bündnislager bezahlt und über den Button auf der Karte gebaut. Wer im Bündnisgebiet farmt, füllt zusätzlich das Lager. Einen feindlichen Außenposten greift an, wer direkt daneben einen eigenen baut.</p>
+  <p class="desc"><b>Felder:</b> Ein Heer sammelt dort 20 Rohstoffe pro Minute, begrenzt durch seine Traglast und den Vorrat. Ein geleertes Feld ist 6 Stunden leer und dann wieder voll, ein angebrochenes erneuert sich 6 Stunden nach dem letzten Besuch. Auf dem Feld kann dein Heer von Feinden überfallen werden (Schutzzeit und Bündnisse gelten wie sonst).</p>
   <p class="desc"><b>Heiligtümer:</b> Jedes gehaltene Heiligtum gibt der Gruppe +15 % auf einen Rohstoff, der Thron +25 % Gold. Dafür muss ein Außenposten-Viereck deines Bündnisses den Ort berühren (beim Thron das weiße Viereck). Der Thron wird nicht bewacht: Wer dort andockt, hält ihn. Heiligtümer besetzt du mit Truppen, die bleiben, bis du sie zurückrufst.</p>`;
 }
 function moreHTML() {
@@ -905,9 +906,10 @@ function autoSend(hit) {
   }
   if (Object.keys(pick_).length) send = pick_;
 }
+function fieldFoes(id) { return (view.world.marches || []).filter(m => m.phase === 'gather' && m.tid === id && !m.own && !m.friend); }
 function mapSignature() {
   const w = view.world, id = msel.id;
-  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
+  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
 }
 function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
 function planFor(o) {
@@ -1011,6 +1013,8 @@ function renderMapSheet() {
         body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Traglast</dt><dd>${fmtN(plan.capacity)}</dd><dt>Ertrag</dt><dd class="costs">${lootHTML({ [res]: amount })}</dd><dt>Sammeln</dt><dd>${fmtT(real(gather))}</dd><dt>Gesamt</dt><dd>${fmtT(real(2 * plan.duration + gather))}</dd></dl>`;
       }
       body += actionRow('Sammeln', plan, left < 50 ? 'Das Feld ist erschöpft.' : '', free);
+      const foes = fieldFoes(id);
+      if (foes.length) body += `<div class="block"><h3>Sammler auf dem Feld</h3>${foes.map(m => `<div class="mrow"><div><b>${esc(m.name)}</b><div class="note">${fmtN((m.troops && m.troops.n) || 0)} Truppen · sammelt noch ${fmtT(real(Math.max(0, m.tEnd - gtNow())))}</div></div></div>`).join('')}</div>` + actionRow(armedKey === 'fattack' + id ? 'Wirklich überfallen' : 'Sammler überfallen', plan, '', free, 'danger', 'fattack');
     } else if (k === 'camp') {
       const dead = (w.camps[id] || 0) > gtNow(), def = campTroops(o.lv), mult = campMult(o.lv), plan = planFor(o), sel_ = sendList();
       body = `<dl class="stats"><dt>Verteidiger</dt><dd>${troopsLine(def)}</dd><dt>Stärke</dt><dd>+${Math.round((mult - 1) * 100)} %</dd><dt>Beute</dt><dd class="costs">${lootHTML(campLoot(o.lv))}</dd></dl>`;
@@ -1092,7 +1096,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -1106,6 +1110,7 @@ function mapAct(act, el) {
     if (mode === 'attack' && !twice('attack' + o.id)) { renderSheet(); return true; }
     command({ type: 'march', target: msel.id, mode, troops: sendList() }).then(ok => { if (ok) { toast(mode === 'attack' ? 'Dein Heer marschiert zum Angriff.' : mode === 'station' ? 'Verstärkung ist unterwegs.' : 'Dein Heer ist unterwegs.', 'info'); closeSheet(); } });
   }
+  else if (act === 'fattack') { if (!twice('fattack' + msel.id)) { renderSheet(); return true; } command({ type: 'march', target: msel.id, mode: 'attack', troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Überfall.', 'info'); closeSheet(); } }); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
   else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
