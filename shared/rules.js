@@ -53,7 +53,7 @@ export const T = {
   steinmetz:   { name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
   handel:      { name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
   kriegskunst: { name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
-  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .06, unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
+  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .30, unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
   lasten:      { name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
 };
 export const T_MAX = 5;
