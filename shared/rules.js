@@ -53,12 +53,14 @@ export const T = {
   steinmetz:   { name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
   handel:      { name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
   kriegskunst: { name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
-  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .30, unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
+  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .06, steps: [.06, .08, .10, .12, .14], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
   lasten:      { name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
 };
 export const T_MAX = 5;
 export const techLv = (S, id) => (S.tech && S.tech[id]) || 0;
-export const techMult = (S, eff) => { let m = 1; for (const k in T) if (T[k].eff === eff) m += T[k].per * techLv(S, k); return m; };
+// Gesamtbonus einer Forschung auf Stufe lv (Marschordnung steigt je Stufe stärker: +6, +8, +10, +12, +14 %)
+export const techBonus = (k, lv) => T[k].steps ? T[k].steps.slice(0, lv).reduce((a, b) => a + b, 0) : T[k].per * lv;
+export const techMult = (S, eff) => { let m = 1; for (const k in T) if (T[k].eff === eff) m += techBonus(k, techLv(S, k)); return m; };
 export const techReq = lv => Math.max(1, 2 * lv - 1);                       // nötige Akademiestufe für Forschungsstufe lv
 export const techCost = (id, lv) => T[id].base.map(c => Math.max(0, Math.round(c * Math.pow(1.7, lv - 1) / 5) * 5));
 export const techTime = (id, lv) => T[id].time * 60 * Math.pow(1.7, lv - 1);

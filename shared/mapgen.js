@@ -245,7 +245,7 @@ export function findPath(map, sx, sy, gx, gy, forestCost = 1.2) {
 }
 
 // Zeit in Spielsekunden bis zu jedem Wegpunkt. speed = Felder pro Stunde.
-export const MARCH_BOOST = 24;   // Grundtempo (Marschordnung Stufe 0); mit Marschordnung 5 (+150 %) wie vorher. Vorlage: Reiterei doppelt so schnell wie Fußtruppen-Tempo der Vorlage, Fußtruppen 20 % langsamer als der Lanzenreiter
+export const MARCH_BOOST = 60;   // Grundtempo (Marschordnung Stufe 0), die Forschung macht es schneller. Vorlage: Reiterei doppelt so schnell wie Fußtruppen-Tempo der Vorlage, Fußtruppen 20 % langsamer als der Lanzenreiter
 export function pathTimes(map, path, speed, forestCost) {
   const arr = [0];
   for (let i = 1; i < path.length; i++) {

@@ -3,7 +3,7 @@
 import {
   RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, techLv, techMult, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
+  T, T_MAX, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
@@ -347,7 +347,7 @@ function plateHTML(id) {
 function techPlateHTML(id) {
   const t = T[id], L = techLv(S, id), run = S.research && S.research.id === id, next = L + 1, why = L >= T_MAX || run ? '' : techBlocker(S, id);
   const pips = `<span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span>`;
-  const now = Math.round(t.per * L * 100), nx = Math.round(t.per * next * 100);
+  const now = Math.round(techBonus(id, L) * 100), nx = Math.round(techBonus(id, next) * 100);
   let act;
   if (run) act = `<div class="bprog"><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span></div>`;
   else if (L >= T_MAX) act = '<span class="note">Höchststufe erreicht</span>';
