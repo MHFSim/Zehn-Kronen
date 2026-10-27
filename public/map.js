@@ -1031,7 +1031,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: T.DoubleSide })); line.renderOrder = 3; grp.add(line);
     return grp;
   }
-  drawTerritory() {
+  drawTerritory(force) {
+    if (this.view && !force) { const sg = this.rectList().map(r => r.id + (r.ready ? 'r' : '') + (r.off ? 'o' : '')).join(','); if (sg === this.terrSig2) return; this.terrSig2 = sg; } else this.terrSig2 = this.view ? this.rectList().map(r => r.id + (r.ready ? 'r' : '') + (r.off ? 'o' : '')).join(',') : '';
     for (const g of this.terrObjs) { this.territory.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     this.terrObjs = []; if (!this.view) return;
     const mine = this.view.match.players.find(p => p.id === this.myId), myG = mine ? (mine.ally ? 'a' + mine.ally : 'p' + mine.id) : '';
@@ -1181,7 +1182,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       if (h.flags.length) this.waveFlags(h.flags, t);
     }
     for (const id in this.opObjs) this.waveFlags(this.opObjs[id].flags, t);
-    if (this.terrDirty || t - this.terrAt > 1) { this.terrAt = t; this.terrDirty = false; this.drawTerritory(); }
+    if (this.terrDirty || t - this.terrAt > 1) { const force = this.terrDirty; this.terrAt = t; this.terrDirty = false; this.drawTerritory(force); }
     // Heere
     const gt = this.gtNow(), step = Math.floor(t * 4) % 2; let routes = [];
     for (const id in this.marchObjs) {
