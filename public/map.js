@@ -909,10 +909,16 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const m of view.world.marches) {
       keep.add(m.id); let s = this.marchObjs[m.id];
       const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
-      const tr = m.troops || {}; let type = 'speer', best = 0, n = 0;
-      for (const u in tr) { if (u === 'n') continue; n += tr[u]; const w = u === 'handkarren' || u === 'ochsen' ? tr[u] * .01 : tr[u]; if (w > best) { best = w; type = u; } }
-      if (tr.n != null) n = tr.n; if (!n) n = Object.values(tr).reduce((a, c) => a + c, 0);
-      const cav = type === 'leicht' || type === 'schwer' || type === 'ochsen', cnt = cav ? clamp(Math.ceil(n / 60), 1, 3) : clamp(Math.ceil(n / 25), 2, 5);
+      const tr = m.troops || {}; let n = 0;
+      const ORDER = ['leicht', 'schwer', 'speer', 'schwert', 'bogen', 'armbrust', 'handkarren', 'ochsen'], kinds = [];
+      for (const u of ORDER) if (tr[u] > 0) { n += tr[u]; kinds.push([u, u === 'handkarren' || u === 'ochsen' ? tr[u] * .05 : tr[u]]); }
+      if (tr.n != null) { n = tr.n; kinds.length = 0; kinds.push(['speer', n]); }
+      if (!kinds.length) kinds.push(['speer', 1]);
+      if (!n) n = Object.values(tr).reduce((a, c) => a + c, 0);
+      const total = clamp(Math.ceil(n / 25), kinds.length, 8), W = kinds.reduce((a, k) => a + k[1], 0), cntOf = kinds.map(() => 1);
+      for (let r = total - kinds.length; r > 0; r--) { let bi = 0, bv = -1; kinds.forEach((k, ki) => { const v = k[1] / W * total - cntOf[ki]; if (v > bv) { bv = v; bi = ki; } }); cntOf[bi]++; }
+      const figs = []; kinds.forEach((k, ki) => { for (let c = 0; c < cntOf[ki]; c++) figs.push(k[0]); });
+      const sig = figs.join(',') + col;
       if (!s) {
         const grp = new T.Group(); this.scene.add(grp);
         const pole = new T.Mesh(new T.CylinderGeometry(.02, .02, 1.5, 5), new T.MeshLambertMaterial({ color: 0x4a3624 })); pole.position.set(0, .75, -.1); grp.add(pole);
@@ -920,14 +926,16 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         s = this.marchObjs[m.id] = { grp, flag, units: [], lab: this.mkBadge('', 0x2a2f38) }; s.lab.el.classList.add('march');
       }
       s.m = m; s.col = col;
-      if (s.sig !== type + col + cnt) {
-        s.sig = type + col + cnt; for (const u of s.units) s.grp.remove(u.g); s.units = [];
-        const ug = this.unitGeo(type, col), pos = cav ? [[-.34, .15], [.34, .15], [0, -.45]] : [[-.28, .2], [.28, .2], [0, -.12], [-.52, -.28], [.52, -.28]];
-        for (let i = 0; i < cnt; i++) {
-          const g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
+      if (s.sig !== sig) {
+        s.sig = sig; for (const u of s.units) s.grp.remove(u.g); s.units = [];
+        const rows = []; for (let k = 0; k < figs.length; k += 3) rows.push(figs.slice(k, k + 3));
+        rows.forEach((row, r) => row.forEach((type, c) => {
+          const cav = type === 'leicht' || type === 'schwer' || type === 'ochsen', ug = this.unitGeo(type, col), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
-          g.position.set(pos[i][0], 0, pos[i][1]); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g); s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m = new T.Mesh(L.g, this.matVC); m.position.set(L.x, L.y, L.z); m.castShadow = true; g.add(m); return { m, s: L.s }; }) });
-        }
+          const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
+          g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
+          s.units.push({ g, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s }; }) });
+        }));
       }
       s.flag.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
       const txt = (m.own ? '' : m.name + ' · ') + (m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : '') + n;
