@@ -1001,7 +1001,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const y1 = Math.max(0, this.yAt(p[0], p[1])) + yo + .03, y2 = Math.max(0, this.yAt(q[0], q[1])) + yo + .03;
       const base = rp.length / 3; rp.push(p[0] - nx, y1, p[1] - nz, p[0] + nx, y1, p[1] + nz, q[0] - nx, y2, q[1] - nz, q[0] + nx, y2, q[1] + nz); ri.push(base, base + 1, base + 2, base + 1, base + 3, base + 2); });
     const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(rp, 3)); lg.setIndex(ri);
-    const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, depthTest: false, side: T.DoubleSide })); line.renderOrder = 30; grp.add(line);
+    const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: T.DoubleSide })); line.renderOrder = 3; grp.add(line);
     return grp;
   }
   unionMesh(rs, color, fillA, lineA, w) {   // Vereinigung mehrerer Vierecke derselben Gruppe: eine Fläche, nur der Außenrand
@@ -1029,7 +1029,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
     const fill = new T.Mesh(g, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: fillA, depthWrite: false, side: T.DoubleSide })); fill.renderOrder = 2; grp.add(fill);
     const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(rp, 3)); lg.setIndex(ri);
-    const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, depthTest: false, side: T.DoubleSide })); line.renderOrder = 30; grp.add(line);
+    const line = new T.Mesh(lg, new T.MeshBasicMaterial({ color: rgb, transparent: true, opacity: lineA, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: T.DoubleSide })); line.renderOrder = 3; grp.add(line);
     return grp;
   }
   drawTerritory() {
