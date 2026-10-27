@@ -23,7 +23,7 @@ assert.equal(S.lv.kaserne, 1, 'Kaserne fertig');
 assert.equal(applyCommand(S, { type: 'train', id: 'kaserne', unit: 'bogen', count: 5 }), 'Diese Einheit wird hier nicht ausgebildet');
 assert.equal(applyCommand(S, { type: 'train', id: 'kaserne', unit: 'speer', count: 2 }), '');
 advanceTo(S, S.at + 2 * 240 * 1000 + 1000, 1);
-assert.equal(S.troops.speer, 2, 'Zwei Speerträger ausgebildet');
+assert.equal(S.troops.speer, 22, 'Zwei Speerträger ausgebildet (zu den 20 vom Start)'); assert.equal(S.troops.handkarren, 1, 'Start: 1 Handkarren');
 
 // Lagergrenze wird nicht überschritten, auch nach langer Abwesenheit mit Tempo 100
 advanceTo(S, S.at + 30 * 86400 * 1000, 100);

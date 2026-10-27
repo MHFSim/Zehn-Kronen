@@ -83,6 +83,7 @@ export function freshState(now) {
   const lv = {}; for (const k in B) lv[k] = 0;
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
+  troops.speer = 20; troops.handkarren = 1;   // Startheer: 20 Speerträger und 1 Handkarren
   return { res: { food: 600, wood: 600, stone: 400, ore: 250, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null, items: {}, tpAt: -1e9 };
 }
 
