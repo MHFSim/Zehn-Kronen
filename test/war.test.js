@@ -160,4 +160,27 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.ok(a.state.reports.some(r => r.kind === 'pvp' && r.role === 'att' && r.win), 'Bericht Angreifer');
 }
 
+// ---- Heer auf der Karte aufstellen ----
+{
+  const { match, players } = mk(2); const [a, b] = players;
+  adv(match, players, 4.1 * DAY);
+  give(a, { speer: 40 }); give(b, { schwert: 400 });
+  const px = a.state.pos[0] + 6, py = a.state.pos[1] + 6;
+  assert.match(run(match, players, clock, a, { type: 'march', mode: 'post', x: 1, y: 1, troops: { speer: 40 } }), /Wasser|außerhalb/);
+  assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', x: px, y: py, troops: { speer: 40 } }), '');
+  { const g0 = match.world.marches.find(m => m.owner === a.id); adv(match, players, g0.arr[g0.arr.length - 1] + 30); }
+  const post = match.world.marches.find(m => m.owner === a.id); assert.equal(post.phase, 'post', 'Heer steht');
+  adv(match, players, 3 * DAY); assert.equal(match.world.marches.find(m => m.owner === a.id).phase, 'post', 'bleibt stehen');
+  assert.equal(run(match, players, clock, b, { type: 'march', target: post.tid, mode: 'attack', troops: { schwert: 400 } }), '');
+  { const g1 = match.world.marches.find(m => m.owner === b.id); adv(match, players, g1.arr[g1.arr.length - 1] + 30); }
+  assert.ok(!match.world.marches.some(m => m.owner === a.id), 'aufgestelltes Heer vernichtet');
+  assert.ok(a.state.reports.some(r => r.role === 'def' && !r.win), 'Bericht Opfer');
+  // zurückrufen
+  give(a, { speer: 10 }); assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', x: px, y: py, troops: { speer: 10 } }), '');
+  { const g2 = match.world.marches.find(m => m.owner === a.id); adv(match, players, g2.arr[g2.arr.length - 1] + 30); assert.equal(g2.phase, 'post'); }
+  const pid = match.world.marches.find(m => m.owner === a.id).id;
+  assert.equal(run(match, players, clock, a, { type: 'recall', id: pid }), '');
+  adv(match, players, 2 * DAY); assert.ok(!match.world.marches.some(m => m.owner === a.id), 'Heer wieder daheim'); assert.equal(a.state.troops.speer >= 10, true);
+}
+
 console.log('Alle Kriegstests bestanden.');

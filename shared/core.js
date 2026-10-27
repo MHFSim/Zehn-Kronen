@@ -104,7 +104,7 @@ export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, ob
 
 export function marchPos(m, gt) {
   const L = m.path.length - 1;
-  if (m.phase === 'gather') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
+  if (m.phase === 'gather' || m.phase === 'post') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
   const el = Math.max(0, Math.min(m.arr[L], gt - m.t0));
   let i = 0; while (i < L && m.arr[i + 1] <= el) i++;
   const [ax, ay] = cellXY(m.path[i]);
@@ -112,7 +112,7 @@ export function marchPos(m, gt) {
   const [bx, by] = cellXY(m.path[i + 1]), f = (el - m.arr[i]) / (m.arr[i + 1] - m.arr[i] || 1);
   return { x: ax + .5 + (bx - ax) * f, y: ay + .5 + (by - ay) * f, i, frac: f, still: false };
 }
-export const nextT = m => m.phase === 'gather' ? m.tEnd : m.t0 + m.arr[m.arr.length - 1];
+export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.t0 + m.arr[m.arr.length - 1];
 export function reversed(m) {
   const L = m.arr.length - 1;
   m.path = m.path.slice().reverse();

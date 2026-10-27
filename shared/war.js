@@ -22,7 +22,7 @@ const tag = (w, pid) => { const a = allianceOf(w, pid); return a ? ' [' + a.tag 
 // Prüft ein Marschziel für Angriff, Stationieren oder Besetzen. Gibt eine Fehlermeldung oder { target } zurück.
 export function checkLaunch(ctx, me, o, mode, troops) {
   const { players } = ctx, w = ctx.match.world, S = me.state, gt = w.gt;
-  if (mode === 'attack' && FIELD_K.includes(o.k)) {          // Sammler auf einem Feld überfallen
+  if (mode === 'attack' && (FIELD_K.includes(o.k) || o.k === 'post')) {          // Sammler auf einem Feld überfallen
     const gs = fieldGatherers(ctx, me.id, o.id, gt);
     if (gs.error) return gs.error;
     return { target: byId(players, gs.list[0].owner) };
@@ -58,10 +58,10 @@ export function checkLaunch(ctx, me, o, mode, troops) {
 
 // Feindliche Heere, die gerade auf einem Feld sammeln und angegriffen werden dürfen
 function fieldGatherers(ctx, myId, fid, gt) {
-  const { players } = ctx, w = ctx.match.world, all = w.marches.filter(g => !g.dead && g.phase === 'gather' && g.tid === fid && g.owner !== myId);
-  if (!all.length) return { error: 'Auf diesem Feld sammelt gerade niemand.' };
+  const { players } = ctx, w = ctx.match.world, all = w.marches.filter(g => !g.dead && (g.phase === 'gather' || g.phase === 'post') && g.tid === fid && g.owner !== myId);
+  if (!all.length) return { error: fid.startsWith('post') ? 'Hier steht kein Heer mehr.' : 'Auf diesem Feld sammelt gerade niemand.' };
   const list = all.filter(g => { const D = byId(players, g.owner); return D && !D.state.out && !allied(w, myId, g.owner) && D.state.vassalOf !== myId && !isProtected(D.state, gt); }).sort((a, b) => a.id - b.id);
-  if (!list.length) return { error: 'Die Sammler hier sind verbündet oder stehen unter Schutz.' };
+  if (!list.length) return { error: 'Die Truppen hier sind verbündet oder stehen unter Schutz.' };
   return { list };
 }
 
@@ -71,7 +71,7 @@ export function afterLaunch(ctx, me, m, target, mode) {
   if (mode === 'attack' && m.tk !== 'start') {
     S.stats.attacks++;
     if (isProtected(S, w.gt)) S.protUntil = w.gt;
-    for (const g of w.marches) if (g.phase === 'gather' && g.tid === m.tid && g.owner !== me.id && !allied(w, me.id, g.owner)) note(ctx, g.owner, 'attack', 'Dein Sammler wird angegriffen!', me.name + tag(w, me.id) + ' greift dein Heer auf dem Feld an. Ankunft in ' + fmtDur(eta) + '.');
+    for (const g of w.marches) if ((g.phase === 'gather' || g.phase === 'post') && g.tid === m.tid && g.owner !== me.id && !allied(w, me.id, g.owner)) note(ctx, g.owner, 'attack', 'Dein Heer wird angegriffen!', me.name + tag(w, me.id) + ' greift dein Heer auf dem Feld an. Ankunft in ' + fmtDur(eta) + '.');
   } else if (mode === 'attack') {
     S.stats.attacks++;
     if (isProtected(S, w.gt)) S.protUntil = w.gt;
@@ -99,27 +99,28 @@ export function arriveField(ctx, m, o, bt, realT, back) {
   const { match, players } = ctx, w = match.world, A = byId(players, m.owner);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
   const gs = fieldGatherers(ctx, A.id, o.id, bt);
-  if (gs.error) { pushReport(A.state, { kind: 'pvp', role: 'att', title: 'Heer kehrt um', win: false, target: info, text: 'Auf dem Feld ist niemand mehr, den du angreifen kannst.' }, realT); return back(); }
+  if (gs.error) { pushReport(A.state, { kind: 'pvp', role: 'att', title: 'Heer kehrt um', win: false, target: info, text: 'Hier ist niemand mehr, den du angreifen kannst.' }, realT); return back(); }
   const startA = { ...m.troops }; let cur = { ...m.troops }, killed = 0, last = null, won = false;
   const defStart = {}, defLeft = {}, gathered = {};
   for (const g of gs.list) {
     if (!sum(cur)) break;
     const D = byId(players, g.owner); advanceTo(D.state, realT, match.speed);
-    const frac = g.tEnd > g.tStart ? Math.max(0, Math.min(1, (bt - g.tStart) / (g.tEnd - g.tStart))) : 0, got = Math.floor(g.amount * frac);
+    const frac = g.phase === 'gather' && g.tEnd > g.tStart ? Math.max(0, Math.min(1, (bt - g.tStart) / (g.tEnd - g.tStart))) : 0, got = g.phase === 'gather' ? Math.floor(g.amount * frac) : 0;
     const sd = { ...g.troops }, r = battle(cur, sd, forceOf(D.state), forceOf(A.state)), sa2 = settleAway(D.state, sd, r.defLeft);
     last = r; killed += sum(sd) - sum(r.defLeft); cur = r.attLeft;
     for (const u in sd) { defStart[u] = (defStart[u] || 0) + sd[u]; defLeft[u] = (defLeft[u] || 0) + (r.defLeft[u] || 0); }
     if (!sum(r.defLeft)) {
       g.dead = true; won = true;
-      const n = w.nodes[o.id] || { left: 0, t: bt }; const rest = n.left - got; w.nodes[o.id] = { left: rest < 50 ? 0 : rest, t: bt };
+      if (o.k !== 'post') { const n = w.nodes[o.id] || { left: 0, t: bt }; const rest = n.left - got; w.nodes[o.id] = { left: rest < 50 ? 0 : rest, t: bt }; }
       if (got > 0) gathered[g.res] = (gathered[g.res] || 0) + got;
     } else {
-      g.troops = r.defLeft; g.amount = Math.min(g.amount, Math.floor(capacityOf(g.troops, D.state))); g.tEnd = g.tStart + GATHER_SEC * g.amount;
+      g.troops = r.defLeft;
+      if (g.phase === 'gather') { g.amount = Math.min(g.amount, Math.floor(capacityOf(g.troops, D.state))); g.tEnd = g.tStart + GATHER_SEC * g.amount; }
     }
-    pushReport(D.state, { kind: 'pvp', role: 'def', title: (g.dead ? 'Sammler überfallen: ' : 'Überfall abgewehrt: ') + A.name, win: !g.dead, target: info,
+    pushReport(D.state, { kind: 'pvp', role: 'def', title: (g.dead ? (o.k === 'post' ? 'Heer überfallen: ' : 'Sammler überfallen: ') : 'Überfall abgewehrt: ') + A.name, win: !g.dead, target: info,
       att: { start: startA, left: r.attLeft }, def: { start: sd, left: r.defLeft, groups: [{ label: 'Dein Heer auf dem Feld', start: sd, left: r.defLeft, wounded: sa2.wounded, dead: sa2.dead }] }, rounds: r.rounds,
       text: g.dead ? A.name + ' hat dein Heer auf dem Feld vernichtet.' : 'Dein Heer hat ' + A.name + ' zurückgeschlagen und sammelt weiter.' }, realT);
-    note(ctx, D.id, 'battle', g.dead ? 'Sammler vernichtet' : 'Überfall abgewehrt', A.name + (g.dead ? ' hat dein Heer auf dem Feld besiegt.' : ' wurde auf dem Feld zurückgeschlagen.'));
+    note(ctx, D.id, 'battle', g.dead ? 'Heer vernichtet' : 'Überfall abgewehrt', A.name + (g.dead ? ' hat dein Heer auf dem Feld besiegt.' : ' wurde auf dem Feld zurückgeschlagen.'));
   }
   const sa = settleAway(A.state, startA, cur);
   m.troops = cur; A.state.stats.kills += killed; if (won) A.state.stats.wins++;
@@ -130,7 +131,7 @@ export function arriveField(ctx, m, o, bt, realT, back) {
     m.load = loot;
   }
   w.marches = w.marches.filter(x => x === m || !x.dead);
-  pushReport(A.state, { kind: 'pvp', role: 'att', title: sum(cur) && won ? 'Sammler überfallen' : 'Überfall gescheitert', win: sum(cur) > 0 && won, target: info,
+  pushReport(A.state, { kind: 'pvp', role: 'att', title: sum(cur) && won ? (o.k === 'post' ? 'Heer überfallen' : 'Sammler überfallen') : 'Überfall gescheitert', win: sum(cur) > 0 && won, target: info,
     att: { start: startA, left: cur, wounded: sa.wounded, dead: sa.dead }, def: { start: defStart, left: defLeft }, rounds: last ? last.rounds : [], loot,
     text: won ? 'Du hast ' + (sum(cur) ? 'die Sammler auf dem Feld besiegt.' : 'die Sammler besiegt, aber dein Heer wurde aufgerieben.') : 'Die Sammler haben dich zurückgeschlagen.' }, realT);
   note(ctx, A.id, 'battle', sum(cur) && won ? 'Überfall gelungen' : 'Überfall gescheitert', 'Dein Heer ' + (won ? 'hat die Sammler auf dem Feld besiegt.' : 'wurde auf dem Feld geschlagen.'));

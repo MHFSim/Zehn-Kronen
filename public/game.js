@@ -983,10 +983,16 @@ function siteSheet(w) {
   body += `<p class="desc">Ein Außenposten gehört eurem Bündnis und erweitert das gemeinsame Revier um ein Viereck (13×13 Felder). Es gibt nur eine Stufe. Mitglieder können ihn mit Truppen bewachen. Feinde können ihn zerstören, wenn ihr Außenposten an seinen grenzt.</p>
     <dl class="stats"><dt>Kosten (Bündnislager)</dt><dd class="costs">${costHTML(OP_COST, st || {})}</dd><dt>Bauzeit</dt><dd>${fmtT(real(opBuildTime(sum(sendList()) || 1)))} nach der Ankunft<br><span class="note">1 Einheit ${fmtT(real(OP_BUILD))}, ${OP_HELP_MAX} Einheiten ${fmtT(real(OP_BUILD_FAST))}. Mehr als ${OP_HELP_MAX} verkürzen nicht weiter.</span></dd><dt>Außenposten des Bündnisses</dt><dd>${mineN} (ohne Limit)</dd></dl>`;
   if (why) body += `<p class="why">${esc(why)}</p>`;
-  else {
+  const o2 = { id: 'post', x: msel.x, y: msel.y }, plan2 = planFor(o2), postOk = view.match.phase === 'running';
+  if (why) {
+    body += `<h3>Heer hier aufstellen</h3><p class="note">Das Heer bleibt auf dem Feld stehen, bis du es zurückrufst. Feinde können es angreifen.</p>` + pickerHTML();
+    if (plan2 && !plan2.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan2.duration))}</dd></dl>`;
+    body += actionRow('Heer aufstellen', postOk ? plan2 : null, postOk ? '' : 'Die Partie läuft nicht.', free, '', 'post');
+  } else {
     body += pickerHTML();
     if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
     body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Die Einheiten bleiben als Besatzung dort (beliebig viele). Du kannst sie jederzeit abziehen.</p>`;
+    body += actionRow('Nur Heer aufstellen', plan2, '', free, 'ghost', 'post') + `<p class="note">Das Heer bleibt ohne Bau auf dem Feld stehen. Feinde können es angreifen.</p>`;
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
@@ -1027,11 +1033,12 @@ function renderMapSheet() {
   if (msel.type === 'march') {
     const m = w.marches.find(x => x.id === msel.id);
     if (!m) { closeSheet(); return; }
-    const tgt = wm.map.byId[m.tid] || null, ph = m.phase === 'out' ? 'auf dem Weg zum Ziel' : m.phase === 'gather' ? 'sammelt' : 'auf dem Rückweg';
+    const tgt = wm.map.byId[m.tid] || null, ph = m.phase === 'out' ? 'auf dem Weg zum Ziel' : m.phase === 'gather' ? 'sammelt' : m.phase === 'post' ? 'steht auf dem Feld' : 'auf dem Rückweg';
     h = `<div class="sh-head"><h2>${m.own ? 'Dein Heer' : 'Heer von ' + esc(m.name)}</h2><span class="lvl">${ph}</span><button class="close" type="button" data-act="close">Schließen</button></div>
       <dl class="stats"><dt>Ziel</dt><dd>${m.tk === 'site' ? 'Bauplatz' : m.tk === 'outpost' ? 'Außenposten' : tgt ? (tgt.k === 'start' ? 'Burg von ' + esc((view.match.players.find(p => p.slot === tgt.slot) || {}).name || '?') : OBJ_NAME[tgt.k] + (tgt.lv ? ' ' + tgt.lv : '')) : '—'}</dd><dt>Noch</dt><dd id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</dd>
       <dt>Truppen</dt><dd>${m.troops.n != null ? fmtN(m.troops.n) + ' Einheiten' : troopsLine(m.troops)}</dd>${m.own && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
       ${m.phase === 'gather' && m.own ? `<dt>Sammelt</dt><dd class="costs">${lootHTML({ [m.res]: Math.floor(m.amount * Math.max(0, Math.min(1, (gtNow() - m.tStart) / (m.tEnd - m.tStart || 1)))) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
+      ${!m.own && m.phase === 'post' ? `${pickerHTML()}<div class="row"><button class="btn ${armedKey === 'patk' + m.id ? 'danger' : ''}" type="button" data-act="patk" ${!sum(sendList()) || ownMarches().length >= armySlots(S) ? 'disabled' : ''}>${armedKey === 'patk' + m.id ? 'Jetzt wirklich angreifen' : 'Heer angreifen'}</button></div>` : ''}
       ${m.own && m.phase !== 'back' ? `<div class="row"><button class="btn ghost" type="button" data-act="recall">${m.phase === 'gather' ? 'Heimrufen (Beute bis jetzt)' : 'Zurückrufen'}</button></div>` : ''}`;
   } else if (msel.type === 'site' || msel.type === 'op') {
     h = msel.type === 'site' ? siteSheet(w) : opSheet(w);
@@ -1135,7 +1142,7 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -1150,6 +1157,8 @@ function mapAct(act, el) {
     command({ type: 'march', target: msel.id, mode, troops: sendList() }).then(ok => { if (ok) { toast(mode === 'attack' ? 'Dein Heer marschiert zum Angriff.' : mode === 'station' ? 'Verstärkung ist unterwegs.' : 'Dein Heer ist unterwegs.', 'info'); closeSheet(); } });
   }
   else if (act === 'fattack') { if (!twice('fattack' + msel.id)) { renderSheet(); return true; } command({ type: 'march', target: msel.id, mode: 'attack', troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Überfall.', 'info'); closeSheet(); } }); }
+  else if (act === 'post') command({ type: 'march', mode: 'post', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Aufstellen.', 'info'); closeSheet(); } });
+  else if (act === 'patk') { const m = view.world.marches.find(x => x.id === msel.id); if (!m) return true; if (!twice('patk' + m.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'attack', target: m.tid, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff.', 'info'); closeSheet(); } }); }
   else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
   else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
