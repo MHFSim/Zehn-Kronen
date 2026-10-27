@@ -7,7 +7,7 @@ import { N, isWater, roadPaths, setMapRoads, NODE_KINDS, NODE_RES } from './mapg
 import { battle, sum, forceOf } from './combat.js';
 import {
   mapOf, byId, groupOf, groupLabel, allianceOf, pushReport, note, chron, settleAway, sendHome, fmtDur, planFrom, launch,
-  reveal, flushBits, VIEW_CITY
+  reveal, flushBits, VIEW_CITY, THRONE_HOLD
 } from './core.js';
 import { RES, TELEPORT_COOLDOWN } from './rules.js';
 
@@ -309,6 +309,7 @@ export function settleTerritory(ctx) {
       w.holds[o.id] = { group: cand.group, since: gt, garr: {} };
       const lab = groupLabel(w, players, cand.group), nm = o.k === 'throne' ? 'den Thron' : 'ein Heiligtum'; chron(ctx, lab + ' hält jetzt ' + nm + '.');
       for (const p of players) if (!p.state.out && groupOf(w, p.id) === cand.group) note(ctx, p.id, 'hold', o.k === 'throne' ? 'Thron erreicht' : 'Heiligtum erreicht', 'Euer Außenposten ist angedockt: ' + lab + ' hält jetzt ' + nm + (o.k === 'sanct' ? ' und bekommt den Bonus.' : '.'));
+      if (o.k === 'throne') for (const p of players) if (!p.state.out && p.state.slot >= 0 && groupOf(w, p.id) !== cand.group) note(ctx, p.id, 'hold', 'Alarm: Der Thron ist besetzt', lab + ' hat den Thron erreicht und gewinnt in ' + fmtDur(THRONE_HOLD / ctx.match.speed) + ', wenn niemand ihre Außenposten am Thron zerstört.');
     }
   }
 }

@@ -479,7 +479,7 @@ function renderBanner() {
     if (S.vassalOf) L.push(['warn', `Du bist Vasall von ${esc(pname(S.vassalOf))} (20 % Tribut) · frei in ${fmtT(real(S.vassalUntil - gt))}. Fällt deine Burg noch einmal, scheidest du aus.`]);
     const vs = m.players.filter(p => p.vassalOf === me.id); if (vs.length) L.push(['good', `Deine Vasallen: ${vs.map(p => esc(p.name)).join(', ')}`]);
     const th = (m.holds || []).find(h => h.id === 'throne1');
-    if (th) L.push([th.mine ? 'good' : 'warn', th.mine ? `👑 Ihr haltet den Thron – noch ${fmtT(real(th.since + THRONE_HOLD - gt))} bis zum Sieg` : `👑 ${esc(th.label)} hält den Thron – noch ${fmtT(real(th.since + THRONE_HOLD - gt))} bis zum Sieg`]);
+    if (th) L.push([th.mine ? 'good' : 'bad', th.mine ? `👑 Ihr haltet den Thron – noch ${fmtT(real(th.since + THRONE_HOLD - gt))} bis zum Sieg` : `⚠ ALARM: ${esc(th.label)} hat den Thron erreicht! Sieg in ${fmtT(real(th.since + THRONE_HOLD - gt))}. Zerstört ihre Außenposten am Thron, bevor die Zeit abläuft.`]);
   }
   const html = L.map(([k, t]) => `<div class="bn ${k}">${t}</div>`).join('');
   if (html !== bannerSig) { bannerSig = html; el.innerHTML = html; }
