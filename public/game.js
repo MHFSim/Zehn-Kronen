@@ -270,6 +270,10 @@ function setupSheet() {
 /* ---------- Stadt als Menü (wie bei Lords & Knights) ---------- */
 const BGROUPS = [['eco', 'Wirtschaft', '🌾', ['farm', 'saege', 'stein', 'mine', 'lager']], ['mil', 'Militär', '⚔️', ['kaserne', 'schiess', 'stall', 'lazarett']], ['adm', 'Verwaltung', '🏛️', ['rathaus', 'akademie', 'mauer']], ['tech', 'Forschung', '📜', []]];
 let cityCat = 'eco';
+// Gebäude-Symbole im Stil der Ressourcen-Zeichen (🌾 Nahrung, 🪵 Holz, 🪨 Stein, ⛏️ Erz, 🪙 Gold)
+const BICON = { rathaus: '🏰', farm: '🌾', saege: '🪵', stein: '🪨', mine: '⛏️', lager: '📦', kaserne: '⚔️', schiess: '🏹', stall: '🐎', lazarett: '🩹', akademie: '📜', mauer: '🧱' };
+const BORDER = ['rathaus', 'farm', 'saege', 'stein', 'mine', 'lager', 'kaserne', 'schiess', 'stall', 'lazarett', 'akademie', 'mauer'];
+const bico = id => `<span class="bi">${BICON[id] || '🏠'}</span>`;
 const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
 const imgCache = {}, imgReal = {};
 // Eigene Bilder (Ordner public/img/city/, z. B. farm1.jpg, rathaus2.jpg) ersetzen die gemalten, sobald sie existieren.
@@ -309,7 +313,7 @@ function plateHTML(id) {
   else if (id === 'rathaus' && L >= 20) act = '<span class="note">Höchststufe</span>';
   else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}</span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
   const extra = t ? `<div class="pmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
-  return `<article class="plate ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="pimg"><img alt="" src="${imgOf(id)}"><span class="ribbon">${L || '–'}</span>${q ? '<span class="btag">Im Bau</span>' : ''}</div>
+  return `<article class="plate ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="pimg">${bico(id)}<span class="ribbon">${L || '–'}</span>${q ? '<span class="btag">Bau</span>' : ''}</div>
     <div class="ptext"><div class="pname">${b.name}</div><div class="pmeta">${cityMeta(id)}</div>${extra}</div><div class="pact">${act}</div></article>`;
 }
 function techPlateHTML(id) {
@@ -320,7 +324,7 @@ function techPlateHTML(id) {
   if (run) act = `<div class="bprog"><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span></div>`;
   else if (L >= T_MAX) act = '<span class="note">Höchststufe erreicht</span>';
   else act = `<span class="costs sm">${costHTML(techCost(id, next))}</span><button class="btn small" type="button" data-tech="${id}" ${why ? 'disabled' : ''}>Erforschen</button><div class="${why ? 'why' : 'note'} one">${why || 'Dauer ' + fmtT(real(techTime(id, next))) + ' · braucht Akademie ' + techReq(next)}</div>`;
-  return `<article class="plate tech ${L ? '' : 'empty'}"><div class="pimg"><img alt="" src="${imgOf(t.icon)}"><span class="ribbon">${L}</span></div>
+  return `<article class="plate tech ${L ? '' : 'empty'}"><div class="pimg">${bico(t.icon)}<span class="ribbon">${L}</span></div>
     <div class="ptext"><div class="pname">${t.name}</div>${pips}<div class="pmeta">${esc(t.desc)}.<br>Jetzt <b>+${now} %</b>${L < T_MAX ? ` → <b>+${nx} %</b>` : ''} ${esc(t.unit)}</div></div><div class="pact">${act}</div></article>`;
 }
 function citySig() {
@@ -334,27 +338,23 @@ function renderCity(force) {
   const sig = citySig(); if (!force && sig === citySigV) return; citySigV = sig;
   const L = S.lv.rathaus, q = S.queue, marches = ownMarches(), keepTop = $('city').scrollTop;
   const tr = []; for (const k in S.train) for (const [i, o] of S.train[k].entries()) tr.push({ k, o, first: i === 0 });
-  const row = (img, main, prog, time, sp) => `<div class="ord"><img alt="" src="${img}"><div class="qmain">${main}${prog}</div>${time}${sp ? `<button class="spd" type="button" data-speed="${sp}" aria-label="Beschleunigen">⚡</button>` : ''}</div>`;
-  const orders = q.map(x => row(imgOf(x.id), `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`, 'build:' + x.id))
-    .concat(S.research ? [row(imgOf(T[S.research.id].icon), `<b>${T[S.research.id].name}</b> → Stufe ${S.research.target} <span class="note">(Forschung)</span>`, `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div>`, `<span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span>`, 'research:1')] : [])
-    .concat(tr.map(({ k, o, first }) => row(imgOf(k), `<b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}`, first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : '', `<span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span>`, first && !o.heal ? 'train:' + k : '')))
+  const row = (img, main, prog, time, sp) => `<div class="ord">${bico(img)}<div class="qmain">${main}${prog}</div>${time}${sp ? `<button class="spd" type="button" data-speed="${sp}" aria-label="Beschleunigen">⚡</button>` : ''}</div>`;
+  const orders = q.map(x => row(x.id, `<b>${B[x.id].name}</b> → Stufe ${x.target}`, `<div class="prog"><i data-qprog="${x.id}" style="width:${Math.max(0, 1 - x.left / x.total) * 100}%"></i></div>`, `<span class="time" data-qtime="${x.id}">${fmtT(real(x.left))}</span>`, 'build:' + x.id))
+    .concat(S.research ? [row(T[S.research.id].icon, `<b>${T[S.research.id].name}</b> → Stufe ${S.research.target} <span class="note">(Forschung)</span>`, `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div>`, `<span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span>`, 'research:1')] : [])
+    .concat(tr.map(({ k, o, first }) => row(k, `<b>${B[k].name}</b>: ${o.count}× ${U[o.unit].name}${o.heal ? ' heilen' : ''}`, first ? `<div class="prog"><i data-tprog="${k}" style="width:${(1 - o.left / o.per) * 100}%"></i></div>` : '', `<span class="time" ${first ? `data-ttime="${k}"` : ''}>${first ? fmtT(real(o.left + (o.count - 1) * o.per)) : 'wartet'}</span>`, first && !o.heal ? 'train:' + k : '')))
     .concat(marches.map(m => `<button class="ord go" type="button" data-march="${m.id}"><div class="qmain"><b>Heer</b> · ${KIND_SHORT[m.tk] || ''}</div><span class="time" data-mtime="${m.id}">${marchLine(m)}</span></button>`));
   const freeSlots = q.length < maxQueues(S) ? '<div class="ord free">Baumeister frei: wähle unten ein Gebäude.</div>' : '';
   const stRow = stationTotal() ? `<div class="ord free">Verbündete Truppen in deiner Burg: <b>${fmtN(stationTotal())}</b> (Tab Bündnis)</div>` : '';
   const home = homeTroops(S), away = awayTroops(S), wd = woundedCount(S);
-  const can = g => g[0] === 'tech' ? 0 : g[3].filter(id => !locked_(id) && !blocker(S, id)).length;
-  const tabs = BGROUPS.map(g => { const c = can(g); return `<button class="tab ${g[0] === cityCat ? 'on' : ''}" type="button" data-cat="${g[0]}"><span class="tico">${g[2]}</span>${g[1]}${c && g[0] !== cityCat ? `<span class="cbadge" title="Jetzt baubar">${c}</span>` : ''}</button>`; }).join('');
-  let body;
-  if (cityCat === 'tech') {
-    const A = S.lv.akademie;
-    body = (A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`)
+  const A = S.lv.akademie;
+  const body = BORDER.map(plateHTML).join('');
+  const techBody = (A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`)
       + `<div class="note-box">Akademie Stufe <b>${A}</b> · Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1.${A ? '' : ''}</div>` + Object.keys(T).map(techPlateHTML).join('');
-  } else body = BGROUPS.find(g => g[0] === cityCat)[3].map(plateHTML).join('');
   $('cityList').innerHTML = `<div class="city-in">
-    <article class="scene" data-b="rathaus"><img alt="" src="${imgOf('rathaus')}"><div class="scene-t"><div><div class="scene-name">Burg von ${esc(me.name)}</div><div class="scene-sub">Rathaus Stufe ${L} · „${esc(match.name)}“</div></div><span class="shield">${L}</span></div></article>
+    <div class="burg" data-b="rathaus"><b>Burg von ${esc(me.name)}</b><span>Rathaus Stufe ${L} · „${esc(match.name)}“</span></div>
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
-    <div class="tabs">${tabs}</div><div class="tabbody parch">${body}</div>
+    <div class="tabbody parch">${body}<h3 class="sec" id="techSec">Forschung</h3>${techBody}</div>
   </div>`;
   $('city').scrollTop = keepTop;
 }
