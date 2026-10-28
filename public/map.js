@@ -676,9 +676,9 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.territory = new T.Group(); this.scene.add(this.territory); this.preview = null; this.terrAt = 0; this.terrDirty = true;
     this.ringMesh = new T.Mesh(new T.RingGeometry(.9, 1.0, 40), new T.MeshBasicMaterial({ color: 0xf0d98a, transparent: true, opacity: .95, side: T.DoubleSide, depthTest: false }));
     this.ringMesh.rotation.x = -Math.PI / 2; this.ringMesh.renderOrder = 20; this.ringMesh.visible = false; this.scene.add(this.ringMesh);
-    this.routeGeo = new T.BufferGeometry(); this.routeGeo.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(3 * 1200), 3)); this.routeGeo.setDrawRange(0, 0);
+    this.routeGeo = new T.BufferGeometry(); this.routeGeo.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(3 * 1200), 3)); this.routeGeo.setAttribute('color', new T.Float32BufferAttribute(new Float32Array(3 * 1200), 3)); this.routeGeo.setDrawRange(0, 0);
     this.routeCol = new T.Color(1, 1, 1);
-    this.routePts = new T.Points(this.routeGeo, new T.PointsMaterial({ size: 5, sizeAttenuation: false, color: 0xffffff, depthTest: false, transparent: true, opacity: .95 })); this.routePts.renderOrder = 15; this.routePts.frustumCulled = false; this.scene.add(this.routePts);
+    this.routePts = new T.Points(this.routeGeo, new T.PointsMaterial({ size: 5, sizeAttenuation: false, vertexColors: true, color: 0xffffff, depthTest: false, transparent: true, opacity: .95 })); this.routePts.renderOrder = 15; this.routePts.frustumCulled = false; this.scene.add(this.routePts);
     const NS = 320; this.smokeN = NS; const sg = new T.BufferGeometry();
     sg.setAttribute('position', new T.BufferAttribute(new Float32Array(NS * 3), 3)); sg.setAttribute('aA', new T.BufferAttribute(new Float32Array(NS), 1)); sg.setAttribute('aS', new T.BufferAttribute(new Float32Array(NS), 1));
     this.smokeMat = new T.ShaderMaterial({ vertexShader: SMOKE_VS, fragmentShader: SMOKE_FS, transparent: true, depthWrite: false, uniforms: { uScale: { value: 600 } } });
@@ -1385,7 +1385,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         } else { const cs = Math.cos(hdg), sn = Math.sin(hdg), wx = p.x + u.rx * cs + u.rz * sn, wz = p.y - u.rx * sn + u.rz * cs; u.g.position.set(u.rx, Math.max(0, this.yAt(wx, wz)) - y0 + bob, u.rz); u.g.rotation.y = 0; }
       });
       if (t - (s.lt || 0) > .5) { s.lt = t; const bt = this.badgeTxt(s, gt); if (bt !== s.bt) { s.bt = bt; this.setBadge(s.lab, bt, 0x2a2f38); } }
-      if (m.own || (this.sel && this.sel.type === 'march' && this.sel.id === m.id)) {
+      if (m.path && m.path.length > 1) {   // Wege aller sichtbaren Märsche, je Spieler in seiner Farbe
         const pts = [[p.x, p.y]]; for (let i = p.i + 1; i < m.path.length; i++) { const [x, yy] = cellXY(m.path[i]); pts.push([x + .5, yy + .5]); }
         routes.push({ pts, col: s.col });
       }
@@ -1438,17 +1438,16 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     g.attributes.position.needsUpdate = true; g.attributes.aA.needsUpdate = true; g.attributes.aS.needsUpdate = true;
   }
   updateRoutes(routes, t) {
-    const a = this.routeGeo.attributes.position.array; let n = 0; const off = (t * 1.2) % .7;
+    const a = this.routeGeo.attributes.position.array, ca = this.routeGeo.attributes.color.array; let n = 0; const off = (t * 1.2) % .7;
     for (const r of routes) {
-      let carry = off;
-      for (let i = 1; i < r.pts.length && n < 395; i++) {
+      let carry = off; const cr = LIN(r.col >> 16 & 255) * 1.6 + .1, cg = LIN(r.col >> 8 & 255) * 1.6 + .1, cb = LIN(r.col & 255) * 1.6 + .1;
+      for (let i = 1; i < r.pts.length && n < 1190; i++) {
         const [x0, z0] = r.pts[i - 1], [x1, z1] = r.pts[i], len = Math.hypot(x1 - x0, z1 - z0); if (!len) continue;
-        for (let d = carry; d < len && n < 395; d += .7) { const u = d / len, x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * u; a[n * 3] = x; a[n * 3 + 1] = Math.max(0, this.yAt(x, z)) + .25; a[n * 3 + 2] = z; n++; carry = d + .7 - len; }
+        for (let d = carry; d < len && n < 1190; d += .7) { const u = d / len, x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * u; a[n * 3] = x; a[n * 3 + 1] = Math.max(0, this.yAt(x, z)) + .25; a[n * 3 + 2] = z; ca[n * 3] = cr; ca[n * 3 + 1] = cg; ca[n * 3 + 2] = cb; n++; carry = d + .7 - len; }
         carry = Math.max(0, carry);
       }
     }
-    this.routeGeo.attributes.position.needsUpdate = true; this.routeGeo.setDrawRange(0, n);
-    if (routes.length) this.routePts.material.color.setRGB(LIN(routes[0].col >> 16 & 255) * 1.6 + .1, LIN(routes[0].col >> 8 & 255) * 1.6 + .1, LIN(routes[0].col & 255) * 1.6 + .1);
+    this.routeGeo.attributes.position.needsUpdate = true; this.routeGeo.attributes.color.needsUpdate = true; this.routeGeo.setDrawRange(0, n);
   }
 
   /* ---------- Antippen ---------- */
