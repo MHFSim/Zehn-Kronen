@@ -232,7 +232,7 @@ body:not(.mode-map) .hud{display:none}
 .scoutpop .mp-t{display:block;margin-bottom:8px}.scoutpop small{display:block;font-size:12px;opacity:.85;margin-top:2px}.scoutpop .row{display:flex;gap:8px}
 
 /* Helden */
-.hport{position:relative;flex:none;width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--hc) 55%,#fff),var(--hc) 62%,#150d06);border:3px solid #d9a93a;box-shadow:0 0 0 2px #0007,0 4px 10px #0009;display:grid;place-items:center}
+.hport{position:relative;isolation:isolate;z-index:0;flex:none;width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--hc) 55%,#fff),var(--hc) 62%,#150d06);border:3px solid #d9a93a;box-shadow:0 0 0 2px #0007,0 4px 10px #0009;display:grid;place-items:center}
 .hport.big{width:104px;height:104px}.hport.big .hface{font-size:60px}.hport.big .hweap{font-size:34px}
 .haura{position:absolute;inset:-9px;border-radius:50%;background:conic-gradient(from 0deg,transparent,var(--hc),transparent 35%,var(--hc),transparent 70%);filter:blur(6px);opacity:.6;animation:hspin 7s linear infinite;z-index:0}
 .hface{position:relative;z-index:2;font-size:40px;line-height:1;animation:hbob 3.2s ease-in-out infinite;filter:drop-shadow(0 3px 2px #000a)}
@@ -438,7 +438,7 @@ body.sheet-open .sheet.popup{transform:translate(-50%,0) scale(1);opacity:1;poin
 .modal-in .btn.ghost{color:var(--ink);border-color:var(--line)}
 
 /* ===== Menüs wie ein richtiges Spiel: Kopfzeile, Reiter, Kacheln ===== */
-.phead{display:flex;align-items:center;gap:12px;margin:-16px -14px 14px;padding:12px 14px;border-radius:11px 11px 0 0;background:linear-gradient(#5a3a1f,#3a2312);border-bottom:3px solid #a77b36;color:#f6e7bd;position:sticky;top:-16px;z-index:2}
+.phead{display:flex;align-items:center;gap:12px;margin:-16px -14px 14px;padding:12px 14px;border-radius:11px 11px 0 0;background:linear-gradient(#5a3a1f,#3a2312);border-bottom:3px solid #a77b36;color:#f6e7bd;position:sticky;top:-16px;z-index:40}
 .phead h2{margin:0;font-size:22px;line-height:1.1;color:#f6e7bd!important;text-shadow:0 2px 0 rgba(0,0,0,.5)}
 .phead small{display:block;font-size:12px;color:#d9c595;margin-top:2px}
 .phead .tag{background:#2b190c;color:#f3d58c;border-color:#a77b36;font-size:12px;vertical-align:middle}
