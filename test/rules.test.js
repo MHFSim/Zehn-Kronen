@@ -33,9 +33,9 @@ assert.ok(S.res.wood <= cap(S) + 1e-9, 'Holz bleibt unter der Lagergrenze');
 {
   assert.equal(Object.keys(U).length, 4, 'Infanterie, Fernkämpfer, Kavallerie, Handkarren');
   assert.deepEqual(U.schwert.cost, [0, 25, 45]); assert.equal(U.schwert.t, 360); assert.deepEqual(U.schwert.at, [10, 45, 50]); assert.deepEqual(U.schwert.df, [20, 35, 30]); assert.equal(U.schwert.name, 'Infanterie'); assert.equal(U.bogen.name, 'Fernkämpfer'); assert.equal(U.schwer.name, 'Kavallerie');
-  assert.deepEqual(U.bogen.df, [14, 31, 10]); assert.equal(Math.round(U.schwer.s), 38); assert.equal(U.handkarren.c, 500);
+  assert.deepEqual(U.bogen.df, [14, 31, 10]); assert.equal(Math.round(U.schwer.s), 38); assert.equal(U.handkarren.c, 200);
   assert.ok(B.lager.units.includes('handkarren'), 'Transport wird im Lagerhaus gebaut');
-  assert.equal(capacityOf({ handkarren: 2, schwert: 10 }), 1220, 'Karren erhöhen die Traglast');
+  assert.equal(capacityOf({ handkarren: 2, schwert: 10 }), 620, 'Karren erhöhen die Traglast');
   assert.ok(armySpeed({ schwert: 10, handkarren: 1 }) < armySpeed({ schwert: 10 }), 'Karren machen das Heer langsamer');
 }
 console.log('Alle Regeltests bestanden.');

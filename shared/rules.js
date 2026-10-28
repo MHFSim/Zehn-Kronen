@@ -39,7 +39,7 @@ export const U = {
   schwert:   mk('Infanterie',      'inf',   [25, 15, 30], 360,  60 / 30, 22, [10, 45, 50], [20, 35, 30], 1, { strong: ['schwer'], good: [], weak: ['bogen'] }),
   bogen:     mk('Fernkämpfer',     'art',   [30, 15, 20], 300,  60 / 30, 22, [20, 60, 10], [14, 31, 10], 1, { strong: ['schwert'], good: [], weak: ['schwer'] }),
   schwer:    mk('Kavallerie',      'kav',   [25, 15, 45], 420,  60 / 38, 22, [24, 15, 21], [59, 27, 36], 1, { strong: ['bogen'], good: [], weak: ['schwert'] }),
-  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  60 / 28, 500, null, null, 1)
+  handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  60 / 28, 200, null, null, 1)
 };
 
 // Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.
