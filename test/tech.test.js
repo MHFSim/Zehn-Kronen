@@ -14,14 +14,14 @@ assert.equal(applyCommand(S, { type: 'cancelResearch' }), ''); assert.equal(S.re
 assert.equal(applyCommand(S, { type: 'research', tech: 'ackerbau' }), '');
 advanceTo(S, techTime('ackerbau', 1) * 1000 + 1000, 1);
 assert.equal(S.tech.ackerbau, 1); assert.equal(S.research, null);
-assert.ok(Math.abs(rate(S, 'food') / r0 - 1.08) < .001, 'Nahrung +8 %');
+assert.ok(Math.abs(rate(S, 'food') / r0 - 1.04) < .001, 'Nahrung +4 %');
 assert.match(applyCommand(S, { type: 'research', tech: 'ackerbau' }), /Akademie Stufe 3/);
 S.lv.akademie = 9; for (let i = 2; i <= T_MAX; i++) { assert.equal(applyCommand(S, { type: 'research', tech: 'ackerbau' }), ''); S.at = 0; advanceTo(S, 1e9 * 1000, 1); }
 assert.equal(S.tech.ackerbau, 5); assert.match(applyCommand(S, { type: 'research', tech: 'ackerbau' }), /Höchststufe/);
 assert.ok(techCost('ackerbau', 3)[0] > techCost('ackerbau', 1)[0]);
 // Wirkung im Kampf, bei der Traglast
 S.tech.kriegskunst = 5; S.tech.lasten = 3;
-assert.equal(forceOf(S), 1.2); assert.equal(capacityOf({ speer: 100 }, S), 2860);
+assert.equal(forceOf(S), 1.1); assert.equal(capacityOf({ speer: 100 }, S), 2530);
 const att = { speer: 100 }, def = { speer: 100 };
 assert.equal(battle(att, def, 1, 1).win, false);
 assert.equal(battle(att, def, 1, 1.5).win, true);
@@ -30,7 +30,7 @@ const S2 = freshState(0); S2.lv.akademie = 9; S2.res = { food: 1e6, wood: 1e6, s
 assert.match(applyCommand(S2, { type: 'research', tech: 'forst' }), /Erst Ackerbau/);
 S2.tech.ackerbau = 2; assert.equal(applyCommand(S2, { type: 'research', tech: 'forst' }), '');
 S2.tech.forst = 2; S2.tech.drill = 5; S2.tech.festungsbau = 0;
-assert.ok(Math.abs(unitTime(S2, 'speer', 'kaserne') - U.speer.t / 1.3) < 1e-6, 'Drill beschleunigt');
+assert.ok(Math.abs(unitTime(S2, 'speer', 'kaserne') - U.speer.t / 1.15) < 1e-6, 'Drill beschleunigt');
 assert.ok(cap(S2) >= 1500);
 assert.equal(catchUpOf(2, 10) > 0, true); assert.equal(catchUpOf(10, 10), 0); assert.ok(catchUpOf(0, 10) <= .4);
 console.log('Alle Forschungstests bestanden.');
