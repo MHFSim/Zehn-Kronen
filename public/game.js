@@ -17,7 +17,7 @@ import { HERO_ART, HERO_POS } from '/public/heroart.js';
 import { snd } from '/public/sound.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
-import { installIcons, banner } from '/public/icons.js';
+import { installIcons, banner, icon } from '/public/icons.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
@@ -220,10 +220,10 @@ function renderTop() {
   const c = cap(S);
   $('res').innerHTML = [...RES, 'gold'].map(r => {
     const v = S.res[r], rt = rate(S, r), bn = (S.bonus && S.bonus[r]) || 0, pct = r === 'gold' ? 0 : Math.min(100, v / c * 100);
-    return `<div class="res-cell" title="${RES_DE[r]}: ${fmtN(v)}"><div class="res-name">${RES_DE[r]}</div><div class="res-top"><i class="r r-${r}"></i>${fmtK(v)}</div>
+    return `<div class="res-cell" title="${RES_DE[r]}: ${fmtN(v)}"><span class="rico rc-${r}">${icon({ food: 'food', wood: 'wood', stone: 'stone', ore: 'ore', gold: 'coin' }[r])}</span><div class="rtx"><div class="res-name">${RES_DE[r]}</div><div class="res-top">${fmtK(v)}</div>
       <div class="res-rate ${rt < 0 ? 'neg' : ''}">${rt >= 0 ? '+' : ''}${fmtK(rt)}/h</div>
       ${bn ? `<div class="res-bonus" title="Bonus durch ein gehaltenes ${r === 'gold' ? 'Thron- oder Heiligtum' : 'Heiligtum'}">✦ +${Math.round(bn * 100)} % Bonus</div>` : ''}
-      <div class="res-bar">${r === 'gold' ? '' : `<i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i>`}</div></div>`;
+      </div><div class="res-bar">${r === 'gold' ? '' : `<i class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></i>`}</div></div>`;
   }).join('');
   $('speed').className = 'speed' + (live ? '' : ' off');
   $('speed').innerHTML = live ? `Tempo <b>×${speed}</b>` : 'Verbindung weg';
