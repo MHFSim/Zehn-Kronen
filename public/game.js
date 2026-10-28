@@ -21,7 +21,7 @@ import { installIcons, banner, icon } from '/public/icons.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
-let lastMapTap = { id: 0, t: 0 }, sendGroup = [], lastArmyTap = { id: 0, t: 0 }, sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
+let armyBtnSwipe = 0, lastMapTap = { id: 0, t: 0 }, sendGroup = [], lastArmyTap = { id: 0, t: 0 }, sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -161,7 +161,7 @@ function revealMap(tx, ty) {
 }
 function focusMap(tx, ty, dist) { wm.focus(tx, ty, dist, document.body.classList.contains('sheet-open') ? .26 : .46); }
 function setupInput() {
-  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lpT = 0, lpDone = false, dragArmy = 0;
+  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lpT = 0, lpDone = false, dragArmy = 0, dragGrp = null;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y), ang = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
   view.style.touchAction = 'none';
   view.addEventListener('pointerdown', e => {
@@ -169,7 +169,7 @@ function setupInput() {
     if (ptrs.size === 1) {
       moved = false; lpDone = false; downAt = { x: e.clientX, y: e.clientY }; dragArmy = 0;
       const h0 = mapReady && !placing && !sendGroup.length ? wm.pickAt(e.clientX, e.clientY) : null, m0 = h0 && h0.type === 'march' ? ownMarches().find(x => x.id === h0.id) : null;
-      if (m0 && (['post', 'gather', 'back', 'fight'].includes(m0.phase) || (m0.phase === 'out' && m0.mode !== 'build'))) dragArmy = m0.id; else wm.dragStart(e.clientX, e.clientY);
+      if (m0 && redirectable(m0)) { dragArmy = m0.id; dragGrp = lastMapTap.id === m0.id && Date.now() - lastMapTap.t < 450 ? nearIds(m0) : null; if (dragGrp && dragGrp.length < 2) dragGrp = null; } else wm.dragStart(e.clientX, e.clientY);
       clearTimeout(lpT); miniClose();
     }
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), a: ang(a, b) }; moved = true; }
@@ -187,7 +187,7 @@ function setupInput() {
   const end = e => {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId); clearTimeout(lpT);
-    if (dragArmy && ptrs.size === 0) { const id = dragArmy; dragArmy = 0; armyDragLine(null); if (!msel) wm.select(null); hoverKey = ''; if (moved && e.type === 'pointerup') { armyDragSend(id, e.clientX, e.clientY); return; } }
+    if (dragArmy && ptrs.size === 0) { const id = dragArmy; dragArmy = 0; armyDragLine(null); if (!msel) wm.select(null); hoverKey = ''; if (moved && e.type === 'pointerup') { if (dragGrp) { const ids = dragGrp; dragGrp = null; lastMapTap = { id: 0, t: 0 }; groupSend(wm.pickAt(e.clientX, e.clientY), e.clientX, e.clientY, ids); } else armyDragSend(id, e.clientX, e.clientY); return; } dragGrp = null; }
     if (ptrs.size === 0 && !moved && !lpDone && e.type === 'pointerup') tap(e.clientX, e.clientY);
     if (ptrs.size === 1) { const [r] = [...ptrs.values()]; wm.dragStart(r.x, r.y); downAt = { x: r.x, y: r.y }; }
     if (ptrs.size < 2) pinch = null;
@@ -275,7 +275,16 @@ function renderArmyBtns() {
   let el = $('armyBtns');
   if (!el) {
     el = document.createElement('div'); el.id = 'armyBtns'; el.className = 'armybtns'; document.body.appendChild(el);
+    let ad = null;   // Wischen vom Heldensymbol zum Ziel (nach Doppeltipp: alle Heere)
+    el.addEventListener('pointerdown', e => { const b = e.target.closest('[data-army]'); if (!b) return; const id = Number(b.dataset.army), r = b.getBoundingClientRect(); ad = { id, x: e.clientX, y: e.clientY, ox: r.left + r.width / 2, oy: r.top + r.height / 2, moved: false, dbl: lastArmyTap.id === id && Date.now() - lastArmyTap.t < 500 }; });
+    el.addEventListener('pointermove', e => { if (!ad) return; if (!ad.moved && Math.hypot(e.clientX - ad.x, e.clientY - ad.y) > 14) { ad.moved = true; try { el.setPointerCapture(e.pointerId); } catch {} } if (ad.moved) { armyDragLine({ x: ad.ox, y: ad.oy }, { x: e.clientX, y: e.clientY }); armyDragHover(e.clientX, e.clientY, ad.id); } });
+    const adEnd = e => { if (!ad) return; const a = ad; ad = null; if (!a.moved) return; armyDragLine(null); hoverKey = ''; if (!msel) wm.select(null); armyBtnSwipe = Date.now();
+      if (e.type !== 'pointerup') return; const hit = wm.pickAt(e.clientX, e.clientY);
+      const grp = sendGroup.length > 1 ? sendGroup.slice() : a.dbl ? ownMarches().filter(redirectable).map(x => x.id) : null;
+      if (grp && grp.length > 1) { lastArmyTap = { id: 0, t: 0 }; groupSend(hit, e.clientX, e.clientY, grp); } else armyDragSend(a.id, e.clientX, e.clientY); };
+    el.addEventListener('pointerup', adEnd); el.addEventListener('pointercancel', adEnd);
     el.addEventListener('click', e => {
+      if (Date.now() - armyBtnSwipe < 400) return;
       const b = e.target.closest('[data-army]'); if (!b) return; const id = Number(b.dataset.army), m = ownMarches().find(x => x.id === id); if (!m) return;
       const nowT = Date.now(), dbl = lastArmyTap.id === id && nowT - lastArmyTap.t < 500; lastArmyTap = { id, t: nowT };
       if (dbl && ownMarches().length >= 2) {   // Doppelklick auf ein Helden-Symbol: alle Heere wählen
@@ -1274,10 +1283,12 @@ function healHTML() {
   return `<div class="block"><h3>Verwundete (${fmtN(woundedCount(S))} von ${fmtN(lazarettCap(S))} Plätzen)</h3>${rows || '<p class="note">Niemand verwundet. Nach Kämpfen überleben bis zu 30 % der Verluste hier, wenn Platz ist.</p>'}${queue ? `<div class="block" style="padding:10px">${queue}</div>` : ''}</div>`;
 }
 
+const redirectable = x => ['post', 'gather', 'back', 'fight'].includes(x.phase) || (x.phase === 'out' && x.mode !== 'build');
+const nearIds = m0 => { const o0 = wm.marchObjs[m0.id]; return ownMarches().filter(x => { if (!redirectable(x)) return false; const o = wm.marchObjs[x.id]; return o && o0 && Math.hypot(o.grp.position.x - o0.grp.position.x, o.grp.position.z - o0.grp.position.z) <= 14; }).map(x => x.id); };
 // Alle gewählten Heere auf einmal losschicken (Gelände, Sammelfelder, Räuber)
-async function groupSend(hit, sx, sy) {
+async function groupSend(hit, sx, sy, idList) {
   const cmd = orderCmd(hit, sx, sy); if (!cmd) return;
-  const ids = sendGroup.slice(); sendGroup = []; syncMoveBar(); let okN = 0;
+  const ids = (idList || sendGroup).slice(); sendGroup = []; syncMoveBar(); let okN = 0;
   for (const id of ids) { sendFrom = id; if (await command({ ...cmd })) okN++; }
   sendFrom = 0; syncMoveBar(); renderArmyBtns(); if (okN) toast(okN + ' Heere ziehen gemeinsam los.', 'info');
 }
