@@ -807,7 +807,7 @@ function techCardHTML(id) {
     <details class="tdet"><summary>Alle Stufen</summary>${rows}</details></div>`;
 }
 let techSel = '';
-const TN = { w: 96, h: 90, gx: 26, gy: 10, pad: 8 };
+const TN = { w: 148, h: 58, gx: 34, gy: 18, pad: 10 };
 function techTreeHTML() {
   const ids = Object.keys(T), px = id => TN.pad + T[id].col * (TN.w + TN.gx), py = id => TN.pad + T[id].row * (TN.h + TN.gy);
   const W = TN.pad * 2 + (Math.max(...ids.map(i => T[i].col)) + 1) * (TN.w + TN.gx) - TN.gx, H = TN.pad * 2 + (Math.max(...ids.map(i => T[i].row)) + 1) * (TN.h + TN.gy) - TN.gy;
@@ -859,12 +859,7 @@ function renderPanel(force) {
   $('sidePanel').scrollTop = top;
   fitTree();
 }
-// Techtree: in voller Größe (mindestens), zum Wischen; auf hohen Bildschirmen so groß, dass die Höhe gerade passt
-function fitTree() {
-  const box = document.querySelector('.tree'), inner = box && box.firstElementChild; if (!inner) return;
-  inner.style.zoom = 1; const H = inner.offsetHeight, ch = box.clientHeight - 12; if (!H || ch <= 0) return;
-  inner.style.zoom = Math.max(1, Math.min(1.5, ch / H));
-}
+function fitTree() {}
 window.addEventListener('resize', () => { if (panelName === 'tech') fitTree(); });
 function openPanel(name) {
   if (!$('reports').hidden) closeReports();
