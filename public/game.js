@@ -285,7 +285,7 @@ function renderArmyBtns() {
   }
   const show = mode === 'map' && !!S && !!view && !msel; el.hidden = !show; if (!show && !sendFrom) { /* bleibt versteckt */ }
   const ST = { out: '🚶', back: '↩', gather: '⛏', fight: '⚔', post: '⚑' };
-  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id || sendGroup.includes(m.id) ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="apic">${H ? hpic(m.hero, H) : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
+  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id || sendGroup.includes(m.id) ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="aname">${H ? esc(H.name) : 'Heer'}</span><span class="apic">${H ? hpic(m.hero, H) : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 function renderPts() {
