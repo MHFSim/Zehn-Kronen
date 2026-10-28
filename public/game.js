@@ -17,6 +17,7 @@ import { HERO_ART, HERO_POS } from '/public/heroart.js';
 import { snd } from '/public/sound.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
+import { installIcons, banner } from '/public/icons.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
@@ -607,7 +608,8 @@ function checkFeed() {
 }
 
 /* ---------- gemeinsame Bausteine der Menüs ---------- */
-const phead = (ico, title, sub, right) => `<header class="phead"><span class="pico">${ico}</span><div class="ptitle"><h2>${title}</h2>${sub ? `<small>${sub}</small>` : ''}</div>${right || ''}</header>`;
+const PSC = { '🛡️': 'ally', '☰': 'more', '⚔️': 'train', '🎓': 'academy', '🪖': 'units', '📜': 'reports', '🦸': 'heroes' };
+const phead = (ico, title, sub, right) => `<header class="phead">${banner(PSC[ico] || 'city')}<span class="pico">${ico}</span><div class="ptitle"><h2>${title}</h2>${sub ? `<small>${sub}</small>` : ''}</div>${right || ''}</header>`;
 const ptabs = (items, cur, act) => `<div class="ptabs" role="tablist">${items.map(([id, label, n]) => `<button type="button" role="tab" class="ptab ${id === cur ? 'on' : ''}" data-act="${act}" data-t="${id}">${label}${n ? `<span class="pbadge">${n}</span>` : ''}</button>`).join('')}</div>`;
 let moreFrom = '', allyTab = '', moreSub = '', repTab = 'all';
 
@@ -1723,4 +1725,5 @@ function startGame() {
   }, 250);
 }
 window.__zk = { get wm() { return wm; }, get cam() { return wm && wm.cam; }, get sel() { return msel; } };   // nur für Tests
+installIcons();
 boot();

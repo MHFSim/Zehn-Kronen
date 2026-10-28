@@ -1,9 +1,9 @@
 /* Zehn Kronen – gemeinsames Aussehen für Spiel und Admin-Seite */
 :root{
-  --bg:#1b1f24; --panel:#232830; --panel-2:#2c323b; --line:#3a414b;
-  --ink:#ebe5d6; --muted:#a29b8b; --brass:#d2a94e; --brass-ink:#1b1f24;
-  --good:#86b56f; --bad:#e3765f;
-  --food:#d9b44a; --wood:#a06c3c; --stone:#a7a49c; --ore:#7b95ad; --gold:#e6c35c;
+  --bg:#0e131a; --panel:#151c26; --panel-2:rgba(255,255,255,.05); --line:rgba(255,255,255,.1);
+  --ink:#e9e2cf; --muted:#a99f86; --brass:#e8c766; --brass-ink:#2b1a0d;
+  --good:#8fd07a; --bad:#ef7a64;
+  --food:#e6c35c; --wood:#c98e55; --stone:#b9bdc6; --ore:#8fb0d6; --gold:#ffd96a;
   --f-display:"IM Fell English SC", Georgia, "Times New Roman", serif;
   --f-body:"Alegreya Sans", "Segoe UI", system-ui, sans-serif;
   color-scheme:dark;
