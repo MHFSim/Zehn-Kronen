@@ -204,6 +204,8 @@ function armyDragLine(a, b) {
   const dx = b.x - a.x, dy = b.y - a.y; el.hidden = false;
   el.style.left = a.x + 'px'; el.style.top = a.y + 'px'; el.style.width = Math.hypot(dx, dy) + 'px'; el.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
 }
+// Nach einem Befehl an ein Heer: alle Menüs und Pop-ups schließen
+function dismissAll() { closeSheet(); miniClose(); if (scoutEl) scoutEl.hidden = true; if (panelName) closePanel(); wm.select(null); wm.setPreview(null); hoverKey = ''; }
 // Beim Wischen: Kreis um das Ziel unter dem Finger (Gebäude, Feld, Räuber)
 let hoverKey = '';
 function armyDragHover(sx, sy, id) {
@@ -215,7 +217,7 @@ async function armyDragSend(id, sx, sy) {
   const cmd = orderCmd(hit, sx, sy, true);
   if (!cmd) { if (hit && hit.type !== 'march') { miniClose(); sendFromOp = ''; sendFrom = id; syncMoveBar(); selectMap(hit, false); } return; }   // Gebäude: Menü mit dem gewählten Heer öffnen
   sendFrom = id; const ok = await command(cmd); sendFrom = 0; syncMoveBar(); renderArmyBtns();
-  if (ok) toast('Das Heer zieht dorthin.', 'info');
+  if (ok) { dismissAll(); toast('Das Heer zieht dorthin.', 'info'); }
 }
 // Befehl für ein Ziel auf der Karte: Gelände, Rohstofffeld oder Räuber
 function orderCmd(hit, sx, sy, quiet) {
@@ -1290,7 +1292,7 @@ async function groupSend(hit, sx, sy, idList) {
   const cmd = orderCmd(hit, sx, sy); if (!cmd) return;
   const ids = (idList || sendGroup).slice(); sendGroup = []; syncMoveBar(); let okN = 0;
   for (const id of ids) { sendFrom = id; if (await command({ ...cmd })) okN++; }
-  sendFrom = 0; syncMoveBar(); renderArmyBtns(); if (okN) toast(okN + ' Heere ziehen gemeinsam los.', 'info');
+  sendFrom = 0; syncMoveBar(); renderArmyBtns(); if (okN) dismissAll(); if (okN) toast(okN + ' Heere ziehen gemeinsam los.', 'info');
 }
 function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
@@ -1308,7 +1310,7 @@ function mapTap(sx, sy) {
     closeSheet(); miniClose(); sendFrom = 0; sendFromOp = ''; sendGroup = near.map(x => x.id); syncMoveBar(); renderArmyBtns(); return;
   }
   lastMapTap = { id: m0 ? m0.id : 0, t: nowT };
-  if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
+  if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); dismissAll(); } }); return; }
   if (!hit) {
     closeSheet(); const t = wm.tileAtScreen(sx, sy);
     if (t && view.match.phase === 'running') { if (!wm.exploredBit(t.x, t.y) && S.slot >= 0 && !S.out) scoutOpen(fieldAt(t.x, t.y), sx, sy); else miniOpen(t.x, t.y, sx, sy); }
