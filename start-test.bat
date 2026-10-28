@@ -1,6 +1,6 @@
 @echo off
 rem Startet Zehn Kronen zum Testen. Passwort unten aendern!
-set ADMIN_PASSWORD=aendere-mich-bitte
+set ADMIN_PASSWORD=Bailey
 set PORT=3000
 set COOKIE_SECURE=1
 set TRUST_PROXY=1

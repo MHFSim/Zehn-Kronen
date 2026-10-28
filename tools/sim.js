@@ -11,7 +11,7 @@ function load() {
   if (mem) return mem;
   try { mem = JSON.parse(localStorage.getItem(KEY)); } catch { mem = null; }
   if (!mem || !mem.matches) {
-    mem = { seq: 1, adminPass: 'admin', matches: [], players: [], session: { playerId: null, admin: false } };
+    mem = { seq: 1, adminPass: 'Bailey', matches: [], players: [], session: { playerId: null, admin: false } };
     mem.matches.push({ id: mem.seq++, name: 'Testpartie', speed: 1, invite: rnd(10), max_players: 10, created: Date.now(), seed: newSeed(), world: newWorld(Date.now(), { phase: 'running' }) });
   }
   return mem;

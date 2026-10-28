@@ -65,7 +65,7 @@ a_css = a_css.replace('header{', '.ahead{').replace('header h1{', '.ahead h1{').
 a_body = re.search(r'<div class="wrap">(.*?)</div>\n<script>', adm, re.S).group(1)
 a_body = a_body.replace('<header>', '<header class="ahead">')
 a_body = must_rep('Das Passwort steht beim ersten Serverstart in der Konsole, oder du setzt es mit ADMIN_PASSWORD.',
-                  'Testversion: Das Passwort ist „admin“.', a_body)
+                  'Testversion: Das Passwort ist „Bailey“.', a_body)
 a_js = re.search(r'<script>(.*?)</script>', adm, re.S).group(1)
 a_js = must_rep("const link = location.origin + '/?einladung=' + m.invite;", "const link = m.invite;", a_js)
 a_js = must_rep('<code>${esc(link)}</code><button class="btn small" data-act="copy" data-link="${esc(link)}" type="button">Kopieren</button>',
