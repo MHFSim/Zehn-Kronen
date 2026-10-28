@@ -1401,7 +1401,7 @@ function miniOpen(x, y, sx, sy) {
     miniEl.addEventListener('pointerdown', e => e.stopPropagation());
   }
   miniTile = { x, y }; wm.select({ type: 'site', x, y });
-  miniEl.querySelector('.mp-t').textContent = x + ' | ' + y; miniEl.hidden = false;
+  miniEl.querySelector('.mp-t').textContent = ''; miniEl.querySelector('.mp-t').hidden = true; miniEl.hidden = false;
   const W = window.innerWidth, w = miniEl.offsetWidth || 220;
   miniEl.style.left = Math.max(8, Math.min(W - w - 8, sx - w / 2)) + 'px'; miniEl.style.top = Math.max(70, sy - 62) + 'px';
 }
