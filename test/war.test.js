@@ -81,18 +81,17 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.equal(run(match, players, clock, a, { type: 'march', target: cityOf(b).id, mode: 'attack', troops: { schwert: 300, bogen: 150, speer: 150 } }), '');
   assert.equal(a.state.protUntil <= match.world.gt, true);
   assert.equal(viewFor(match, players, b, clock).incoming.length, 1);
-  { // Belagerung: nach der Ankunft steht das Heer 1:30 h vor der Burg, erst dann wird gekämpft
+  { // Kampf in Echtzeit: beginnt sofort bei der Ankunft
     const mm = match.world.marches.find(x => x.owner === a.id), feed0 = b.state.feed.length;
-    adv(match, players, mm.arr[mm.arr.length - 1] + 60);
-    assert.equal(mm.phase, 'siege', 'Heer belagert'); assert.ok(b.state.feed.length > feed0 && b.state.feed[0].title.includes('Belagerung'), 'Warnung an den Verteidiger');
-    const inc = viewFor(match, players, b, clock).incoming[0]; assert.ok(inc && inc.siege, 'Belagerung in der Anzeige');
+    adv(match, players, mm.arr[mm.arr.length - 1] + 1);
+    assert.equal(mm.phase, 'fight', 'Kampf beginnt sofort'); assert.ok(b.state.feed.length > feed0 && b.state.feed[0].title.includes('Kampf'), 'Warnung an den Verteidiger');
+    const inc = viewFor(match, players, b, clock).incoming[0]; assert.ok(inc && inc.siege, 'Kampf in der Anzeige');
+    const pw = viewFor(match, players, b, clock).sieges[0].pw; assert.ok(pw && pw.pa > 0 && pw.pd > 0, 'Lebensbalken');
     give(b, { speer: 5 }); const cc = players[2], dd = players[3]; cc.state.protUntil = 0; dd.state.protUntil = 0; give(cc, { speer: 40 }); give(dd, { speer: 30 });
     assert.match(run(match, players, clock, b, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'att', troops: { speer: 1 } }), /Verteidigern/, 'Verteidiger helfen nicht dem Angreifer');
     assert.match(run(match, players, clock, a, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'def', troops: { speer: 1 } }), /Verbündeten/, 'Angreifer verteidigt nicht');
     const ra = run(match, players, clock, cc, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'def', troops: { speer: 40 } }); assert.equal(ra, '', 'Fremder hilft den Verteidigern: ' + ra);
     const rb = run(match, players, clock, dd, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'att', troops: { speer: 30 } }); assert.equal(rb, '', 'Fremder hilft den Angreifern: ' + rb);
-    adv(match, players, 2400); assert.equal(mm.aux.length, 2, 'Helfer sind eingetroffen'); assert.equal(mm.phase, 'siege');
-    adv(match, players, 1200); assert.equal(b.state.vassalOf, 0, 'vor Ablauf noch kein Kampf'); assert.equal(mm.phase, 'siege');
   }
   adv(match, players, 2 * DAY);
   assert.equal(b.state.vassalOf, a.id, 'erster Fall: Vasall');
@@ -259,29 +258,31 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   void before; void got;
 }
 
-// ---- Abzug aus der Belagerung + Kräfteanzeige ----
+// ---- Kampf in Echtzeit: Balken, Verstärkung, Abzug mit Verlusten ----
 {
   const { match, players } = mk(5); const [a, b] = players;
   const cityOf = q => mapOf(match).objects.find(o => o.k === 'start' && o.slot === q.state.slot);
-  a.state.protUntil = 0; b.state.protUntil = 0; give(a, { speer: 60 });
-  const bs = match.world.marches; void bs;
+  a.state.protUntil = 0; b.state.protUntil = 0; give(a, { speer: 400 }); give(b, { speer: 400 });
   adv(match, players, 4 * DAY + 10);
-  const r = run(match, players, clock, a, { type: 'march', mode: 'attack', target: cityOf(b).id, troops: { speer: 60 } });
-  if (r === '') {
-    const m = match.world.marches.find(x => x.owner === a.id);
-    adv(match, players, m.arr[m.arr.length - 1] + 20);
-    assert.equal(m.phase, 'siege');
-    const v = viewFor(match, players, b, clock), sg = v.sieges.find(x => x.id === m.id);
-    assert.ok(sg && sg.pw && sg.pw.pa > 0 && sg.pw.pd > 0 && sg.pw.na === 60, 'Kräfteanzeige');
-    assert.equal(sg.pw.fight, false);
-    adv(match, players, m.tSiege - 400 - match.world.gt);   // mitten im Kampf
-    const v2 = viewFor(match, players, b, clock), sg2 = v2.sieges.find(x => x.id === m.id);
-    assert.ok(sg2.pw.fight && sg2.pw.na <= sg.pw.na && sg2.pw.pa0 === sg.pw.pa0, 'Kampf läuft in Echtzeit');
-    assert.match(run(match, players, clock, b, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'def', siege: m.id, troops: { speer: 1 } }), /Kampf hat schon begonnen/);
-    assert.equal(run(match, players, clock, a, { type: 'recall', id: m.id }), '', 'Abzug aus dem Kampf');
-    const mm = match.world.marches.find(x => x.id === m.id);
-    assert.ok(!mm || mm.phase === 'back', 'zieht heim');
-  } else console.log('Belagerungstest übersprungen:', r);
+  assert.equal(run(match, players, clock, a, { type: 'march', mode: 'attack', target: cityOf(b).id, troops: { speer: 400 } }), '');
+  const m = match.world.marches.find(x => x.owner === a.id);
+  adv(match, players, m.arr[m.arr.length - 1] + 1);
+  assert.equal(m.phase, 'fight');
+  const v0 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
+  adv(match, players, m.fight.dt * 2 + 1);
+  const v1 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
+  assert.ok(v1.na < v0.na && v1.nd < v0.nd, 'beide Balken sinken: ' + JSON.stringify([v0, v1]));
+  give(b, { speer: 100 }); const home0 = b.state.troops.speer;
+  assert.ok(home0 > 0);
+  const f0 = m.fight.D0.speer;
+  // Verteidiger-Verstärkung aus eigenem Heer, das heimkehrt
+  const r = run(match, players, clock, a, { type: 'recall', id: m.id }); assert.equal(r, '', 'Abzug aus dem Kampf');
+  assert.equal(m.phase, 'back'); assert.ok(sumT(m.troops) < 400, 'Verluste beim Abzug'); assert.ok(sumT(m.troops) > 0);
+  assert.ok(f0 > 0);
+  adv(match, players, DAY);
+  assert.equal(a.state.troops.speer + (a.state.away.speer || 0) > 0, true);
+  assert.equal(match.world.marches.filter(x => x.phase === 'fight').length, 0);
 }
+function sumT(t) { return Object.values(t).reduce((x, y) => x + y, 0); }
 
 console.log('Alle Kriegstests bestanden.');

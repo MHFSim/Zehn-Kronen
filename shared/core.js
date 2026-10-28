@@ -107,7 +107,7 @@ export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, ob
 
 export function marchPos(m, gt) {
   const L = m.path.length - 1;
-  if (m.phase === 'gather' || m.phase === 'post' || m.phase === 'siege') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
+  if (m.phase === 'gather' || m.phase === 'post' || m.phase === 'fight') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
   const el = Math.max(0, Math.min(m.arr[L], gt - m.t0));
   let i = 0; while (i < L && m.arr[i + 1] <= el) i++;
   const [ax, ay] = cellXY(m.path[i]);
@@ -115,7 +115,19 @@ export function marchPos(m, gt) {
   const [bx, by] = cellXY(m.path[i + 1]), f = (el - m.arr[i]) / (m.arr[i + 1] - m.arr[i] || 1);
   return { x: ax + .5 + (bx - ax) * f, y: ay + .5 + (by - ay) * f, i, frac: f, still: false };
 }
-export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.phase === 'siege' ? m.tSiege : m.t0 + m.arr[m.arr.length - 1];
+export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.phase === 'fight' ? (m.lead ? Infinity : m.ft) : m.t0 + m.arr[m.arr.length - 1];
+// Läuft am Ziel gerade ein Kampf? (Der Anführer-Marsch trägt den Kampfstand in m.fight.)
+export const fightAt = (w, tid) => w.marches.find(x => !x.dead && x.phase === 'fight' && x.fight && x.tid === String(tid)) || null;
+// Verstärkung für die Verteidiger eines laufenden Kampfes (Burg oder Außenposten)
+export function joinDefenders(w, tid, troops) {
+  const L = fightAt(w, tid); if (!L) return;
+  const f = L.fight; for (const u in troops) { f.D[u] = (f.D[u] || 0) + troops[u]; f.D0[u] = (f.D0[u] || 0) + troops[u]; }
+}
+// Verteidiger ziehen mitten im Kampf Truppen ab: ihr Anteil verlässt den Kampf samt den bisherigen Verlusten
+export function leaveDefenders(w, tid, troops) {
+  const L = fightAt(w, tid); if (!L) return;
+  const f = L.fight; for (const u in troops) { const k = f.D0[u] > 0 ? Math.min(1, (f.D[u] || 0) / f.D0[u]) : 0; f.D[u] = Math.max(0, (f.D[u] || 0) - troops[u] * k); f.D0[u] = Math.max(0, (f.D0[u] || 0) - troops[u]); }
+}
 export function reversed(m) {
   const L = m.arr.length - 1;
   m.path = m.path.slice().reverse();
