@@ -55,7 +55,7 @@ game = rd('public/game.js')
 game = must_rep("const invite = params.get('einladung') || '';", "let invite = window.zkSimInvite();", game)
 game = must_rep("  if (joinMode) history.replaceState(null, '', '/');\n", '', game)
 game = game.replace("location.href = '/'", 'location.reload()')
-game = game.replace("wm = new WorldMap(THREE, $('stage'));", "wm = new WorldMap(THREE, $('stage')); window.__wm = wm; window.__sel = (h, k) => selectMap(h, k);", 1)
+game = game.replace("wm = new WorldMap(THREE, $('stage'));", "wm = new WorldMap(THREE, $('stage')); window.__wm = wm; window.__sel = (h, k) => selectMap(h, k); window.__snd = snd;", 1)
 game = wrap('game', game)
 
 # --- Admin: Seite und Skript übernehmen ---

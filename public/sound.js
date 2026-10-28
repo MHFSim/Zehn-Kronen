@@ -195,10 +195,29 @@ function playlistOn() {
     player.addEventListener('error', () => { trackBad = true; player = null; if (cfg.music) generatedOn(); });
     player.src = TRACKS[trackI];
   }
-  player.volume = Math.min(1, cfg.vm * .8); player.play().catch(() => {});
+  player.volume = bon ? 0 : musVol(); if (!bon) player.play().catch(() => {});
+}
+// Schlachtmusik: startet mit dem Kampf, läuft höchstens einmal und nur so lange der Kampf dauert; danach weicher Übergang zurück zur normalen Musik
+const BATTLE = '/public/audio/schlacht.mp3';
+let bplayer = null, bfade = 0, bon = false;
+function fadeTo(a, to, sec, done) {
+  if (!a) return; clearInterval(a._f); const from = a.volume, t0 = performance.now();
+  a._f = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / (sec * 1000)); a.volume = Math.max(0, Math.min(1, from + (to - from) * k)); if (k >= 1) { clearInterval(a._f); if (done) done(); } }, 50);
+}
+const musVol = () => Math.min(1, cfg.vm * .8);
+function battleStart() {
+  if (!cfg.music || bon || trackBad) return; bon = true;
+  if (!bplayer) { bplayer = new Audio(); bplayer.preload = 'auto'; bplayer.src = BATTLE; bplayer.addEventListener('ended', () => battleEnd()); bplayer.addEventListener('error', () => { bon = false; if (player) fadeTo(player, musVol(), 1); }); }
+  bplayer.currentTime = 0; bplayer.volume = 0; bplayer.play().catch(() => {});
+  fadeTo(bplayer, musVol(), 1.5); if (player) fadeTo(player, 0, 1.5, () => { if (bon && player) player.pause(); });
+}
+function battleEnd() {
+  if (!bon) return; bon = false;
+  if (bplayer) fadeTo(bplayer, 0, 2.5, () => { if (!bon) bplayer.pause(); });
+  if (cfg.music && player) { player.volume = 0; player.play().catch(() => {}); fadeTo(player, musVol(), 2.5); }
 }
 function musicOn() { if (trackBad) return generatedOn(); playlistOn(); }
-function musicOff() { if (player) player.pause(); generatedOff(); }
+function musicOff() { if (player) player.pause(); if (bplayer) { bplayer.pause(); bon = false; } generatedOff(); }
 function generatedOn() { if (!ac()) return; if (!timer) { nextT = ctx.currentTime + .2; timer = setInterval(schedule, 250); } schedule(); }
 function generatedOff() { clearInterval(timer); timer = 0; }
 
@@ -226,9 +245,9 @@ export const snd = {
     if (level <= 0 && !bed) return;
     try { if (level <= 0) { bed.master.gain.setTargetAtTime(0, ctx.currentTime, .4); return; } const now = ctx.currentTime; if (now - battleT < .28) return; battleT = now; battleTick(Math.min(1, level)); } catch { /* egal */ }
   },
-  mood(m) { if (m !== mood) { mood = m; if (ctx && timer) nextT = Math.max(nextT, ctx.currentTime + .1); } },
+  mood(m) { if (m !== mood) { mood = m; if (m === 'battle') battleStart(); else battleEnd(); if (ctx && timer) nextT = Math.max(nextT, ctx.currentTime + .1); } },
   setMusic(on) { cfg.music = !!on; save(); if (on) musicOn(); else musicOff(); },
   setSfx(on) { cfg.sfx = !!on; save(); if (on) { ac(); this.sfx('ok'); } else if (bed) bed.master.gain.value = 0; },
-  setVol(k, v) { cfg[k] = Math.max(0, Math.min(1, v)); save(); if (ctx) { sfxG.gain.value = cfg.vs; musG.gain.value = cfg.vm * .5; } if (player) player.volume = Math.min(1, cfg.vm * .8); },
+  setVol(k, v) { cfg[k] = Math.max(0, Math.min(1, v)); save(); if (ctx) { sfxG.gain.value = cfg.vs; musG.gain.value = cfg.vm * .5; } if (player && !bon) player.volume = musVol(); if (bplayer && bon) bplayer.volume = musVol(); },
   cfg
 };
