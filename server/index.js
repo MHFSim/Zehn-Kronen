@@ -151,12 +151,20 @@ function readBody(req) {
 const validName = n => typeof n === 'string' && /^[\p{L}\p{N} _-]{3,20}$/u.test(n.trim());
 const validPass = p => typeof p === 'string' && p.length >= 6 && p.length <= 100;
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json' };
-async function serveFile(res, rel) {
+const TYPES = { '.mp3': 'audio/mpeg', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json' };
+async function serveFile(res, rel, req) {
   const file = normalize(join(ROOT, rel));
   if (!file.startsWith(join(ROOT, 'public')) && !file.startsWith(join(ROOT, 'shared'))) return fail(res, 404, 'Nicht gefunden');
   try {
     const buf = await readFile(file);
+    const rg = extname(file) === '.mp3' && req && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');   // Musik: Teilabrufe (nötig für iPhone/Safari)
+    if (rg) {
+      const a = rg[1] === '' ? Math.max(0, buf.length - Number(rg[2])) : Number(rg[1]), b = rg[1] === '' || rg[2] === '' ? buf.length - 1 : Math.min(Number(rg[2]), buf.length - 1);
+      if (a > b || a >= buf.length) { res.writeHead(416, { 'Content-Range': 'bytes */' + buf.length }); return res.end(); }
+      res.writeHead(206, { 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${a}-${b}/${buf.length}`, 'Content-Length': b - a + 1, 'Cache-Control': 'public, max-age=86400' });
+      return res.end(buf.subarray(a, b + 1));
+    }
+    if (extname(file) === '.mp3') { res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400' }); return res.end(buf); }
     res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-cache' });
     res.end(buf);
   } catch { fail(res, 404, 'Nicht gefunden'); }
@@ -365,7 +373,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/manifest.json') return serveFile(res, 'public/manifest.json');
     if (url.pathname === '/impressum') return serveLegal(res, 'impressum');
     if (url.pathname === '/datenschutz') return serveLegal(res, 'datenschutz');
-    if (url.pathname.startsWith('/public/') || url.pathname.startsWith('/shared/')) return serveFile(res, url.pathname.slice(1));
+    if (url.pathname.startsWith('/public/') || url.pathname.startsWith('/shared/')) return serveFile(res, url.pathname.slice(1), req);
     fail(res, 404, 'Nicht gefunden');
   } catch (e) {
     const soft = e.message === 'kein JSON' || e.message === 'zu groß';

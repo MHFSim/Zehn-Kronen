@@ -40,7 +40,14 @@ mods = []
 for name, path in [('mapgen', 'shared/mapgen.js'), ('rules', 'shared/rules.js'), ('heroes', 'shared/heroes.js'), ('combat', 'shared/combat.js'), ('core', 'shared/core.js'), ('outpost', 'shared/outpost.js'), ('war', 'shared/war.js'), ('social', 'shared/social.js'), ('world', 'shared/world.js'), ('cheat', 'shared/cheat.js'),
                    ('art', 'public/art.js'), ('heropics', 'public/heropics.js'), ('rockdata', 'public/rockdata.js'), ('vikingdata', 'public/vikingdata.js'), ('riderdata', 'public/riderdata.js'), ('map', 'public/map.js'), ('audiodata', 'public/audiodata.js'), ('sound', 'public/sound.js'), ('city3d', 'public/city3d.js')]:
     if (root / path).exists():
-        mods.append(wrap(name, rd(path)))
+        msrc = rd(path)
+        if name == 'sound':   # Musik: die Stücke werden klein umkodiert und eingebettet (die Testdatei ist eine einzelne Seite)
+            import subprocess, base64, tempfile
+            for tr in re.findall(r"'(/public/audio/[\w.-]+\.mp3)'", msrc):
+                tmp = tempfile.mktemp(suffix='.mp3')
+                subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(root / tr[1:]), '-vn', '-map_metadata', '-1', '-ac', '1', '-b:a', '56k', tmp], check=True)
+                msrc = msrc.replace("'" + tr + "'", "'data:audio/mpeg;base64," + base64.b64encode(open(tmp, 'rb').read()).decode() + "'"); os.remove(tmp)
+        mods.append(wrap(name, msrc))
 sim = wrap('sim', rd('tools/sim.js'))
 
 # --- Spiel: Anpassungen für die Testversion ---

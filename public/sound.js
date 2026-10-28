@@ -183,8 +183,24 @@ function schedule() {
   const bpm = mood === 'battle' ? 112 : 62;
   while (nextT < ctx.currentTime + 1.4) { if (nextT < ctx.currentTime) nextT = ctx.currentTime + .05; bar(nextT, bars++, bpm); nextT += 4 * 60 / bpm; }
 }
-function musicOn() { if (!ac()) return; if (!timer) { nextT = ctx.currentTime + .2; timer = setInterval(schedule, 250); } schedule(); }
-function musicOff() { clearInterval(timer); timer = 0; }
+// Hintergrundmusik: die Stücke aus public/audio laufen nacheinander im Kreis. Fehlen sie, spielt die erzeugte Musik unten.
+const TRACKS = ['/public/audio/wache.mp3', '/public/audio/eidgenossenschaft.mp3'];
+let player = null, trackI = -1, trackBad = false;
+function playlistOn() {
+  if (!player) {
+    player = new Audio(); player.preload = 'auto';
+    if (trackI < 0) trackI = Math.floor(Math.random() * TRACKS.length);
+    const next = () => { trackI = (trackI + 1) % TRACKS.length; player.src = TRACKS[trackI]; player.play().catch(() => {}); };
+    player.addEventListener('ended', next);
+    player.addEventListener('error', () => { trackBad = true; player = null; if (cfg.music) generatedOn(); });
+    player.src = TRACKS[trackI];
+  }
+  player.volume = Math.min(1, cfg.vm * .8); player.play().catch(() => {});
+}
+function musicOn() { if (trackBad) return generatedOn(); playlistOn(); }
+function musicOff() { if (player) player.pause(); generatedOff(); }
+function generatedOn() { if (!ac()) return; if (!timer) { nextT = ctx.currentTime + .2; timer = setInterval(schedule, 250); } schedule(); }
+function generatedOff() { clearInterval(timer); timer = 0; }
 
 const clipBuf = {};
 async function clipPlay(name, vol) {
@@ -198,7 +214,7 @@ export const snd = {
   // Eigene Klangdatei (public/audio) abspielen
   clip(name, vol = 1) { clipPlay(name, vol); },
   // Beim ersten Tippen darf der Browser Ton abspielen
-  unlock() { if (!ac()) return; if (cfg.music && !timer) musicOn(); },
+  unlock() { ac(); if (cfg.music && (trackBad ? !timer : !player || player.paused)) musicOn(); },
   sfx(name, vol = 1) {
     if (!cfg.sfx || !SFX[name] || !ac()) return;
     const now = ctx.currentTime; if (last[name] && now - last[name] < (name === 'tap' ? .04 : .09)) return; last[name] = now;
@@ -213,6 +229,6 @@ export const snd = {
   mood(m) { if (m !== mood) { mood = m; if (ctx && timer) nextT = Math.max(nextT, ctx.currentTime + .1); } },
   setMusic(on) { cfg.music = !!on; save(); if (on) musicOn(); else musicOff(); },
   setSfx(on) { cfg.sfx = !!on; save(); if (on) { ac(); this.sfx('ok'); } else if (bed) bed.master.gain.value = 0; },
-  setVol(k, v) { cfg[k] = Math.max(0, Math.min(1, v)); save(); if (ctx) { sfxG.gain.value = cfg.vs; musG.gain.value = cfg.vm * .5; } },
+  setVol(k, v) { cfg[k] = Math.max(0, Math.min(1, v)); save(); if (ctx) { sfxG.gain.value = cfg.vs; musG.gain.value = cfg.vm * .5; } if (player) player.volume = Math.min(1, cfg.vm * .8); },
   cfg
 };
