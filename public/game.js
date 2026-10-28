@@ -1417,19 +1417,19 @@ function bestHero(hit) {
   return want.find(id => free.includes(id)) || free.sort((a, b) => heroLvl(b) - heroLvl(a))[0];
 }
 const heroBonusText = id => skillList(S, id).map(k => '+' + (Math.round(k.val * 1000) / 10).toString().replace('.', ',') + ' % ' + k.name).join(' · ');
-function heroPickHTML() {
+function heroPickHTML(closeBtn) {
   if (!sendHero || busyHero(sendHero)) sendHero = bestHero(msel);
-  return `<div class="block hpick"><h3>Anführer</h3><div class="hrow">${HERO_IDS.map(id => { const H = HEROES[id], b = busyHero(id);
+  return `<div class="block hpick"><h3>Anführer${closeBtn ? '<button class="close" type="button" data-act="close" style="float:right;margin:-2px 0 0 8px">Schließen</button>' : ''}</h3><div class="hrow">${HERO_IDS.map(id => { const H = HEROES[id], b = busyHero(id);
     return `<button type="button" class="hchip${id === sendHero ? ' on' : ''}" data-hero="${id}" ${b ? 'disabled' : ''}><span class="hpic fx-${H.fx}" style="--hc:${H.col}">${hpic(id, H)}</span><b>${H.name}</b><small>${b ? 'unterwegs' : 'Stufe ' + heroLvl(id)}</small></button>`; }).join('')}</div>
     ${sendHero ? `<p class="note">${HEROES[sendHero].name}: ${heroBonusText(sendHero)}</p>` : '<p class="why">Alle Helden sind unterwegs.</p>'}</div>`;
 }
-function pickerHTML() {
+function pickerHTML(closeBtn) {
   if (sendFromOp) return heroPickHTML() + `<div class="block picker"><h3>Besatzung weiterschicken</h3><p class="note">${troopsLine(sendOpAll())} ziehen vom Außenposten zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`;
   if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); return `<div class="block picker"><h3>Marschieren</h3><p class="note">${sm ? (sm.troops.n != null ? fmtN(sm.troops.n) + ' Einheiten' : troopsLine(sm.troops)) : ''} ziehen von ihrem Standort zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`; }
   const us = Object.keys(U).filter(u => S.troops[u] > 0);
   if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
   const tot = sendList(), cp = capacityOf(tot, S, sendHero);
-  return heroPickHTML() + `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="shalf">Hälfte</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => {
+  return heroPickHTML(closeBtn) + `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="shalf">Hälfte</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => {
     const max = S.troops[u], val = Math.max(0, Math.min(max, send[u] || 0));
     return `<div class="urow"><div class="un"><b>${U[u].name}</b><small>${fmtN(max)} daheim</small></div><input class="qr" type="range" min="0" max="${max}" value="${val}" data-q="send" data-u="${u}" aria-label="${U[u].name}"><input class="qn" type="number" inputmode="numeric" min="0" max="${max}" value="${val}" data-q="send" data-u="${u}" aria-label="Anzahl"></div>`; }).join('')}
     <p class="note usum">${fmtN(sum(tot))} Einheiten · tragen ${fmtN(cp)}</p></div>`;
@@ -1453,8 +1453,7 @@ function siteSheet(w) {
   if (msel.post) {
     wm.setPreview(null);
     const plan2 = planFor({ id: 'post', x: msel.x, y: msel.y }), ok = view.match.phase === 'running';
-    return `<div class="sh-head"><h2>Marschieren</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-      <p class="note">Das Heer bleibt dort stehen, bis du es zurückrufst. Feinde können es angreifen.</p>${pickerHTML()}`
+    return pickerHTML(true)
       + (plan2 && !plan2.error ? `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan2.duration))}</dd></dl>` : '')
       + actionRow('Marschieren', ok ? plan2 : null, ok ? '' : 'Die Partie läuft nicht.', free, '', 'post');
   }
