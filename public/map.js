@@ -1032,7 +1032,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       keep.add(m.id); let s = this.marchObjs[m.id];
       const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
       const tr = m.troops || {}; let n = 0;
-      const ORDER = ['leicht', 'schwer', 'speer', 'schwert', 'bogen', 'armbrust', 'handkarren'], kinds = [];
+      const ORDER = ['speer', 'schwert', 'bogen', 'armbrust', 'leicht', 'schwer', 'handkarren'], kinds = [];   // vorne Fußvolk, dann Fernkampf, ganz hinten Reiter und Karren
       for (const u of ORDER) if (tr[u] > 0) { n += tr[u]; kinds.push([u, u === 'handkarren' ? tr[u] * .05 : tr[u]]); }
       if (tr.n != null) { n = tr.n; kinds.length = 0; kinds.push(['speer', n]); }
       if (!kinds.length) kinds.push(['speer', 1]);
@@ -1048,11 +1048,13 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       s.m = m; s.col = col;
       if (s.sig !== sig) {
         s.sig = sig; s.dOk = false; for (const u of s.units) s.grp.remove(u.g); s.units = [];
-        const rows = []; for (let k = 0; k < figs.length; k += 3) rows.push(figs.slice(k, k + 3));
+        const GRP = t => t === 'speer' || t === 'schwert' ? 0 : t === 'bogen' || t === 'armbrust' ? 1 : t === 'handkarren' ? 3 : 2, rows = [];   // Fußvolk | Fernkampf | Reiter | Karren: jede Gruppe in eigenen 3er-Reihen
+        for (let gi = 0; gi < 4; gi++) { const gf = figs.filter(t => GRP(t) === gi); for (let k = 0; k < gf.length; k += 3) rows.push(gf.slice(k, k + 3)); }
+        let rowZ = .35; const zs = rows.map((row, r) => { if (r) rowZ -= (GRP(row[0]) === 2 ? .75 : .55); return rowZ; });
         rows.forEach((row, r) => row.forEach((type, c) => {
           const cav = type === 'leicht' || type === 'schwer', ug = this.unitGeo(type, col, type === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
-          const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = .35 - r * (cav ? .75 : .55);
+          const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = zs[r];
           g.position.set(x, 0, z); g.scale.setScalar(type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
           const rr = (type === 'handkarren' ? .42 : cav ? .4 : .3) / g.scale.x, ring = new T.Mesh(new T.RingGeometry(rr * .86, rr, 28), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); ring.rotation.x = -Math.PI / 2; ring.position.y = .04 / g.scale.x; ring.renderOrder = 2; g.add(ring);
           s.units.push({ g, ring, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.5 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
@@ -1356,8 +1358,10 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         if (Math.hypot(dx, dz) > .01) s.hd = m.side === 'def' ? Math.atan2(-dx, -dz) : Math.atan2(dx, dz);
         if (m.side !== 'def' && t - (s.sp || 0) > .28) { s.sp = t; this.spark(p.x + Math.sin(s.hd) * .9, y + .55, p.y + Math.cos(s.hd) * .9); }
       }
-      const colm = !p.still && s.units.length > 1;
-      s.grp.rotation.y = colm ? 0 : (s.hd || 0);
+      const colm = false;   // Heer zieht als geschlossener Block (3er-Reihen), nicht als Schlange
+      if (s.hs == null) s.hs = s.hd || 0; { let dh = ((s.hd || 0) - s.hs + Math.PI * 3) % (Math.PI * 2) - Math.PI; s.hs += dh * Math.min(1, .12 + (s.hd === undefined ? 1 : 0)); }
+      const hdg = fighting ? (s.hd || 0) : s.hs;
+      s.grp.rotation.y = hdg;
       const y0 = Math.max(0, y);
       s.units.forEach((u, k) => {
         const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
@@ -1368,7 +1372,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
           const q = marchPos(m, gt - u.dist * dtc), qa = m.path[Math.min(L, q.i + 1)], [bx, by] = cellXY(qa), ddx = bx + .5 - q.x, ddz = by + .5 - q.y;
           u.g.position.set(q.x - p.x, Math.max(0, this.yAt(q.x, q.y)) - y0 + bob, q.y - p.y);
           u.g.rotation.y = Math.hypot(ddx, ddz) > .01 ? Math.atan2(ddx, ddz) : (u.hd || 0); u.hd = u.g.rotation.y;
-        } else { u.g.position.set(u.rx, bob, u.rz); u.g.rotation.y = 0; }
+        } else { const cs = Math.cos(hdg), sn = Math.sin(hdg), wx = p.x + u.rx * cs + u.rz * sn, wz = p.y - u.rx * sn + u.rz * cs; u.g.position.set(u.rx, Math.max(0, this.yAt(wx, wz)) - y0 + bob, u.rz); u.g.rotation.y = 0; }
       });
       if (t - (s.lt || 0) > .5) { s.lt = t; const bt = this.badgeTxt(s, gt); if (bt !== s.bt) { s.bt = bt; this.setBadge(s.lab, bt, 0x2a2f38); } }
       if (m.own || (this.sel && this.sel.type === 'march' && this.sel.id === m.id)) {
