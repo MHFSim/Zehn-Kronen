@@ -329,6 +329,11 @@ function resolveFight(ctx, lead, bt, realT, win) {
 
 /* ---------- Helfer im Kampf: Spieler (auch aus anderen Bündnissen) schicken Truppen auf Seite der Angreifer oder Verteidiger ---------- */
 // Darf der Spieler in diesem Kampf auf der Seite helfen? Gibt den Kampf (Anführer-Marsch) zurück oder einen Fehlertext
+// Wer auf einer Seite kämpft (oder mit jemandem von ihr verbündet ist), darf der Gegenseite nie helfen
+function sideConflict(ctx, lead, pid, side) {
+  const w = ctx.match.world, foes = side === 'def' ? [lead, ...fightMembers(w, lead, 'att')] : fightMembers(w, lead, 'def');
+  return foes.some(x => x.owner === pid || allied(w, pid, x.owner));
+}
 export function checkAssist(ctx, me, tid, side, defGroupHas) {
   const w = ctx.match.world, sm = fightAt(w, tid);
   if (!sm) return 'Dort läuft gerade kein Kampf.';
@@ -336,15 +341,15 @@ export function checkAssist(ctx, me, tid, side, defGroupHas) {
   const att = byId(ctx.players, sm.owner);
   if (side === 'att') {
     if (defGroupHas(me)) return 'Du gehörst zu den Verteidigern.';
-  } else {
-    if (me.id === sm.owner || allied(w, me.id, sm.owner)) return 'Du kannst nicht gegen deinen eigenen Verbündeten verteidigen.';
-  }
+    if (sideConflict(ctx, sm, me.id, 'att')) return 'Du kannst den Angreifern nicht helfen: Du oder dein Bündnis steht auf der Seite der Verteidiger.';
+  } else if (sideConflict(ctx, sm, me.id, 'def')) return 'Du kannst nicht gegen deinen eigenen Verbündeten verteidigen. Angreifer und ihre Bündnisse helfen nie den Verteidigern.';
   if (!att) return 'Der Angreifer ist nicht mehr da.';
   return sm;
 }
 export function arriveAssist(ctx, m, bt, realT, back) {
   const { match, players } = ctx, w = match.world, P = byId(players, m.owner), lead = fightAt(w, m.tid);
   if (!lead) { pushReport(P.state, { kind: 'pvp', role: 'att', title: 'Zu spät', win: false, target: { kind: m.tk, id: m.tid }, text: 'Der Kampf ist schon vorbei. Dein Heer kehrt um.' }, realT); return back(); }
+  if (sideConflict(ctx, lead, m.owner, m.side)) { pushReport(P.state, { kind: 'pvp', role: m.side, title: 'Hilfe abgewiesen', win: false, target: { kind: m.tk, id: m.tid }, text: 'Du oder dein Bündnis kämpft inzwischen auf der Gegenseite. Dein Heer kehrt um.' }, realT); return back(); }
   attach(ctx, lead, m, m.side);
   pushReport(P.state, { kind: 'pvp', role: m.side === 'att' ? 'att' : 'def', title: 'Truppen im Kampf eingetroffen', win: true, target: { kind: m.tk, id: m.tid }, text: 'Deine ' + sum(m.troops) + ' Truppen kämpfen auf Seite der ' + (m.side === 'att' ? 'Angreifer' : 'Verteidiger') + '. Du kannst sie jederzeit abziehen.' }, realT);
 }
