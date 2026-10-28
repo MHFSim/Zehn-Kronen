@@ -397,12 +397,21 @@ function showSelHero() {
 }
 { const si = document.getElementById('sheetInner'); if (si) new MutationObserver(showSelHero).observe(si, { childList: true, subtree: true }); }
 // Rathaus: Rohstoffe gegen Silber tauschen (1000 Rohstoffe = 1 Silber). Silber braucht man zum Spähen.
+const exchAmt = {};
 function exchangeHTML() {
   const rows = [['food', 'Nahrung'], ['wood', 'Holz'], ['stone', 'Stein'], ['gold', 'Gold']].map(([r, n]) => {
-    const k = Math.floor(S.res[r] / 1000), b = (c, label) => `<button class="btn ghost small" type="button" data-act="exch" data-r="${r}" data-n="${c}" ${k >= c && c > 0 ? '' : 'disabled'}>${label}</button>`;
-    return `<div class="urow"><div class="un"><b>${n}</b><small>${fmtN(S.res[r])} da · ${k} Silber möglich</small></div><div class="row">${b(1, '+1')}${b(5, '+5')}${b(k, 'Max')}</div></div>`; }).join('');
-  return `<div class="block exch"><h3>Silber <span class="silv">🥈 ${fmtN(S.silver || 0)}</span></h3><p class="note">1000 Rohstoffe, egal welche, werden zu 1 Silber. Mit Silber schickst du Späher los.</p>${rows}</div>`;
+    const k = Math.floor(S.res[r] / 1000), v = Math.min(k, exchAmt[r] || 0);
+    return `<div class="urow exrow"><div class="un"><b>${n}</b><small>${fmtN(S.res[r])} da · <span data-exl="${r}">${v} Silber für ${fmtN(v * 1000)}</span></small>
+      <input type="range" class="exr" data-exr="${r}" min="0" max="${k}" step="1" value="${v}" ${k > 0 ? '' : 'disabled'} aria-label="Silber aus ${n}"></div>
+      <button class="btn small" type="button" data-act="exch" data-r="${r}" ${v > 0 ? '' : 'disabled'}>Tauschen</button></div>`; }).join('');
+  return `<div class="block exch"><h3>Silber <span class="silv">🥈 ${fmtN(S.silver || 0)}</span></h3><p class="note">1000 Rohstoffe, egal welche, werden zu 1 Silber. Mit Silber schickst du Späher los. Regler einstellen, dann tauschen.</p>${rows}</div>`;
 }
+document.addEventListener('input', e => {
+  const r = e.target && e.target.dataset && e.target.dataset.exr; if (!r) return;
+  const v = Number(e.target.value); exchAmt[r] = v;
+  const l = document.querySelector(`[data-exl="${r}"]`); if (l) l.textContent = `${v} Silber für ${fmtN(v * 1000)}`;
+  const bt = document.querySelector(`[data-act="exch"][data-r="${r}"]`); if (bt) bt.disabled = v < 1;
+});
 function renderSheet() {
   $('sheet').classList.add('parch'); $('sheet').classList.toggle('popup', !!msel);
   if (msel) return renderMapSheet();
@@ -462,16 +471,7 @@ function setupSheet() {
     if (act === 'cancel') return command({ type: 'cancel', id });
     if (act === 'askHelp') { const ok = await command({ type: 'askHelp', id }); if (ok) toast('Dein Bündnis wurde um Hilfe gebeten.', 'info'); return renderSheet(); }
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
-    if (act === 'exch') {
-      const key = el.dataset.r + ':' + el.dataset.n;
-      if (el.dataset.ask !== '1') { // erst bestätigen lassen
-        document.querySelectorAll('[data-act="exch"][data-ask]').forEach(x => { x.textContent = x.dataset.lbl; delete x.dataset.ask; });
-        el.dataset.lbl = el.textContent; el.dataset.ask = '1'; el.textContent = 'Kaufen? ' + el.dataset.n + ' 🥈';
-        setTimeout(() => { if (el.isConnected && el.dataset.ask) { el.textContent = el.dataset.lbl; delete el.dataset.ask; } }, 4000);
-        return;
-      }
-    }
-    if (act === 'exch') return void command({ type: 'exchange', res: el.dataset.r, count: Number(el.dataset.n) }).then(ok => ok && renderSheet());
+    if (act === 'exch') { const n = exchAmt[el.dataset.r] || 0; exchAmt[el.dataset.r] = 0; return void command({ type: 'exchange', res: el.dataset.r, count: n }).then(ok => renderSheet()); }
     if (act === 'plus' || act === 'minus') {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
       pick[u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); renderSheet();
