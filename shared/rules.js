@@ -11,17 +11,17 @@ export const B = {
   farm:     { name: 'Farm', x: 1, y: 1, w: 2, unlock: 1, base: [0, 60, 20], time: 8, prod: 'food',
               desc: 'Erzeugt Nahrung für Bau, Ausbildung und Forschung. Truppen kosten keinen Unterhalt.' },
   saege:    { name: 'Sägewerk', x: 1, y: 4, w: 2, unlock: 1, base: [50, 30, 20], time: 8, prod: 'wood',
-              desc: 'Erzeugt Holz für Gebäude, Speere, Bögen und Rammen.' },
+              desc: 'Erzeugt Holz für Gebäude, Truppen und Handkarren.' },
   stein:    { name: 'Steinbruch', x: 1, y: 7, w: 2, unlock: 2, base: [50, 80, 0], time: 10, prod: 'stone',
               desc: 'Erzeugt Stein für Mauer, Truppen und späte Gebäude.' },
   lager:    { name: 'Lagerhaus', x: 4, y: 1, w: 2, unlock: 2, base: [0, 120, 80], time: 15, units: ['handkarren'],
               desc: 'Erhöht die Lagergrenze und den Anteil, den Plünderer nicht mitnehmen können. Baut Handkarren (Transport; ziehen nur mit anderen Einheiten los).' },
-  kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60], time: 20, units: ['speer', 'schwert'],
-              desc: 'Bildet Speerträger und Schwertkämpfer aus. Jede Stufe verkürzt die Ausbildung.' },
-  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 80], time: 25, units: ['bogen', 'armbrust'],
-              desc: 'Bildet Bogen- und Armbrustschützen aus.' },
-  stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 250], time: 40, units: ['leicht', 'schwer'],
-              desc: 'Bildet Lanzenreiter und Panzerreiter aus. Panzerreiter ab Stall Stufe 5.' },
+  kaserne:  { name: 'Kaserne', x: 7, y: 1, w: 2, unlock: 2, base: [80, 150, 60], time: 20, units: ['schwert'],
+              desc: 'Bildet Infanterie aus. Jede Stufe verkürzt die Ausbildung.' },
+  schiess:  { name: 'Schießstand', x: 10, y: 1, w: 2, unlock: 4, base: [80, 180, 80], time: 25, units: ['bogen'],
+              desc: 'Bildet Fernkämpfer aus.' },
+  stall:    { name: 'Stall', x: 10, y: 4, w: 2, unlock: 6, base: [200, 200, 250], time: 40, units: ['schwer'],
+              desc: 'Bildet Kavallerie aus.' },
   lazarett: { name: 'Lazarett', x: 10, y: 7, w: 2, unlock: 3, base: [100, 120, 80], time: 20,
               desc: 'Nimmt verwundete Verteidiger auf, solange Plätze frei sind.' },
   akademie: { name: 'Akademie', x: 10, y: 10, w: 2, unlock: 5, base: [150, 200, 230], time: 40,
@@ -31,17 +31,14 @@ export const B = {
 };
 
 // Einheiten nach der Tabelle „Lords & Knights“: Kosten Holz/Stein (Erz-Kosten der Tabelle sind im Stein enthalten), Ausbildungszeit t (Sekunden je Einheit), Tempo in Minuten je Feld,
-// Traglast c, Angriff at und Abwehr df gegen [Artillerie, Infanterie, Kavallerie]. g = Gattung. Transporter kämpfen nicht.
-export const GATT = { inf: 'Infanterie', art: 'Artillerie', kav: 'Kavallerie', trans: 'Transport' };
+// Traglast c, Angriff at und Abwehr df gegen [Fernkämpfer, Infanterie, Kavallerie]. g = Gattung. Transporter kämpfen nicht.
+export const GATT = { inf: 'Infanterie', art: 'Fernkämpfer', kav: 'Kavallerie', trans: 'Transport' };
 const mk = (name, g, cost, t, tempo, c, at, df, req, o = {}) => ({ name, g, cost: [0, cost[0], cost[1] + (cost[2] || 0)], t, tempo, s: 60 / tempo, c, at, df, req,
   a: at ? Math.round(at.reduce((x, y) => x + y, 0) / 3) : 0, v: df ? Math.round(df.reduce((x, y) => x + y, 0) / 3) : 0, ...o });
 export const U = {
-  speer:     mk('Speerträger',     'inf',   [20, 10, 15], 240,  60 / 30, 22, [5, 7, 12],   [20, 31, 58], 1, { strong: ['leicht'], good: ['schwert'], weak: ['bogen'] }),
-  schwert:   mk('Schwertkämpfer',  'inf',   [25, 15, 30], 360,  60 / 30, 22, [10, 45, 50], [20, 35, 30], 1, { strong: ['schwer'], good: ['speer'], weak: ['armbrust'] }),
-  bogen:     mk('Bogenschütze',    'art',   [30, 15, 20], 300,  60 / 30, 22, [20, 60, 10], [14, 31, 10], 1, { strong: ['speer'], good: [], weak: [] }),
-  armbrust:  mk('Armbrustschütze', 'art',   [35, 20, 25], 420,  60 / 30, 22, [15, 21, 9],  [59, 91, 32], 3, { strong: ['schwert'], good: [], weak: ['leicht'] }),
-  leicht:    mk('Lanzenreiter',    'kav',   [40, 20, 40], 720,  60 / 38, 22, [5, 8, 30],   [40, 15, 35], 1, { strong: ['armbrust'], good: ['schwer'], weak: ['speer'] }),
-  schwer:    mk('Panzerreiter',    'kav',   [25, 15, 45], 1050, 60 / 38, 22, [24, 15, 21], [59, 27, 36], 5, { strong: ['bogen'], good: ['leicht'], weak: ['schwert'] }),
+  schwert:   mk('Infanterie',      'inf',   [25, 15, 30], 360,  60 / 30, 22, [10, 45, 50], [20, 35, 30], 1, { strong: ['schwer'], good: [], weak: ['bogen'] }),
+  bogen:     mk('Fernkämpfer',     'art',   [30, 15, 20], 300,  60 / 30, 22, [20, 60, 10], [14, 31, 10], 1, { strong: ['schwert'], good: [], weak: ['schwer'] }),
+  schwer:    mk('Kavallerie',      'kav',   [25, 15, 45], 1050, 60 / 38, 22, [24, 15, 21], [59, 27, 36], 1, { strong: ['bogen'], good: [], weak: ['schwert'] }),
   handkarren: mk('Handkarren',     'trans', [45, 25, 30], 600,  60 / 28, 500, null, null, 1)
 };
 
@@ -99,7 +96,7 @@ export function freshState(now) {
   const lv = {}; for (const k in B) lv[k] = 0;
   lv.rathaus = 1; lv.farm = 1; lv.saege = 1;
   const troops = {}; for (const k in U) troops[k] = 0;
-  troops.speer = 20; troops.handkarren = 1;   // Startheer: 20 Speerträger und 1 Handkarren
+  troops.schwert = 20; troops.handkarren = 1;   // Startheer: 20 Infanterie und 1 Handkarren
   return { res: { food: 600, wood: 600, stone: 650, gold: 100 }, lv, queue: [], train: {}, troops, away: {}, wounded: {}, reports: [], nextRep: 1, explored: '', slot: -1, pos: [0, 0], at: now, stationed: {}, protUntil: 0, vassalOf: 0, vassalUntil: 0, out: false, exAllies: {}, feed: [], nextFeed: 1, stats: { attacks: 0, wins: 0, conquests: 0, kills: 0, lost: 0 }, bonus: {}, tech: {}, research: null, items: {}, tpAt: -1e9 };
 }
 

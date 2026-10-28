@@ -361,7 +361,7 @@ const VIK = (() => {
   const u8 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0)), pb = u8(VIKING.p);
   return { n: VIKING.n, hip: VIKING.hip / 1000, P: new Int16Array(pb.buffer, 0, pb.length / 2), C: u8(VIKING.c) };
 })();
-const VIK_FOOT = ['speer', 'schwert', 'bogen', 'armbrust'];
+const VIK_FOOT = ['schwert', 'bogen'];
 function vikingParts(body, la, lb, tab) {
   const COLS = [[226, 190, 150], [150, 156, 166], [100, 74, 52], tab, [170, 120, 60], [204, 186, 150], [110, 90, 70], [70, 52, 40]], parts = [body, la, lb];
   for (let t = 0; t < VIK.n; t++) {
@@ -1034,10 +1034,10 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       keep.add(m.id); let s = this.marchObjs[m.id];
       const col = parseInt(PLAYER_COLORS[(m.slot < 0 ? 0 : m.slot) % 10].slice(1), 16);
       const tr = m.troops || {}; let n = 0;
-      const ORDER = ['speer', 'schwert', 'bogen', 'armbrust', 'leicht', 'schwer', 'handkarren'], kinds = [];   // vorne Fußvolk, dann Fernkampf, ganz hinten Reiter und Karren
+      const ORDER = ['schwert', 'bogen', 'schwer', 'handkarren'], kinds = [];   // vorne Fußvolk, dann Fernkampf, ganz hinten Reiter und Karren
       for (const u of ORDER) if (tr[u] > 0) { n += tr[u]; kinds.push([u, u === 'handkarren' ? tr[u] * .05 : tr[u]]); }
-      if (tr.n != null) { n = tr.n; kinds.length = 0; kinds.push(['speer', n]); }
-      if (!kinds.length) kinds.push(['speer', 1]);
+      if (tr.n != null) { n = tr.n; kinds.length = 0; kinds.push(['schwert', n]); }
+      if (!kinds.length) kinds.push(['schwert', 1]);
       if (!n) n = Object.values(tr).reduce((a, c) => a + c, 0);
       const total = clamp(Math.ceil(n / 25), kinds.length, 8), W = kinds.reduce((a, k) => a + k[1], 0), cntOf = kinds.map(() => 1);
       for (let r = total - kinds.length; r > 0; r--) { let bi = 0, bv = -1; kinds.forEach((k, ki) => { const v = k[1] / W * total - cntOf[ki]; if (v > bv) { bv = v; bi = ki; } }); cntOf[bi]++; }
@@ -1050,15 +1050,15 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       s.m = m; s.col = col;
       if (s.sig !== sig) {
         s.sig = sig; s.dOk = false; for (const u of s.units) s.grp.remove(u.g); s.units = []; if (s.big) { s.grp.remove(s.big.g); s.big.g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); s.big = null; }
-        const GRP = t => t === 'speer' || t === 'schwert' ? 0 : t === 'bogen' || t === 'armbrust' ? 1 : t === 'handkarren' ? 3 : 2, rows = [];   // Fußvolk | Fernkampf | Reiter | Karren: jede Gruppe in eigenen 3er-Reihen
+        const GRP = t => t === 'schwert' ? 0 : t === 'bogen' ? 1 : t === 'handkarren' ? 3 : 2, rows = [];   // Fußvolk | Fernkampf | Reiter | Karren: jede Gruppe in eigenen 3er-Reihen
         for (let gi = 0; gi < 4; gi++) { const gf = figs.filter(t => GRP(t) === gi); for (let k = 0; k < gf.length; k += 3) rows.push(gf.slice(k, k + 3)); }
         if (m.hero) rows.unshift(['hero']);   // der Held reitet vorn, vor dem Fußvolk
         let rowZ = .35; const zs = rows.map((row, r) => { if (r) rowZ -= (m.hero && r === 1 ? .95 : GRP(row[0]) === 2 ? .75 : .55); return rowZ; });
         rows.forEach((row, r) => row.forEach((type, c) => {
-          const isHero = type === 'hero', ht = isHero ? HERO_UNIT(m.hero) : type, cav = ht === 'leicht' || ht === 'schwer', ug = this.unitGeo(ht, col, ht === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
+          const isHero = type === 'hero', ht = isHero ? HERO_UNIT(m.hero) : type, cav = ht === 'schwer', ug = this.unitGeo(ht, col, ht === 'handkarren' && loaded), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           const mk = geo => { if (!geo) return null; const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); return l; };
           const sp = cav ? .62 : .5, x = (c - (row.length - 1) / 2) * sp, z = zs[r];
-          g.position.set(x, 0, z); g.scale.setScalar(isHero ? (cav ? 1.75 : ht === 'handkarren' ? 1.6 : 1.6) : type === 'leicht' || type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
+          g.position.set(x, 0, z); g.scale.setScalar(isHero ? (cav ? 1.75 : ht === 'handkarren' ? 1.6 : 1.6) : type === 'schwer' ? 1.1 : type === 'handkarren' ? 1.35 : cav ? 1.5 : VIK_FOOT.includes(type) ? 1.3 : 1.7); s.grp.add(g);
           const rr = (ht === 'handkarren' ? .42 : cav ? .4 : .3) / g.scale.x, ring = new T.Mesh(new T.RingGeometry(rr * .66, rr * 1.12, 32), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); ring.rotation.x = -Math.PI / 2; ring.position.y = .04 / g.scale.x; ring.renderOrder = 2; g.add(ring); const disc = new T.Mesh(new T.CircleGeometry(rr * .66, 24), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })); disc.rotation.x = -Math.PI / 2; disc.position.y = .035 / g.scale.x; disc.renderOrder = 1; g.add(disc); ring.userData.disc = disc; const edge = new T.Mesh(new T.RingGeometry(rr * 1.12, rr * 1.3, 32), new T.MeshBasicMaterial({ color: 0x120c08, transparent: true, opacity: .75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); edge.rotation.x = -Math.PI / 2; edge.position.y = .038 / g.scale.x; edge.renderOrder = 1; g.add(edge); ring.userData.edge = edge;
           s.units.push({ hero: isHero, g, ring, rx: x, rz: z, k: s.units.length, sz: type === 'handkarren' ? 1.5 : cav ? .95 : .6, la: mk(ug.la), lb: mk(ug.lb), cav, legs: (ug.legs || []).map(L => { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); return { m: m2, s: L.s, spin: L.spin }; }) });
         }));
@@ -1084,12 +1084,12 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const r of view.world.raiders || []) {
       keep.add(r.id); let s = this.raiderObjs[r.id];
       if (!s) {
-        const grp = new T.Group(), types = r.lv >= 15 ? ['schwer', 'leicht', 'schwert', 'bogen', 'speer'] : r.lv >= 6 ? ['schwert', 'speer', 'bogen', 'leicht'] : ['speer', 'schwert', 'bogen'], figs = [], col = 0x7a2626;
+        const grp = new T.Group(), types = r.lv >= 15 ? ['schwer', 'schwert', 'bogen', 'schwert', 'schwer'] : r.lv >= 6 ? ['schwert', 'schwert', 'bogen', 'schwer'] : ['schwert', 'schwert', 'bogen'], figs = [], col = 0x7a2626;
         types.forEach((type, i) => {
           const ug = this.unitGeo(type, col, false), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
           for (const geo of [ug.la, ug.lb]) if (geo) { const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); }
           for (const L of ug.legs || []) { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); }
-          const a = i / types.length * Math.PI * 2, cav = type === 'leicht' || type === 'schwer';
+          const a = i / types.length * Math.PI * 2, cav = type === 'schwer';
           g.position.set(Math.cos(a) * .85, 0, Math.sin(a) * .85); g.rotation.y = -a + Math.PI / 2; g.scale.setScalar(cav ? 1.5 : 1.7); grp.add(g); figs.push(g);
         });
         const pole = new T.Mesh(new T.CylinderGeometry(.04, .04, 2.1, 6), new T.MeshLambertMaterial({ color: 0x3a2a1a })); pole.position.y = 1.05; grp.add(pole);

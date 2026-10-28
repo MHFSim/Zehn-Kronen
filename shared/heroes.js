@@ -12,7 +12,7 @@ export const SKILL_NAME = {
   force: 'Truppenstärke', garrison: 'Burgwache', camp: 'Räuberjäger', assault: 'Sturmangriff', speed: 'Marschtempo'
 };
 export const SKILL_TEXT = {
-  gather: 'Sammelt schneller', carry: 'Das Heer trägt mehr', atkInf: 'Infanterie kämpft stärker', atkCav: 'Kavallerie kämpft stärker', atkRng: 'Bogen- und Armbrustschützen kämpfen stärker',
+  gather: 'Sammelt schneller', carry: 'Das Heer trägt mehr', atkInf: 'Infanterie kämpft stärker', atkCav: 'Kavallerie kämpft stärker', atkRng: 'Fernkämpfer kämpfen stärker',
   force: 'Alle Truppen im Heer kämpfen stärker', garrison: 'Stärkt die Verteidigung der Burg, solange er sie bewacht', camp: 'Stärker gegen Räuber', assault: 'Stärker beim Angriff auf Spieler und Außenposten', speed: 'Das Heer marschiert schneller'
 };
 const RES_NAME = { food: 'Nahrung', wood: 'Holz', stone: 'Stein' };

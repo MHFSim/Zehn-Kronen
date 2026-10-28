@@ -73,7 +73,7 @@ const MODELS = {
     b.cyl(.04, .05, .7, 5, -.75, .06, .5, WOOD_D); b.sph(.12, -.75, .82, .5, [190, 160, 110], 6); b.box(.5, .05, .06, -.75, .55, .5, WOOD_D);          // Übungspuppe
     b.box(.55, .05, .1, .62, .25, .4, WOOD_D); b.cyl(.012, .012, .8, 3, .45, .26, .42, WOOD); b.cyl(.012, .012, .8, 3, .6, .26, .42, WOOD); b.cyl(.012, .012, .8, 3, .75, .26, .42, WOOD);
     b.cyl(.025, .025, 1.5, 5, 1.0, .06, -.2, WOOD_D); ctx.flags.push([1.0, 1.4, -.2]);
-    return { geo: b.build(), s: 1, h: 1.9, smoke: [], padS: 2.5, units: [['speer', .55, 0, .55, .35, 0], ['speer', -.45, 0, .62, .3, 2], ['schwert', .0, 0, .78, .4, 4]] };
+    return { geo: b.build(), s: 1, h: 1.9, smoke: [], padS: 2.5, units: [['schwert', .55, 0, .55, .35, 0], ['schwert', -.45, 0, .62, .3, 2], ['schwert', .0, 0, .78, .4, 4]] };
   },
   schiess(lv, pc, ctx) {
     const b = new MB(), roof = [70, 108, 62];
@@ -103,7 +103,7 @@ const MODELS = {
     for (const s of [-1, 1]) for (let i = 0; i < 5; i++) b.cyl(.025, .03, .4, 5, s * 1.1, .06, .05 + i * .31, WOOD);
     b.box(.04, .04, 1.4, -1.1, .3, .7, WOOD_D); b.box(.04, .04, 1.4, 1.1, .3, .7, WOOD_D);
     b.cyl(.025, .025, 1.3, 5, -1.15, .06, -.1, WOOD_D); ctx.flags.push([-1.15, 1.2, -.1]);
-    return { geo: b.build(), s: 1, h: 1.7, smoke: [], padS: 2.5, units: [['leicht', -.4, 0, .75, .3, 0], ['schwer', .5, 0, .8, .3, 3]] };
+    return { geo: b.build(), s: 1, h: 1.7, smoke: [], padS: 2.5, units: [['schwer', -.4, 0, .75, .3, 0], ['schwer', .5, 0, .8, .3, 3]] };
   },
   lazarett(lv, pc) {
     const b = new MB();

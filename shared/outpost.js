@@ -24,7 +24,7 @@ export const CLAN_SHARE = 0.25;                           // Anteil, der beim Fa
 export const FIELD_INCOME = 50;                           // pro Feld im Bündnisrevier und Spielstunde automatisch ins Bündnislager
 export const maxOutposts = () => Infinity;   // kein Limit
 export const cityR = rathaus => 3 + Math.ceil(rathaus / 3);
-export const opGuard = () => ({ troops: { speer: 30, bogen: 20 }, mult: 1.3 });   // Wachen ohne Besatzung
+export const opGuard = () => ({ troops: { schwert: 30, bogen: 20 }, mult: 1.3 });   // Wachen ohne Besatzung
 export const storeOf = al => al ? (al.store = al.store || { food: 0, wood: 0, stone: 0 }) : { food: 0, wood: 0, stone: 0 };
 export const canAfford = (al, c = OP_COST) => RES.every((r, i) => storeOf(al)[r] >= c[i]);
 export const opReady = (o, gt) => gt >= o.done;

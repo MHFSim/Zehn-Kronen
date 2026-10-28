@@ -39,7 +39,17 @@ export function newWorld(now, o = {}) {
     phase, weeks, startGt: 0, endGt: 0,
     alliances: {}, nextAl: 1, pending: [], nextPend: 1, holds: {}, outposts: {}, nextOp: 1, chron: [], result: null };
 }
+// Alte Einheiten (Speerträger, Armbrustschütze, Lanzenreiter) gehen in Infanterie, Fernkämpfer und Kavallerie auf
+const OLD_UNITS = { speer: 'schwert', armbrust: 'bogen', leicht: 'schwer' };
+export function migrateUnits(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 12) return;
+  if (Array.isArray(o)) { for (const x of o) migrateUnits(x, depth + 1); return; }
+  for (const k of Object.keys(OLD_UNITS)) if (k in o && typeof o[k] === 'number') { o[OLD_UNITS[k]] = (o[OLD_UNITS[k]] || 0) + o[k]; delete o[k]; }
+  if (typeof o.unit === 'string' && OLD_UNITS[o.unit]) o.unit = OLD_UNITS[o.unit];
+  for (const k in o) if (o[k] && typeof o[k] === 'object') migrateUnits(o[k], depth + 1);
+}
 export function ensureWorld(w) {
+  if (w.uv !== 3) { migrateUnits(w); w.uv = 3; }
   if (!w.phase) w.phase = 'running';
   if (!w.alliances) w.alliances = {}; if (!w.nextAl) w.nextAl = 1;
   if (!w.pending) w.pending = []; if (!w.nextPend) w.nextPend = 1;
@@ -50,6 +60,7 @@ export function ensureWorld(w) {
   return w;
 }
 export function ensureState(S) {
+  if (S.uv !== 3) { migrateUnits(S); S.uv = 3; }
   S.away = S.away || {}; S.wounded = S.wounded || {}; S.reports = S.reports || []; S.nextRep = S.nextRep || 1;
   S.explored = S.explored || ''; if (S.slot == null) S.slot = -1; S.pos = S.pos || [0, 0];
   S.tech = S.tech || {}; S.research = S.research || null; S.items = S.items || {}; if (S.tpAt == null) S.tpAt = -1e9; if (S.startTp == null) S.startTp = 1; S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;

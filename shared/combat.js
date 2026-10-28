@@ -7,13 +7,13 @@ export const capacityOf = (troops, S, hero) => Math.floor(Object.keys(troops).re
 // Kraft der Truppen eines Spielers (Kriegskunst) als Faktor für Angriff, Verteidigung und Leben
 export const forceOf = S => S ? techMult(S, 'force') : 1;
 export const armySpeed = troops => Math.min(...Object.keys(troops).filter(u => troops[u] > 0).map(u => U[u].s));
-export const forestCostFor = troops => (troops.leicht > 0 || troops.schwer > 0 || troops.handkarren > 0) ? 1.7 : 1.2;
+export const forestCostFor = troops => (troops.schwer > 0 || troops.handkarren > 0) ? 1.7 : 1.2;
 
 /* ---------- Banditenlager ---------- */
 export function campTroops(lv) {
   const total = Math.round(4 + 2 * Math.pow(lv, 1.5));   // wächst langsamer als die Beute, damit sich der Angriff lohnt
-  const mix = lv >= 7 ? { speer: .25, schwert: .25, bogen: .2, leicht: .15, schwer: .15 }
-    : lv >= 4 ? { speer: .3, schwert: .3, bogen: .25, leicht: .15 } : { speer: .4, schwert: .35, bogen: .25 };
+  const mix = lv >= 7 ? { schwert: .4, bogen: .3, schwer: .3 }
+    : lv >= 4 ? { schwert: .5, bogen: .3, schwer: .2 } : { schwert: .65, bogen: .35 };
   const t = {}; for (const u in mix) t[u] = Math.max(1, Math.round(total * mix[u]));
   return t;
 }
@@ -21,7 +21,7 @@ export const campMult = lv => 1 + 0.05 * (lv - 1);
 export const campLoot = lv => ({ food: 300 * lv, wood: 300 * lv, stone: 350 * lv, gold: 20 * lv });
 
 /* ---------- Kampf ---------- */
-// Jede Einheit hat Angriff und Abwehr gegen Artillerie, Infanterie und Kavallerie. Je Runde fällt von einer Zielgruppe h
+// Jede Einheit hat Angriff und Abwehr gegen Fernkämpfer, Infanterie und Kavallerie. Je Runde fällt von einer Zielgruppe h
 // (Anteil am Heer) so viel: Anzahl × Angriff gegen deren Gattung × KAMPF / Abwehr der Zielgruppe gegen die Gattung des Angreifers.
 const TI = { art: 0, inf: 1, kav: 2 };
 const KAMPF = 0.25, RUNDEN = 30, TRANS_DEF = 10;
@@ -65,7 +65,7 @@ export const power = (t, m = 1) => grp(t, m).reduce((s, g) => s + g.n * (U[g.u].
 
 /* ---------- Stadtwache und Wächter ---------- */
 // Jede Burg hat eine kleine Stadtwache, damit sie nie ganz leer ist (wächst mit Rathaus und Mauer).
-export const guardOf = S => ({ speer: Math.round(10 + 8 * S.lv.rathaus + 15 * S.lv.mauer) });
+export const guardOf = S => ({ schwert: Math.round(10 + 8 * S.lv.rathaus + 15 * S.lv.mauer) });
 export const wallMult = S => 1 + 0.05 * S.lv.mauer * techMult(S, 'wall');
 // Neutrale Wächter von Thron und Heiligtümern, solange sie niemand hält
 export const holdGuard = kind => kind === 'throne' ? { troops: campTroops(10), mult: 2.0 } : { troops: campTroops(6), mult: 1.5 };

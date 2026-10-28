@@ -206,7 +206,7 @@ function toolsBar() {
     if (a.dataset.a === 'bot') {
       const name = bots.find(n => !db.players.some(p => p.name === n)) || 'Bot' + db.seq;
       const S = addPlayer(m, pl, 0, name, t); if (!S) { alert('Die Partie ist voll.'); return; }
-      Object.assign(S.lv, { rathaus: 3, mauer: 2, kaserne: 2 }); S.troops = { speer: 60, schwert: 40, bogen: 30 };
+      Object.assign(S.lv, { rathaus: 3, mauer: 2, kaserne: 2 }); S.troops = { schwert: 100, bogen: 30 };
       db.players.push({ id: db.seq++, match_id: m.id, name, pass: 'bot-' + rnd(8), state: S, created: t, last_seen: t });
     } else if (a.dataset.a === 'd1') skip(m, pl, 1);
     else if (a.dataset.a === 'd5') skip(m, pl, 5);

@@ -18,10 +18,10 @@ assert.ok(HERO_IDS.every(i => S.heroes[i].lv === 1 && S.heroes[i].xp === 0));
 assert.ok(skillOf(S, 'brienne', 'atkCav') > 0.04 && skillOf(S, 'brienne', 'atkCav') < 0.05);
 S.heroes.brienne.lv = HERO_MAX; assert.ok(Math.abs(skillOf(S, 'brienne', 'atkCav') - .18) < 1e-9); S.heroes.brienne.lv = 1;
 // Gattungsbonus wirkt nur im Verhältnis der passenden Truppen
-const fcav = heroForce(S, 'brienne', { leicht: 50, speer: 50 }, 'att', 'player'), fall = heroForce(S, 'brienne', { leicht: 100 }, 'att', 'player'), fnone = heroForce(S, 'brienne', { speer: 100 }, 'att', 'player');
+const fcav = heroForce(S, 'brienne', { schwer: 50, schwert: 50 }, 'att', 'player'), fall = heroForce(S, 'brienne', { schwer: 100 }, 'att', 'player'), fnone = heroForce(S, 'brienne', { schwert: 100 }, 'att', 'player');
 assert.ok(fnone === 1 && fcav > 1 && fall > fcav);
-assert.ok(heroForce(S, 'cedric', { speer: 10 }, 'def', 'home') > heroForce(S, 'cedric', { speer: 10 }, 'att', 'player'), 'Burgwache nur beim Verteidigen');
-assert.ok(heroForce(S, 'draven', { speer: 10 }, 'att', 'camp') > heroForce(S, 'draven', { speer: 10 }, 'att', 'player'), 'Räuberjäger nur gegen Lager und Räuber');
+assert.ok(heroForce(S, 'cedric', { schwert: 10 }, 'def', 'home') > heroForce(S, 'cedric', { schwert: 10 }, 'att', 'player'), 'Burgwache nur beim Verteidigen');
+assert.ok(heroForce(S, 'draven', { schwert: 10 }, 'att', 'camp') > heroForce(S, 'draven', { schwert: 10 }, 'att', 'player'), 'Räuberjäger nur gegen Lager und Räuber');
 assert.deepEqual(heroPrefers('brienne'), ['kav']); assert.deepEqual(heroPrefers('gorm'), ['trans']); assert.deepEqual(heroPrefers('seraphine'), []);
 // Erfahrung und Stufen
 { const T = { heroes: { x: { lv: 1, xp: 0 } } }; const up = heroXp(T, 'x', xpNeed(1) + xpNeed(2) + 5); assert.equal(up, 2); assert.equal(T.heroes.x.lv, 3); assert.equal(T.heroes.x.xp, 5);
@@ -32,16 +32,16 @@ assert.equal(fightXp(S, 'aldric', 100, 'k1', 1, 0), 100); assert.equal(fightXp(S
 S.heroes.aldric.lv = 30; assert.equal(fightXp(S, 'aldric', 100, 'k2', 3, 0), 20); S.heroes.aldric.lv = 1;
 
 // Marsch braucht einen freien Helden
-S.troops = { speer: 40, schwert: 20, handkarren: 5 }; S.res = { food: 99999, wood: 99999, stone: 99999, gold: 99999 };
+S.troops = { schwert: 60, handkarren: 5 }; S.res = { food: 99999, wood: 99999, stone: 99999, gold: 99999 };
 const map = mapOf(match), node = map.objects.filter(o => ['farm', 'wood', 'stone'].includes(o.k)).sort((a, b) => Math.hypot(a.x - S.pos[0], a.y - S.pos[1]) - Math.hypot(b.x - S.pos[0], b.y - S.pos[1]))[0];
 let t = T0 + 1000;
-assert.match(rawCommand(match, players, p1, { type: 'march', target: node.id, troops: { speer: 10 } }, t), /Helden/);
-assert.match(rawCommand(match, players, p1, { type: 'march', target: node.id, troops: { speer: 10 }, hero: 'gibtsnicht' }, t), /Helden/);
+assert.match(rawCommand(match, players, p1, { type: 'march', target: node.id, troops: { schwert: 10 } }, t), /Helden/);
+assert.match(rawCommand(match, players, p1, { type: 'march', target: node.id, troops: { schwert: 10 }, hero: 'gibtsnicht' }, t), /Helden/);
 const hero = { farm: 'gorm', wood: 'thorin', stone: 'ilsa' }[node.k];
-assert.equal(rawCommand(match, players, p1, { type: 'march', target: node.id, troops: { speer: 10, handkarren: 5 }, hero }, t), '');
+assert.equal(rawCommand(match, players, p1, { type: 'march', target: node.id, troops: { schwert: 10, handkarren: 5 }, hero }, t), '');
 assert.ok(heroBusy(w, 1, hero)); assert.equal(w.marches[0].hero, hero);
 const node2 = map.objects.filter(o => ['farm', 'wood', 'stone'].includes(o.k) && o.id !== node.id).sort((a, b) => Math.hypot(a.x - S.pos[0], a.y - S.pos[1]) - Math.hypot(b.x - S.pos[0], b.y - S.pos[1]))[0];
-assert.match(rawCommand(match, players, p1, { type: 'march', target: node2.id, troops: { speer: 10 }, hero }, t), /führt schon ein anderes Heer/);
+assert.match(rawCommand(match, players, p1, { type: 'march', target: node2.id, troops: { schwert: 10 }, hero }, t), /führt schon ein anderes Heer/);
 assert.equal(viewFor(match, players, p1, t).world.marches[0].hero, hero);
 // Burgwächter: Wächter, sonst Stellvertreter, sonst niemand
 assert.equal(keeperOf(S, w, 1), 'cedric');
@@ -68,8 +68,8 @@ const t2 = t + 31 * 3600_000; syncMatch(match, players, t2);
 const r = { id: 'raiderTest', lv: 2, x: Math.min(270, S.pos[0] + 6), y: S.pos[1], until: w.gt + 99999 };
 const spot = [[6, 0], [-6, 0], [0, 6], [0, -6], [8, 3], [-8, 3]].map(([dx, dy]) => [S.pos[0] + dx, S.pos[1] + dy]).find(([x, y]) => map.pass[y * 280 + x]);
 r.x = spot[0]; r.y = spot[1]; w.raiders.push(r);
-S.troops = { speer: 80, schwert: 60, leicht: 40 }; S.items = {}; S.packs = [];
-assert.equal(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest', troops: { speer: 80, schwert: 60, leicht: 40 }, hero: 'draven' }, t2), '');
+S.troops = { schwert: 140, schwer: 40 }; S.items = {}; S.packs = [];
+assert.equal(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest', troops: { schwert: 140, schwer: 40 }, hero: 'draven' }, t2), '');
 { // Kampf gegen Räuber dauert immer 20 Sekunden echte Zeit (Spieltempo match.speed)
   let seen = 0, t0 = 0, t1 = 0;
   for (let i = 1; i <= 40 && w.raiders.some(x => x.id === 'raiderTest'); i++) {
@@ -82,7 +82,7 @@ for (let i = 1; i <= 40 && w.raiders.some(x => x.id === 'raiderTest'); i++) sync
 assert.ok(!w.raiders.some(x => x.id === 'raiderTest'), 'Räuber besiegt');
 assert.ok(Object.keys(S.items).some(k => k.startsWith('sp')), 'Beschleuniger als Belohnung');
 assert.ok(S.heroes.draven.xp > 0 || S.heroes.draven.lv > 1, 'Held lernt');
-assert.match(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest', troops: { speer: 5 }, hero: 'kael' }, t2 + 3600_000), /gibt es nicht/);
+assert.match(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest', troops: { schwert: 5 }, hero: 'kael' }, t2 + 3600_000), /gibt es nicht/);
 console.log('Alle Heldentests bestanden.');
 // Mut: Angriffe auf Räuber kosten Mut, stündlich kehrt etwas zurück
 { const { mutCost, mutStep, MUT_MAX, MUT_REGEN } = await import('../shared/war.js');
