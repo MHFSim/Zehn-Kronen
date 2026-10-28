@@ -13,7 +13,7 @@ export const SKILL_NAME = {
 };
 export const SKILL_TEXT = {
   gather: 'Sammelt schneller', carry: 'Das Heer trägt mehr', atkInf: 'Infanterie kämpft stärker', atkCav: 'Kavallerie kämpft stärker', atkRng: 'Bogen- und Armbrustschützen kämpfen stärker',
-  force: 'Alle Truppen im Heer kämpfen stärker', garrison: 'Stärkt die Verteidigung der Burg, solange er sie bewacht', camp: 'Stärker gegen Banditenlager und Räuber', assault: 'Stärker beim Angriff auf Spieler und Außenposten', speed: 'Das Heer marschiert schneller'
+  force: 'Alle Truppen im Heer kämpfen stärker', garrison: 'Stärkt die Verteidigung der Burg, solange er sie bewacht', camp: 'Stärker gegen Räuber', assault: 'Stärker beim Angriff auf Spieler und Außenposten', speed: 'Das Heer marschiert schneller'
 };
 const RES_NAME = { food: 'Nahrung', wood: 'Holz', stone: 'Stein' };
 export const HEROES = {
@@ -36,7 +36,7 @@ export const HEROES = {
   seraphine: { name: 'Elara', title: 'Schwurritterin', icon: '👑', pic: '👸', col: '#e0b45a', fx: 'glow', role: 'fight', skills: [{ k: 'force', max: .12 }, { k: 'speed', max: .04 }],
                story: 'Sie kniet vor der Schlacht, damit ihr Heer danach aufrecht steht.' },
   draven:    { name: 'Corvin', title: 'Rabenjäger', icon: '🗡️', pic: '🥷', col: '#5b4a8a', fx: 'shadow', role: 'fight', skills: [{ k: 'camp', max: .25 }, { k: 'force', max: .03 }],
-               story: 'Seine Raben wissen, wo die Banditen lagern, noch bevor sie es selbst wissen.' },
+               story: 'Seine Raben wissen, wo die Räuber streifen, noch bevor sie es selbst wissen.' },
   kael:      { name: 'Morgrim', title: 'Schattenreiter', icon: '⚔️', pic: '🤺', col: '#b8452a', fx: 'flame', role: 'fight', skills: [{ k: 'assault', max: .14 }, { k: 'atkCav', max: .06 }],
                story: 'Man hört ihn nicht kommen. Burgen fallen, wenn er nur auf sie zeigt.' },
   zephyr:    { name: 'Nyx', title: 'Frostschatten', icon: '🧭', pic: '🧑‍🚀', col: '#3fa7c4', fx: 'gust', role: 'fight', skills: [{ k: 'speed', max: .20 }, { k: 'atkRng', max: .06 }],

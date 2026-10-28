@@ -84,7 +84,8 @@ assert.ok(conter.win || (conter.attLeft.speer || 0) > (conter.defLeft.leicht || 
 // Lager angreifen und Bericht
 p1.state.troops.speer = 50; p1.state.troops.schwert = 50; p1.state.troops.bogen = 30;
 p1.state.lv.lazarett = 2;
-const camp = map.objects.filter(o => o.k === 'camp' && o.lv === 1)[0];
+// Banditenlager gibt es auf der Karte nicht mehr; die Kampfregeln bleiben, hier wird ein Stein-Ort zum Lager umgewidmet
+const camp = map.objects.filter(o => o.k === 'stone' && o.id !== myNode.id)[0]; camp.k = 'camp'; camp.lv = 1;
 assert.equal(command(match, players, p1, { type: 'march', target: camp.id, troops: { speer: 50, schwert: 50, bogen: 30 } }, t), '');
 const cm = match.world.marches[0], cdur = cm.arr[cm.arr.length - 1];
 t += (cdur + 60) / 100 * 1000;

@@ -357,7 +357,7 @@ export const QUEST_INFO = {
   train: { icon: '🛡️', title: 'Truppen ausbilden', text: n => 'Bilde ' + n + ' Einheiten aus.' },
   research: { icon: '📜', title: 'Zeitalter des Wissens', text: n => 'Schließe ' + n + (n === 1 ? ' Forschung' : ' Forschungen') + ' in der Akademie ab.' },
   help:  { icon: '🤝', title: 'Hilfreiche Hand', text: n => 'Hilf ' + n + (n === 1 ? ' Bündnismitglied' : ' Bündnismitgliedern') + ' beim Bauen.' },
-  camp:  { icon: '⚔️', title: 'Lagerräumer', text: n => 'Besiege ' + n + ' Banditenlager.' }
+  camp:  { icon: '⚔️', title: 'Räuberjäger', text: n => 'Besiege ' + n + (n === 1 ? ' Räuber.' : ' Räuber.') }
 };
 const r100 = n => Math.max(100, Math.round(n / 100) * 100);
 // Welche Aufgaben heute sinnvoll sind, hängt vom Stand des Spielers ab (mates = andere Mitglieder im Bündnis)

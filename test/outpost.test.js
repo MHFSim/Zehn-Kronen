@@ -70,7 +70,8 @@ assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].spee
 }
 // Besatzung aus dem Außenposten gegen ein Banditenlager schicken
 {
-  const camp = map.objects.filter(o => o.k === 'camp').sort((p, q) => Math.hypot(p.x - op.x, p.y - op.y) - Math.hypot(q.x - op.x, q.y - op.y))[0];
+  const camp = map.objects.filter(o => o.k === 'stone').sort((p, q) => Math.hypot(p.x - op.x, p.y - op.y) - Math.hypot(q.x - op.x, q.y - op.y))[0];
+  camp.k = 'camp'; camp.lv = 1;
   give(a, { schwert: 200, bogen: 100 }); op.garr[a.id].schwert = 200; op.garr[a.id].bogen = 100; a.state.away.schwert = (a.state.away.schwert || 0) + 200; a.state.away.bogen = (a.state.away.bogen || 0) + 100;
   const awayBefore = JSON.stringify(a.state.away), garr0 = { ...op.garr[a.id] };
   const r = run(a, { type: 'march', mode: 'normal', fromOp: op.id, target: camp.id, troops: { schwert: 150, bogen: 80 } });

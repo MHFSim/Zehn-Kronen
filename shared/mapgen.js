@@ -202,6 +202,8 @@ export function generateMap(seed) {
   scatter('farm', 14, 10, nodeLv, 36); scatter('wood', 14, 8, nodeLv, 36); scatter('stone', 14, 10, nodeLv, 36);
   scatter('camp', 14, 10, campLv);
 
+  // Banditenlager gibt es nicht mehr. Sie werden weiter mitgewürfelt, damit alle anderen Orte (und laufende Partien) an derselben Stelle bleiben, und dann entfernt.
+  for (let i = objects.length - 1; i >= 0; i--) if (objects[i].k === 'camp') objects.splice(i, 1);
   const map = { seed, N, H, F, pass, reach, objects, starts, byId: Object.fromEntries(objects.map(o => [o.id, o])) };
   if (cache.size > 3) cache.clear();
   cache.set(seed, map);

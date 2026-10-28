@@ -700,7 +700,7 @@ function tutorialHTML() {
     ['Rathaus auf Stufe 2 ausbauen', S.lv.rathaus >= 2, 'Schaltet die Kaserne und weitere Gebäude frei.'],
     ['Kaserne bauen und Truppen ausbilden', troopCount(S) > 0, 'Stadt → Militär → Kaserne.'],
     ['Ein Heer zu einem Feld schicken', rp.some(r => r.kind === 'gather' || r.kind === 'return'), 'Karte → Feld antippen, Truppen wählen, Sammeln.'],
-    ['Ein Banditenlager besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Stufe 1 und 2 sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
+    ['Einen Räuber besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Niedrige Stufen sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
     ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer, an einem der Türme am Kartenrand. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
     ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
@@ -1634,7 +1634,7 @@ const REP_ICON = { pvp: '⚔️', camp: '🏕️', spy: '🔍', gather: '🌾', 
 const REP_TABS = [['all', 'Alle', () => true], ['fight', 'Kämpfe', r => r.kind === 'pvp' || r.kind === 'camp'], ['spy', 'Späher', r => r.kind === 'spy'], ['march', 'Märsche', r => r.kind === 'gather' || r.kind === 'return']];
 function renderReports() {
   const f = (REP_TABS.find(x => x[0] === repTab) || REP_TABS[0])[2], un = S.reports.filter(r => !r.read).length;
-  const list = S.reports.filter(f).map(reportHTML).join('') || '<p class="note">Hier ist noch nichts. Schicke ein Heer zu einem Feld, einem Banditenlager oder spähe einen Gegner aus.</p>';
+  const list = S.reports.filter(f).map(reportHTML).join('') || '<p class="note">Hier ist noch nichts. Schicke ein Heer zu einem Feld, gegen Räuber oder spähe einen Gegner aus.</p>';
   $('reportsInner').innerHTML = phead('📜', 'Berichte', un ? un + ' ungelesen' : S.reports.length + ' Berichte', '<button class="pback" type="button" data-act="rclose">Schließen</button>')
     + ptabs(REP_TABS.map(([id, l, fn]) => [id, l, id === 'all' ? 0 : S.reports.filter(fn).length]), repTab, 'rtab') + list;
 }
