@@ -46,6 +46,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest && e.target.closest('[data-snd]');
   if (el) { const k = el.dataset.snd, on = k === 'sfx' ? !snd.cfg.sfx : !snd.cfg.music; if (k === 'sfx') snd.setSfx(on); else snd.setMusic(on); el.textContent = (k === 'sfx' ? '🔊 Töne: ' : '🎵 Musik: ') + (on ? 'an' : 'aus'); el.classList.toggle('ghost', !on); return; }
 }, true);
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button,.chip,[data-act],[data-goto],.ptab,summary,a.btn,label.tgl,[data-nav],[data-sub]')) snd.click(); }, true);
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
 setInterval(() => { snd.heroMenu(panelName === 'heroes'); }, 300);
 let dailyWas = null;   // null = noch nicht gesehen: beim Laden kein Ton

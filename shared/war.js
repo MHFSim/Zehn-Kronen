@@ -177,7 +177,8 @@ function ticksLeft(A, D, am, dm, k, from = 0, cap = MAXT) {
 
 function startFight(ctx, m, def, dm, bt, kind) {
   const A = { ...m.troops }, D = { ...def }, n0 = sum(A) + sum(D), P = byId(ctx.players, m.owner), am = P ? forceOf(P.state) * heroForce(P.state, m.hero, m.troops, 'att', foeOf(kind)) : 1;
-  const dur = Math.max(600, Math.min(7200, 600 + 6600 * Math.min(1, n0 / 3000)));   // mindestens 10 Minuten, höchstens 2 Stunden
+  // Spieler gegen Spieler: mindestens 10 Minuten, höchstens 2 Stunden. Banditenlager und Räuber: immer 20 Sekunden (echte Zeit, unabhängig vom Spieltempo).
+  const dur = kind === 'camp' || kind === 'raider' ? 20 * (ctx.match.speed || 1) : Math.max(600, Math.min(7200, 600 + 6600 * Math.min(1, n0 / 3000)));
   const r0 = Math.max(1, ticksLeft(A, D, am, dm, .25, 0, 120) * .25), k = r0 / NT;   // so viele Kampfrunden-Einheiten verteilen sich auf die Kampfdauer
   m.phase = 'fight'; m.side = 'att'; m.tStart = bt; m.ft = bt + dur / NT;
   m.fight = { kind, dt: dur / NT, k, round: 0, A, A0: { ...A }, D, D0: { ...D }, dm, pkA: power(A), pkD: power(D, dm) };

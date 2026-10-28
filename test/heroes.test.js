@@ -66,7 +66,15 @@ const spot = [[6, 0], [-6, 0], [0, 6], [0, -6], [8, 3], [-8, 3]].map(([dx, dy]) 
 r.x = spot[0]; r.y = spot[1]; w.raiders.push(r);
 S.troops = { speer: 80, schwert: 60, leicht: 40 }; S.items = {}; S.packs = [];
 assert.equal(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest', troops: { speer: 80, schwert: 60, leicht: 40 }, hero: 'draven' }, t2), '');
-for (let i = 1; i <= 40 && w.raiders.some(x => x.id === 'raiderTest'); i++) syncMatch(match, players, t2 + i * 60_000);
+{ // Kampf gegen Räuber dauert immer 20 Sekunden echte Zeit (Spieltempo match.speed)
+  let seen = 0, t0 = 0, t1 = 0;
+  for (let i = 1; i <= 40 && w.raiders.some(x => x.id === 'raiderTest'); i++) {
+    syncMatch(match, players, t2 + i * 1000);
+    const fm = w.marches.find(x => !x.dead && x.fight && x.fight.kind === 'raider');
+    if (fm && !t0) t0 = i; if (!fm && t0 && !t1) t1 = i;
+  }
+  assert.ok(t0 && t1 && t1 - t0 <= 22, 'Räuberkampf kurz: ' + (t1 - t0) + ' s'); }
+for (let i = 1; i <= 40 && w.raiders.some(x => x.id === 'raiderTest'); i++) syncMatch(match, players, t2 + 100_000 + i * 60_000);
 assert.ok(!w.raiders.some(x => x.id === 'raiderTest'), 'Räuber besiegt');
 assert.ok(Object.keys(S.items).some(k => k.startsWith('sp')), 'Beschleuniger als Belohnung');
 assert.ok(S.heroes.draven.xp > 0 || S.heroes.draven.lv > 1, 'Held lernt');

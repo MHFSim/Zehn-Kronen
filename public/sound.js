@@ -43,11 +43,17 @@ function battleStart() { if (!cfg.music || bon) return; bon = true; if (!bplayer
 function battleEnd() { if (!bon) return; bon = false; applyScene(); }
 function heroScene(on) { if (on === hon) return; hon = on; if (on && !hplayer) hplayer = mk(HEROMUS, true); applyScene(); }
 
+let lastClick = 0;
 export const snd = {
   // Eigene Klangdatei (eingebettet aus public/audio) einmal abspielen, z. B. 'quests'
   clip(name, vol = 1) {
     if (!cfg.sfx || !CLIPS[name]) return;
     try { const a = new Audio(CLIPS[name]); a.volume = Math.min(1, vol * Math.max(.3, cfg.vs)); a.play().catch(() => {}); } catch { /* ein Ton darf nie das Spiel stören */ }
+  },
+  // Einfacher Klick beim Durchblättern der Menüs
+  click() {
+    if (!cfg.sfx || !CLIPS.click) return; const now = performance.now(); if (now - lastClick < 40) return; lastClick = now;
+    try { const a = new Audio(CLIPS.click); a.volume = Math.min(1, .6 * Math.max(.3, cfg.vs)); a.play().catch(() => {}); } catch { /* egal */ }
   },
   // Beim ersten Tippen darf der Browser Ton abspielen
   unlock() { if (cfg.music && (!player || (player.paused && !bon && !hon))) playlistOn(); },
