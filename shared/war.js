@@ -610,6 +610,17 @@ export function spy(ctx, me, targetId) {
 
 /* ---------- Punkte, Rangliste, Spielende ---------- */
 export const scoreOf = S => S.out ? 0 : Math.round(Object.keys(S.lv).reduce((a, k) => a + S.lv[k], 0) * 10 + troopCount(S) * 2 + S.stats.conquests * 200 + S.stats.kills * 0.5 + Object.values(S.tech || {}).reduce((a, b) => a + b, 0) * 15);
+// Mut: Leiste (0–100). Jeder Angriff auf Räuber und Banditenlager kostet Mut, stündlich kehrt etwas zurück. Bremst zu schnelles Wachsen durch Dauerangriffe.
+export const MUT_MAX = 100, MUT_REGEN = 8, MUT_HOUR = 3600;
+export const mutCost = lv => 4 + Math.ceil((lv || 1) / 3);
+export function mutStep(S, gt) {
+  if (S.mut == null) { S.mut = MUT_MAX; S.mutAt = gt; }
+  if (S.mut >= MUT_MAX) { S.mut = MUT_MAX; S.mutAt = gt; return; }
+  while (gt - S.mutAt >= MUT_HOUR && S.mut < MUT_MAX) { S.mut = Math.min(MUT_MAX, S.mut + MUT_REGEN); S.mutAt += MUT_HOUR; }
+  if (S.mut >= MUT_MAX) S.mutAt = gt;
+}
+// Stärke eines Spielers (Truppen, Heldenstufen, Rathaus): Räuber in seiner Nähe richten sich danach.
+export const powerOf = S => S.out ? 0 : Math.round(troopCount(S) * 2 + Object.values(S.heroes || {}).reduce((a, h) => a + (h.lv - 1), 0) * 25 + (S.lv.rathaus || 1) * 10);
 export function rankingOf(match, players) {
   const w = match.world, rows = players.map(p => {
     const S = p.state, a = allianceOf(w, p.id);

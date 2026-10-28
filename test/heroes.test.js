@@ -55,7 +55,7 @@ assert.equal(S.heroes.aldric.xp, 0);
 
 // Räuber erscheinen, bleiben begrenzt und verschwinden wieder
 syncMatch(match, players, t + 30 * 3600_000);
-assert.ok(w.raiders.length >= 1 && w.raiders.length <= 7, 'Räuber: ' + w.raiders.length);
+assert.ok(w.raiders.length >= 20 && w.raiders.length <= 40, 'Räuber: ' + w.raiders.length);
 assert.ok(w.raiders.every(r => r.lv >= 1 && r.lv <= 30));
 assert.ok(viewFor(match, players, p1, t + 30 * 3600_000).world.raiders.length === w.raiders.length);
 
@@ -72,3 +72,10 @@ assert.ok(Object.keys(S.items).some(k => k.startsWith('sp')), 'Beschleuniger als
 assert.ok(S.heroes.draven.xp > 0 || S.heroes.draven.lv > 1, 'Held lernt');
 assert.match(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest', troops: { speer: 5 }, hero: 'kael' }, t2 + 3600_000), /gibt es nicht/);
 console.log('Alle Heldentests bestanden.');
+// Mut: Angriffe auf Räuber kosten Mut, stündlich kehrt etwas zurück
+{ const { mutCost, mutStep, MUT_MAX, MUT_REGEN } = await import('../shared/war.js');
+  assert.ok(mutCost(30) > mutCost(1));
+  const M = {}; mutStep(M, 0); assert.equal(M.mut, MUT_MAX);
+  M.mut = 50; M.mutAt = 0; mutStep(M, 3599); assert.equal(M.mut, 50); mutStep(M, 3600 * 2 + 5); assert.equal(M.mut, 50 + 2 * MUT_REGEN);
+  mutStep(M, 3600 * 100); assert.equal(M.mut, MUT_MAX); }
+console.log('Mut-Tests bestanden.');

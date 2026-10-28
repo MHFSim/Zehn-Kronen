@@ -6,7 +6,7 @@ import {
   T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, PACK_NAME, DAILY_SPEED_GIFT
 } from '/shared/rules.js';
 import { FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldAt, fieldCenter, PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
-import { castleSafe, scoreOf } from '/shared/war.js';
+import { castleSafe, scoreOf, MUT_MAX } from '/shared/war.js';
 import { HEROES, HERO_IDS, HERO_MAX, xpNeed, skillList, heroPrefers, heroForce } from '/shared/heroes.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
@@ -273,9 +273,12 @@ function renderArmyBtns() {
 function renderPts() {
   let el = $('ptsChip'); if (!el) { el = document.createElement('div'); el.id = 'ptsChip'; el.className = 'ptschip'; document.body.appendChild(el); }
   const tb = document.querySelector('.topbar');
-  el.hidden = mode !== 'map' || !S; if (el.hidden) return;
+  el.hidden = mode !== 'map' || !S; { const m0 = $('mutChip'); if (m0) m0.hidden = el.hidden; } if (el.hidden) return;
   el.style.top = ((tb ? tb.offsetHeight : 60) + 6) + 'px';
   const t = `🏅 <b>${fmtN(scoreOf(S))}</b> Punkte`; if (el.innerHTML !== t) el.innerHTML = t;
+  let mu = $('mutChip'); if (!mu) { mu = document.createElement('div'); mu.id = 'mutChip'; mu.className = 'ptschip'; document.body.appendChild(mu); }
+  mu.hidden = false; mu.style.top = ((tb ? tb.offsetHeight : 60) + 6 + el.offsetHeight + 6) + 'px';
+  const t2 = `💪 Mut <b>${Math.floor(S.mut == null ? MUT_MAX : S.mut)}</b>/${MUT_MAX}`; if (mu.innerHTML !== t2) mu.innerHTML = t2;
 }
 // Bündnishilfe: kleine Popups mit Hilfe-Symbol
 function renderHelpPop() {

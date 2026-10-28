@@ -10,7 +10,7 @@ import {
   reveal, flushBits, FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldCenter, fieldUnseen, revealField, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack, standIdx
 } from './core.js';
-import { startCampFight, startRaiderFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { startCampFight, startRaiderFight, powerOf, mutStep, mutCost, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { HEROES, heroBusy, heroGather, heroXp, gathersXp } from './heroes.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
@@ -118,25 +118,28 @@ function migrate(ctx) {
 
 /* ---------- Abgleich der ganzen Partie ---------- */
 /* ---------- Räuber: kleine KI-Armeen auf der Karte (Stufe 1 bis 30) ---------- */
-const RAID_LIFE = 4 * 3600, RAID_EVERY = 900;
+const RAID_LIFE = 3 * 3600, RAID_EVERY = 90, RAID_WANT = 36;
+export const raidLevel = (mut, r) => Math.max(1, Math.min(30, Math.round(mut / 110 * (0.65 + r * 0.55))));   // Räuberstufe folgt der Stärke des nächsten Spielers
 const rnd1 = s => { const x = Math.sin(s * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
-function manageRaiders(ctx, players) {
+function manageRaiders(ctx, players, depth = 0) {
   const w = ctx.match.world, map = mapOf(ctx.match), alive = players.filter(p => p.state.slot >= 0 && !p.state.out).length;
   w.raiders = (w.raiders || []).filter(r => r.until > w.gt || fightAt(w, r.id) || w.marches.some(m => !m.dead && m.tid === r.id && m.tk === 'raider' && m.phase === 'out'));
-  const want = Math.min(30, 3 + 2 * alive);
+  const want = alive ? RAID_WANT : 0;
   if (w.raiders.length >= want || w.gt < (w.raidNext || 0)) return;
   const starts = map.objects.filter(o => o.k === 'start');
   for (let i = 0; i < 40; i++) {
-    const sd = w.nextRaider * 977 + i * 131 + Math.floor(w.gt / 60), pl = players.filter(q => q.state.slot >= 0 && !q.state.out && q.state.pos), hs = pl.length ? { x: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[0], y: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[1] } : { x: N / 2, y: N / 2 }, ang = rnd1(sd) * 6.2832, rad = 10 + rnd1(sd + 7) * 34,
+    const sd = w.nextRaider * 977 + i * 131 + Math.floor(w.gt / 60), pl = players.filter(q => q.state.slot >= 0 && !q.state.out && q.state.pos), hs = pl.length ? { x: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[0], y: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[1] } : { x: N / 2, y: N / 2 }, ang = rnd1(sd) * 6.2832, rad = 9 + rnd1(sd + 7) * 50,
       x = Math.round(hs.x + Math.cos(ang) * rad), y = Math.round(hs.y + Math.sin(ang) * rad);
     if (x < 0 || y < 0 || x >= N || y >= N) continue;
     if (!map.pass[y * N + x] || !SITE_OK(map, x, y)) continue;
     if (starts.some(o => Math.hypot(o.x - x, o.y - y) < 9)) continue;   // nicht direkt an einer Burg
-    if (map.objects.some(o => Math.hypot(o.x - x, o.y - y) < 4) || w.raiders.some(r => Math.hypot(r.x - x, r.y - y) < 12)) continue;
-    const lv = 1 + Math.floor(29 * Math.pow(rnd1(sd + 13), 1.7));
+    if (map.objects.some(o => Math.hypot(o.x - x, o.y - y) < 4) || w.raiders.some(r => Math.hypot(r.x - x, r.y - y) < 5)) continue;
+    let near = pl[0], nd = 1e9; for (const q of pl) { const d = Math.hypot(q.state.pos[0] - x, q.state.pos[1] - y); if (d < nd) { nd = d; near = q; } }
+    const lv = raidLevel(near ? powerOf(near.state) : 0, rnd1(sd + 13));
     w.raiders.push({ id: 'raider' + w.nextRaider++, lv, x, y, until: w.gt + RAID_LIFE });
     // Solange weniger als die Hälfte der Wunschzahl da ist, kommen sie schnell nach (Spielstart), danach gemächlich
-    w.raidNext = w.gt + (w.raiders.length < Math.ceil(want / 2) ? 5 : RAID_EVERY); return;
+    if (w.raiders.length < Math.ceil(want * .7) && depth < 30) { w.raidNext = 0; return manageRaiders(ctx, players, depth + 1); }   // Spielstart / lange Pause: in einem Schwung auffüllen
+    w.raidNext = w.gt + RAID_EVERY; return;
   }
   w.raidNext = w.gt + 10;
 }
@@ -181,6 +184,7 @@ export function syncMatch(match, players, now) {
     for (let i = 0; i < n; i++) { addPack(S, i ? '' : th); names.push(PACK_NAME[i ? '' : th] || 'Ressourcenpaket'); }
     note(ctx, p.id, 'scout', 'Feld ' + fieldName(sc.f) + ' erkundet', 'Dein Erkunder hat den Nebel gelichtet und gefunden: ' + names.join(', ') + '. Du findest es unter „Ressourcen“.');
   }
+  for (const p of players) mutStep(p.state, w.gt);
   manageRaiders(ctx, players);
   w.help = (w.help || []).filter(h => { const hp = players.find(x => x.id === h.pid); return hp && inQueue(hp.state, h.bid) && (w.gt - h.t) < 86400 * 30; });
   vassalStep(ctx, dt, w.gt);
@@ -395,6 +399,11 @@ export function command(match, players, player, cmd, now) {
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
     const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S, hid) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S, hid) : planMarch(map, S, o, troops, hid);
     if (plan.error) return plan.error;
+    if (mode === 'normal' && (o.k === 'camp' || o.k === 'raider') && !(src && src.tid === o.id)) {   // Mut kostet jeder Angriff auf Räuber und Banditenlager
+      mutStep(S, w.gt); const cost = mutCost(o.lv);
+      if (S.mut < cost) return 'Zu wenig Mut (' + Math.floor(S.mut) + ' von ' + cost + '). Mut erholt sich stündlich.';
+      S.mut -= cost;
+    }
     let carry = null;
     if (src) {
       if (src.phase === 'fight') { withdraw(ctx, player, src, w.gt, now); if (src.dead) return ''; }
