@@ -26,10 +26,19 @@ const hexRGB = h => [h >> 16 & 255, h >> 8 & 255, h & 255];
 let T;   // THREE
 class MB {
   constructor() { this.p = []; this.n = []; this.c = []; this.tri = 0; }
+  // Grafik „Hoch": gleiche Eckpunkte (ab Index i0) teilen sich Normale und Farbe, dadurch wirken Kugeln, Laub und Felsen rund statt kantig
+  smoothFrom(i0, colToo) {
+    const P = this.p, N = this.n, C = this.c, m = new Map();
+    for (let i = i0; i < P.length; i += 3) {
+      const k = Math.round(P[i] * 2000) + ',' + Math.round(P[i + 1] * 2000) + ',' + Math.round(P[i + 2] * 2000); let e = m.get(k); if (!e) { e = [0, 0, 0, 0, 0, 0, 0, []]; m.set(k, e); }
+      e[0] += N[i]; e[1] += N[i + 1]; e[2] += N[i + 2]; if (colToo) { e[3] += C[i]; e[4] += C[i + 1]; e[5] += C[i + 2]; } e[6]++; e[7].push(i);
+    }
+    for (const e of m.values()) { const l = Math.hypot(e[0], e[1], e[2]) || 1; for (const i of e[7]) { N[i] = e[0] / l; N[i + 1] = e[1] / l; N[i + 2] = e[2] / l; if (colToo) { C[i] = e[3] / e[6]; C[i + 1] = e[4] / e[6]; C[i + 2] = e[5] / e[6]; } } }
+  }
   // Körper einfügen; jit = Helligkeitsschwankung je Dreieck (wirkt wie gemauerte Steine / Holzmaserung)
   push(g, col, x = 0, y = 0, z = 0, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0, jit = .1) {
     // Grafik „Hoch": runde Körper behalten gemeinsame Ecken und bekommen weiche Normalen (nicht kantig), Dreiecks-Helligkeitsrauschen wird schwächer
-    const smooth = MB.hi && !!g.index; if (smooth) jit *= .4; else g = g.index ? g.toNonIndexed() : g;
+    const smooth = MB.hi && !!g.index, poly = MB.hi && !g.index && !!g.parameters && g.parameters.detail !== undefined, i0 = this.p.length; if (smooth || poly) jit *= .4; if (!smooth) g = g.index ? g.toNonIndexed() : g;
     const m = new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz, 'YXZ')), new T.Vector3(sx, sy, sz));
     g.applyMatrix4(m); g.computeVertexNormals(); if (smooth) g = g.toNonIndexed();
     const p = g.attributes.position.array, nn = g.attributes.normal.array, k0 = 1 + (hash(Math.round(x * 31), Math.round(z * 17), Math.round(y * 13)) - .5) * .08;
@@ -38,6 +47,7 @@ class MB {
       const k = k0 * (1 + (hash(this.tri++, 7, 3) - .5) * jit), r = LIN(Math.min(255, col[0] * k)), gg = LIN(Math.min(255, col[1] * k)), b = LIN(Math.min(255, col[2] * k));
       for (let v = 0; v < 3; v++) this.c.push(r, gg, b);
     }
+    if (poly) this.smoothFrom(i0, true);
     g.dispose(); return this;
   }
   box(w, h, d, x, y, z, col, ry = 0, rx = 0, rz = 0) { return this.push(new T.BoxGeometry(w, h, d), col, x, y + h / 2, z, ry, 1, 1, 1, rx, rz); }
@@ -56,7 +66,7 @@ class MB {
   ico(r, x, y, z, col, sy = 1, sx = 1, ry = 0, det = 0) { return this.push(new T.IcosahedronGeometry(r, det), col, x, y, z, ry, sx, sy, sx); }
   // Felsen aus public/rockdata.js (Dreiecke mit fester Farbe): sc = Maßstab, ry = Drehung um die Hochachse
   rock(r, sc, x, y, z, ry = 0, tint = 1) {
-    const cs = Math.cos(ry), sn = Math.sin(ry), mid = [x, y + r.h * sc * .5, z];
+    const cs = Math.cos(ry), sn = Math.sin(ry), mid = [x, y + r.h * sc * .5, z], i0 = this.p.length;
     for (let t = 0; t < r.n; t++) {
       const v = [];
       for (let q = 0; q < 3; q++) { const i = (t * 3 + q) * 3, px = r.P[i] / 1000 * sc, py = r.P[i + 1] / 1000 * sc, pz = r.P[i + 2] / 1000 * sc; v.push([x + px * cs + pz * sn, y + py, z - px * sn + pz * cs]); }
@@ -68,6 +78,7 @@ class MB {
       const k = (1 + (hash(this.tri++, 5, 3) - .5) * .06) * tint, cr = LIN(Math.min(255, r.C[t * 3] * k)), cg = LIN(Math.min(255, r.C[t * 3 + 1] * k)), cb = LIN(Math.min(255, r.C[t * 3 + 2] * k));
       for (const q of v) { this.p.push(q[0], q[1], q[2]); this.n.push(n[0], n[1], n[2]); this.c.push(cr, cg, cb); }
     }
+    if (MB.hi) this.smoothFrom(i0, true);
     return this;
   }
   build() {
@@ -504,7 +515,7 @@ function treeGeo(kind) {
     b.cone(.42, .5, 14, 0, .2, 0, c[0]); b.cone(.35, .46, 14, 0, .44, 0, c[1]); b.cone(.27, .42, 14, 0, .68, 0, c[2]); b.cone(.17, .38, 12, 0, .9, 0, c[3]);
   } else if (kind === 'oak') {
     b.cyl(.06, .095, .46, 8, 0, 0, 0, [98, 70, 44]); b.cyl(.025, .04, .3, 6, .1, .3, 0, [98, 70, 44]);
-    b.ico(.34, 0, .68, 0, W, .88, 1, 0, 2); b.ico(.23, .2, .84, .08, [238, 238, 238], .88, 1, 0, 2); b.ico(.21, -.18, .78, -.1, [222, 226, 222], .88, 1, 0, 2); b.ico(.17, .02, .98, -.06, [246, 246, 246], .9, 1, 0, 1);
+    b.ico(.34, 0, .68, 0, W, .88, 1, 0, MB.hi ? 3 : 2); b.ico(.23, .2, .84, .08, [238, 238, 238], .88, 1, 0, 2); b.ico(.21, -.18, .78, -.1, [222, 226, 222], .88, 1, 0, 2); b.ico(.17, .02, .98, -.06, [246, 246, 246], .9, 1, 0, 1);
   } else if (kind === 'bush') { b.ico(.2, 0, .13, 0, W, .8, 1, 0, 2); b.ico(.14, .16, .1, .06, [225, 225, 225], .8, 1, 0, 1); b.ico(.11, -.14, .09, .07, [236, 236, 236], .8, 1, 0, 1); }
   else { b.ico(.24, 0, .1, 0, W, .65, 1, 0, 1); b.ico(.14, .2, .06, .08, [220, 220, 220], .7, 1, 0, 1); }
   return b.build();
