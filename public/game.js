@@ -41,40 +41,19 @@ function afterAccept() {
 const serverNow = () => Date.now() + offset;
 
 /* ---------- Töne und Musik ---------- */
-let sndPrev = null, fightIds = new Set(), battleLv = 0;
 document.addEventListener('pointerdown', () => snd.unlock(), true);
 document.addEventListener('click', e => {
   const el = e.target.closest && e.target.closest('[data-snd]');
   if (el) { const k = el.dataset.snd, on = k === 'sfx' ? !snd.cfg.sfx : !snd.cfg.music; if (k === 'sfx') snd.setSfx(on); else snd.setMusic(on); el.textContent = (k === 'sfx' ? '🔊 Töne: ' : '🎵 Musik: ') + (on ? 'an' : 'aus'); el.classList.toggle('ghost', !on); return; }
-  const t = e.target.closest && e.target.closest('button,.chip,[data-act],[data-goto],.ptab,summary,a.btn,label.tgl');
-  if (t) snd.sfx('tap');
 }, true);
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
-setInterval(() => { snd.battle(fightIds.size && !document.hidden ? battleLv : 0); snd.heroMenu(panelName === 'heroes'); }, 300);
-function cmdSound(cmd) {
-  const t = cmd.type;
-  if (t === 'march') return ['attack', 'raid', 'assist'].includes(cmd.mode) ? 'war' : 'march';
-  if (/^(upgrade|build|op|site|opDismantle)$/.test(t)) return 'build';
-  if (/^(train|heal)$/.test(t)) return 'train';
-  if (/^(research)$/.test(t)) return 'research';
-  if (/^(buy|donate|useSpeed)$/.test(t)) return 'coin';
-  if (t === 'teleport') return 'teleport';
-  if (/^(recall|halt|stationRecall|opRecall|holdRecall)$/.test(t)) return 'home';
-  if (/Chat$/.test(t)) return 'pop';
-  return 'ok';
-}
+setInterval(() => { snd.heroMenu(panelName === 'heroes'); }, 300);
 let dailyWas = null;   // null = noch nicht gesehen: beim Laden kein Ton
 function soundTick() {
   try {
-    const sg = (view.sieges || []).filter(x => x.mine), ids = new Set(sg.map(x => x.id));
-    for (const x of sg) if (!fightIds.has(x.id) && x.tpid !== me.id) snd.sfx('war');
-    for (const id of fightIds) if (!ids.has(id)) { const r = S.reports[0]; snd.sfx(r && r.win ? 'win' : 'lose'); }
-    const tot = sg.reduce((a, x) => a + ((x.pw && ((x.pw.na || 0) + (x.pw.nd || 0)) * (x.pw.na != null && x.pw.nd != null ? 1 : 2)) || 0), 0); battleLv = ids.size ? Math.min(1, .25 + Math.log10(1 + tot) / 4.5) : 0;
-    fightIds = ids; snd.mood(ids.size ? 'battle' : 'calm');
+    const ids = new Set((view.sieges || []).filter(x => x.mine).map(x => x.id));
+    snd.mood(ids.size ? 'battle' : 'calm');
     { const dd = !!(S.daily && dailyDone(S)); if (dd && dailyWas === false) snd.clip('quests'); dailyWas = dd; }
-    const lv = Object.values(S.lv || {}).reduce((a, b) => a + (+b || 0), 0), tc = Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
-    if (sndPrev) { if (lv > sndPrev.lv) snd.sfx('done'); if (tc > sndPrev.tc) snd.sfx('research'); if (S.reports.length > sndPrev.rep && !ids.size) snd.sfx('report'); }
-    sndPrev = { lv, tc, rep: S.reports.length };
   } catch (e) { console.error(e); }
 }
 
@@ -387,7 +366,6 @@ async function command(cmd) {
   busy = false; if (moved) { sendFrom = 0; sendFromOp = ''; syncMoveBar(); }
   if (r.data && r.data.state) accept(r.data);
   if (!r.ok) toast(r.data.error || 'Das hat nicht geklappt.');
-  snd.sfx(r.ok ? cmdSound(cmd) : 'err');
   renderSheet(); renderTop(); renderHud(); renderNav(); renderCity(true); renderBanner(); renderPanel(true);
   return r.ok;
 }
@@ -621,7 +599,6 @@ function checkFeed() {
   if (fresh.length) {
     feedToasted = top;
     const bad = fresh.some(f => ['attack', 'battle', 'out'].includes(f.kind));
-    snd.sfx(bad ? 'alert' : 'bell');
     toast(fresh.length === 1 ? fresh[0].title + (fresh[0].body ? ' – ' + fresh[0].body : '') : fresh.length + ' neue Meldungen (Mehr)', bad ? '' : 'info');
   }
 }
