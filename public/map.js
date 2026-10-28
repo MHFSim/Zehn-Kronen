@@ -229,8 +229,9 @@ function buildTower() {
   for (const y of [4, 8, 12]) b.cyl(1.95 - y * .03, 1.95 - y * .03, .3, 16, 0, y, 0, D);              // Bänder
   for (const y of [3, 6, 9.5, 12]) for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + y; b.box(.14, .6, .1, Math.cos(a) * 1.6, y, Math.sin(a) * 1.6, [40, 36, 34], -a); }   // Schießscharten
   b.cyl(2.5, 1.5, 1.0, 16, 0, 14.1, 0, mul(S, .9)); b.cyl(2.7, 2.7, .3, 16, 0, 15.0, 0, GOLD);       // Plattform
-  for (let i = 0; i < 10; i++) { const a = i / 10 * 6.2832; b.box(.7, .65, .45, Math.cos(a) * 2.45, 15.3, Math.sin(a) * 2.45, S, -a); }   // Zinnen
-  b.cyl(.55, .3, .34, 12, 0, 15.3, 0, IRON); b.cyl(.62, .55, .1, 12, 0, 15.6, 0, GOLD);
+  b.cyl(2.4, 2.4, .14, 24, 0, 15.2, 0, [26, 24, 28], .03);   // dunkler Boden der Plattform: darauf hebt sich die Flamme ab
+  for (let i = 0; i < 10; i++) { const a = i / 10 * 6.2832; b.box(.7, .65, .45, Math.cos(a) * 2.45, 15.3, Math.sin(a) * 2.45, mul(S, .6), -a); }   // Zinnen (dunkler)
+  b.cyl(.55, .3, .34, 12, 0, 15.34, 0, [40, 38, 42]); b.cyl(.62, .55, .1, 12, 0, 15.64, 0, GOLD);
   parts.push({ k: 'flame', pos: [0, 16.4, 0], s: 1.9 });
   return { geo: b.build(), flags: [], h: 17, parts, smoke: [[0, 17.4, 0]] };
 }
