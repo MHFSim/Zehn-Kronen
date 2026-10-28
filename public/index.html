@@ -439,6 +439,18 @@ body.mode-map.sheet-open #chatBtn,body.mode-map.reports-open #chatBtn{display:no
 #chatPop .msg b{color:#7a4a10}#chatPop .msg small{color:#6d5a3b}
 #chatPop .msg.mine{margin-left:auto;background:#f3e2b3}
 #chatPop input{color:#1b1712;background:#fffaf0;border:1px solid #8a7447}
+#miniPop{position:fixed;z-index:9;display:flex;align-items:center;gap:6px;padding:6px 8px;background:linear-gradient(180deg,#f9f1d8,#efe1b9);color:#2e2012;border:1px solid #c99a3d;border-radius:12px;box-shadow:0 3px 14px #0007;font-size:13px;font-weight:700}
+#miniPop[hidden]{display:none}
+#miniPop .mp-t{font-variant-numeric:tabular-nums;margin-right:2px}
+#miniPop .btn.ghost{color:#2e2012;border-color:#8a7447}
+.picker h3{margin:0 0 4px;font-size:15px}
+.picker .quick .btn{padding:2px 9px;font-size:12px}
+.urow{display:grid;grid-template-columns:92px 1fr 58px;gap:8px;align-items:center;padding:3px 0;border-top:1px solid var(--line)}
+.urow:first-of-type{border-top:none}
+.urow .un{line-height:1.15;min-width:0}.urow .un b{font-size:13px}.urow .un small{display:block;font-size:11px;color:var(--muted)}
+.urow .qr{width:100%;min-width:0;height:28px;margin:0}
+.urow .qn{width:58px;height:30px;font-size:14px}
+.picker .usum{margin:4px 0 0;font-size:12px}
 </style>
 </head>
 <body>

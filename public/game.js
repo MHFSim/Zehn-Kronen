@@ -143,8 +143,7 @@ function setupInput() {
     view.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 1) {
       moved = false; lpDone = false; downAt = { x: e.clientX, y: e.clientY }; wm.dragStart(e.clientX, e.clientY);
-      clearTimeout(lpT); const lx = e.clientX, ly = e.clientY;
-      lpT = setTimeout(() => { if (moved || ptrs.size !== 1 || mode !== 'map' || !mapReady) return; lpDone = true; const t = wm.tileAtScreen(lx, ly); selectMap({ type: 'site', x: t.x, y: t.y, post: true }, false); }, 550);
+      clearTimeout(lpT); miniClose();
     }
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), a: ang(a, b) }; moved = true; }
   });
@@ -293,7 +292,7 @@ function syncMoveBar() {
   if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span>➜ Ziel antippen – das Heer zieht sofort los</span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
   el.hidden = false;
 }
-function closeSheet() { sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
+function closeSheet() { if (miniEl) miniEl.hidden = true; miniTile = null; sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
 
 async function command(cmd) {
   if (busy) return false; busy = true;
@@ -985,8 +984,24 @@ function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
   const hit = wm.pickAt(sx, sy);
   if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
-  if (!hit) { closeSheet(); return; }
-  selectMap(hit, false);
+  if (!hit) { closeSheet(); const t = wm.tileAtScreen(sx, sy); if (t && view.match.phase === 'running') miniOpen(t.x, t.y, sx, sy); return; }
+  miniClose(); selectMap(hit, false);
+}
+// Kleines Pop-up nach kurzem Tippen aufs Gelände: Marschieren oder Abbrechen – die Karte bleibt stehen
+let miniEl = null, miniTile = null;
+function miniClose() { if (miniEl) miniEl.hidden = true; if (miniTile) { miniTile = null; if (!msel && wm) wm.select(null); } }
+function miniOpen(x, y, sx, sy) {
+  if (!miniEl) {
+    miniEl = document.createElement('div'); miniEl.id = 'miniPop'; miniEl.innerHTML = '<span class="mp-t"></span><button type="button" class="btn small" data-mp="go">Marschieren</button><button type="button" class="btn ghost small" data-mp="no">Abbrechen</button>';
+    document.body.appendChild(miniEl);
+    miniEl.addEventListener('click', e => { const b = e.target.closest('[data-mp]'); if (!b) return; const t = miniTile; miniEl.hidden = true; miniTile = null;
+      if (b.dataset.mp === 'go' && t) selectMap({ type: 'site', x: t.x, y: t.y, post: true }, false); else if (!msel) wm.select(null); });
+    miniEl.addEventListener('pointerdown', e => e.stopPropagation());
+  }
+  miniTile = { x, y }; wm.select({ type: 'site', x, y });
+  miniEl.querySelector('.mp-t').textContent = x + ' | ' + y; miniEl.hidden = false;
+  const W = window.innerWidth, w = miniEl.offsetWidth || 220;
+  miniEl.style.left = Math.max(8, Math.min(W - w - 8, sx - w / 2)) + 'px'; miniEl.style.top = Math.max(70, sy - 62) + 'px';
 }
 function selectMap(hit, keepSend) {
   placing = false; 
@@ -1036,8 +1051,11 @@ function pickerHTML() {
   if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); return `<div class="block picker"><h3>Aufgestelltes Heer weiterschicken</h3><p class="note">${sm ? (sm.troops.n != null ? fmtN(sm.troops.n) + ' Einheiten' : troopsLine(sm.troops)) : ''} ziehen von ihrem Standort zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`; }
   const us = Object.keys(U).filter(u => S.troops[u] > 0);
   if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
-  return `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => `<div class="unit"><div><div class="unit-name">${U[u].name}</div><div class="unit-stats">daheim ${fmtN(S.troops[u])} · trägt ${U[u].c}</div></div>
-    ${qtyHTML('send', u, send[u] || 0, 0, S.troops[u], 'sminus', 'splus')}</div>`).join('')}</div>`;
+  const tot = sendList(), cp = capacityOf(tot, S);
+  return `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="shalf">Hälfte</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => {
+    const max = S.troops[u], val = Math.max(0, Math.min(max, send[u] || 0));
+    return `<div class="urow"><div class="un"><b>${U[u].name}</b><small>${fmtN(max)} daheim</small></div><input class="qr" type="range" min="0" max="${max}" value="${val}" data-q="send" data-u="${u}" aria-label="${U[u].name}"><input class="qn" type="number" inputmode="numeric" min="0" max="${max}" value="${val}" data-q="send" data-u="${u}" aria-label="Anzahl"></div>`; }).join('')}
+    <p class="note usum">${fmtN(sum(tot))} Einheiten · tragen ${fmtN(cp)}</p></div>`;
 }
 
 /* ---------- Revier: Bauplatz und Außenposten (gehören dem Bündnis) ---------- */
@@ -1247,12 +1265,13 @@ function updateMapSheet() {
   if (msel.type === 'march') { const m = view.world.marches.find(x => x.id === msel.id), t = $('mTime'); if (m && t) { t.textContent = fmtT(real(Math.max(0, marchRemain(m)))); const pr = $('mProg'), st = marchState(m); if (pr) pr.style.width = Math.round(st.pct * 100) + '%'; const gl = $('mGather'); if (gl && m.own) gl.innerHTML = lootHTML({ [m.res]: Math.floor(m.amount * st.pct) }) + ` <span class="note">von ${fmtN(m.amount)}</span>`; } }
 }
 function mapAct(act, el) {
-  if (!['sminus', 'splus', 'sall', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'opSend', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt', 'assistA', 'assistD'].includes(act)) return false;
+  if (!['sminus', 'splus', 'sall', 'shalf', 'snone', 'march', 'recall', 'toCity', 'spy', 'holdRecall', 'build', 'raid', 'fattack', 'garrison', 'opMove', 'opSend', 'teleport', 'opRecall', 'opDis', 'opGoto', 'post', 'patk', 'sfStart', 'sfCancel', 'halt', 'assistA', 'assistD'].includes(act)) return false;
   const u = el.dataset.u;
   if (act === 'splus' || act === 'sminus') {
     const home = S.troops[u] || 0, n = send[u] || 0, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
     send[u] = Math.max(0, Math.min(home, act === 'splus' ? n + step : n - step)); renderSheet();
   } else if (act === 'sall') { send = {}; for (const k in S.troops) if (S.troops[k] > 0) send[k] = S.troops[k]; renderSheet(); }
+  else if (act === 'shalf') { send = {}; for (const k in S.troops) if (S.troops[k] > 0) send[k] = Math.ceil(S.troops[k] / 2); renderSheet(); }
   else if (act === 'snone') { send = {}; renderSheet(); }
   else if (act === 'toCity') setMode('city');
   else if (act === 'march') {
