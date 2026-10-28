@@ -50,7 +50,7 @@ document.addEventListener('click', e => {
   if (t) snd.sfx('tap');
 }, true);
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
-setInterval(() => { snd.battle(fightIds.size && !document.hidden ? battleLv : 0); }, 300);
+setInterval(() => { snd.battle(fightIds.size && !document.hidden ? battleLv : 0); snd.heroMenu(panelName === 'heroes'); }, 300);
 function cmdSound(cmd) {
   const t = cmd.type;
   if (t === 'march') return ['attack', 'raid', 'assist'].includes(cmd.mode) ? 'war' : 'march';
