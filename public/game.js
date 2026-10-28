@@ -233,9 +233,10 @@ function orderCmd(hit, sx, sy, quiet) {
 /* ---------- Oberfläche ---------- */
 const $ = id => document.getElementById(id);
 // Mengenwahl: Regler plus Zahlenfeld (und − / +). kind: 'pick' (Ausbildung) oder 'send' (Heer), mdn/pl = Aktionen der Knöpfe
+const maxTrain = u => Math.max(1, Math.min(MAX_TRAIN_COUNT, ...U[u].cost.map((c, i) => c > 0 ? Math.floor(S.res[RES[i]] / c) : MAX_TRAIN_COUNT)));
 function qtyHTML(kind, u, val, min, max, mdn, pl) {
   max = Math.max(min, max); val = Math.max(min, Math.min(max, val));
-  return `<div class="qty"><div class="stepper"><button type="button" data-act="${mdn}" data-u="${u}" aria-label="Weniger">−</button><input class="qn" type="number" inputmode="numeric" min="${min}" max="${max}" value="${val}" data-q="${kind}" data-u="${u}" aria-label="Anzahl"><button type="button" data-act="${pl}" data-u="${u}" aria-label="Mehr">+</button></div><input class="qr" type="range" min="${min}" max="${max}" value="${val}" data-q="${kind}" data-u="${u}" aria-label="Regler"></div>`;
+  return `<div class="qty"><div class="stepper"><button type="button" data-act="${mdn}" data-u="${u}" aria-label="Weniger">−</button><input class="qn" type="number" inputmode="numeric" min="${min}" max="${max}" value="${val}" data-q="${kind}" data-u="${u}" aria-label="Anzahl"><button type="button" data-act="${pl}" data-u="${u}" aria-label="Mehr">+</button><button type="button" class="qmax" data-act="max" data-u="${u}" aria-label="Maximum">Max</button></div><input class="qr" type="range" min="${min}" max="${max}" value="${val}" data-q="${kind}" data-u="${u}" aria-label="Regler"></div>`;
 }
 let sheetSig = '', busy = false;
 const fmtK = n => { n = Math.floor(n); const a = Math.abs(n);
@@ -472,6 +473,7 @@ function setupSheet() {
     if (act === 'askHelp') { const ok = await command({ type: 'askHelp', id }); if (ok) toast('Dein Bündnis wurde um Hilfe gebeten.', 'info'); return renderSheet(); }
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
     if (act === 'exch') { const n = exchAmt[el.dataset.r] || 0; exchAmt[el.dataset.r] = 0; return void command({ type: 'exchange', res: el.dataset.r, count: n }).then(ok => renderSheet()); }
+    if (act === 'max') { pick[u] = maxTrain(u); return void renderSheet(); }
     if (act === 'plus' || act === 'minus') {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
       pick[u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); renderSheet();
@@ -1069,6 +1071,7 @@ function setupPanel() {
     if (act === 'techGo') { techSel = ''; renderPanel(true); return void command({ type: 'research', tech: d.id }); }
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
     if (act === 'train') return void command({ type: 'train', id: d.b, unit: d.u, count: pick[d.u] || 10 });
+    if (act === 'max') { pick[d.u] = maxTrain(d.u); return renderPanel(true); }
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
     if (act === 'atab') { allyTab = d.t; return go(); }
     if (act === 'devUnlock') { if (val('devPw') === 'Bailey') { devOk = true; try { sessionStorage.setItem('zk-dev', '1'); } catch {} return go(); } const mm = $('devMsg'); if (mm) mm.textContent = 'Falsches Passwort.'; return; }
