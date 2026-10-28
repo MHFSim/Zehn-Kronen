@@ -21,7 +21,7 @@ import { installIcons, banner, icon } from '/public/icons.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
-let sendGroup = [], lastArmyTap = { id: 0, t: 0 }, sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
+let lastMapTap = { id: 0, t: 0 }, sendGroup = [], lastArmyTap = { id: 0, t: 0 }, sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -1278,6 +1278,18 @@ function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
   const hit = wm.pickAt(sx, sy);
   if (sendGroup.length) { groupSend(hit, sx, sy); return; }
+  // Doppeltipp auf eines deiner Heere: alle eigenen Heere in der Nähe wählen, die gerade marschieren (nicht die stationierten)
+  const nowT = Date.now(), m0 = hit && hit.type === 'march' ? ownMarches().find(x => x.id === hit.id) : null;
+  if (m0 && lastMapTap.id === m0.id && nowT - lastMapTap.t < 450) {
+    lastMapTap = { id: 0, t: 0 };
+    const o0 = wm.marchObjs[m0.id], near = ownMarches().filter(x => {
+      if (!(x.phase === 'out' && x.mode !== 'build') && x.phase !== 'back') return false;
+      const o = wm.marchObjs[x.id]; return o && o0 && Math.hypot(o.grp.position.x - o0.grp.position.x, o.grp.position.z - o0.grp.position.z) <= 14;
+    });
+    if (near.length < 2) { toast('Kein weiteres marschierendes Heer in der Nähe.'); return; }
+    closeSheet(); miniClose(); sendFrom = 0; sendFromOp = ''; sendGroup = near.map(x => x.id); syncMoveBar(); renderArmyBtns(); return;
+  }
+  lastMapTap = { id: m0 ? m0.id : 0, t: nowT };
   if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
   if (!hit) {
     closeSheet(); const t = wm.tileAtScreen(sx, sy);
