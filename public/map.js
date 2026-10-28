@@ -562,6 +562,19 @@ export class WorldMap {
     this.fx = []; this.marchObjs = {}; this.opObjs = {}; this.terrObjs = []; this.mats = {};
     this.resize(); window.addEventListener('resize', () => this.resize());
   }
+  // Grafik: 'std' = bisheriger Look, 'high' = volle Pixeldichte, schärfere weichere Schatten, zusätzliches Gegenlicht (Kanten) und wärmeres Sonnenlicht
+  setQuality(q) {
+    this.q = q; const hi = q === 'high', r = this.renderer, dpr = window.devicePixelRatio || 1, sh = this.sun.shadow;
+    r.setPixelRatio(hi ? Math.min(dpr, 3) : Math.min(dpr, 2)); if (this.W) r.setSize(this.W, this.H);
+    const sz = hi ? 4096 : 2048; if (sh.mapSize.x !== sz) { sh.mapSize.set(sz, sz); if (sh.map) { sh.map.dispose(); sh.map = null; } }
+    sh.radius = hi ? 2.5 : 1; sh.bias = hi ? -.0004 : -.0006;
+    let redo = false;
+    if (!this.rim) { this.rim = new T.DirectionalLight(0x9fbcff, 0); this.rim.position.set(-34, 16, -42); this.scene.add(this.rim, this.rim.target); redo = true; }
+    this.rim.intensity = hi ? .42 : 0; this.hemi.intensity = hi ? .7 : .82; this.sun.intensity = hi ? 1.42 : 1.2; this.sun.color.setHex(hi ? 0xffd08a : 0xffd9a0);
+    if (!r.shadowMap.enabled) { r.shadowMap.enabled = true; this.sun.castShadow = true; this.perf1 = 0; redo = true; }
+    this.grace = this.time + 4; this.hiDown = 0;
+    if (redo) this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+  }
   resize() {
     const w = window.innerWidth, h = window.innerHeight; this.W = w; this.H = h;
     this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
@@ -1335,7 +1348,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   /* ---------- Bild für Bild ---------- */
   frame(dt) {
     this.ema = (this.ema || .016) * .97 + Math.min(dt, .2) * .03;
-    if (this.time > 3 && !this.perf1 && this.ema > .045) { this.perf1 = 1; this.sun.castShadow = false; this.renderer.shadowMap.enabled = false; this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+    if (this.q === 'high' && !this.hiDown && this.time > (this.grace || 3) && this.ema > .04) { this.hiDown = 1; const g = this.grace; this.setQuality('std'); this.q = 'high-lite'; this.grace = this.time + 4; void g; }
+    if (this.time > Math.max(3, this.grace || 0) && !this.perf1 && this.ema > .045) { this.perf1 = 1; this.sun.castShadow = false; this.renderer.shadowMap.enabled = false; this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
     if (this.time > 6 && this.perf1 === 1 && this.ema > .055) { this.perf1 = 2; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); this.renderer.setSize(this.W, this.H); }
     dt = Math.min(dt, .1); this.time += dt; const t = this.time; this.waterMat.uniforms.uTime.value = t;
     if (this.anim) { const a = this.anim; a.t = Math.min(1, a.t + dt / .38); const u = 1 - Math.pow(1 - a.t, 3); this.cam.x = a.sx + (a.ex - a.sx) * u; this.cam.z = a.sz + (a.ez - a.sz) * u; if (a.t >= 1) this.anim = null; }

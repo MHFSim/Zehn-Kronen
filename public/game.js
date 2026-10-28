@@ -50,6 +50,12 @@ document.addEventListener('click', e => {
 }, true);
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button,.chip,[data-act],[data-goto],.ptab,summary,a.btn,label.tgl,[data-nav],[data-sub]')) snd.click(); }, true);
 document.addEventListener('scroll', e => { if (e.target && e.target.id === 'hdock') dockX = e.target.scrollLeft; }, true);
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-gfx]'); if (!b) return;
+  gfxQ = b.dataset.gfx === 'high' ? 'high' : 'std'; try { localStorage.setItem('zk.gfx', gfxQ); } catch (x) { /* egal */ }
+  if (wm) wm.setQuality(gfxQ); if (cv) cv.setQuality(gfxQ);
+  document.querySelectorAll('[data-gfx]').forEach(x => x.classList.toggle('ghost', x.dataset.gfx !== gfxQ));
+});
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
 setInterval(() => { snd.heroMenu(panelName === 'heroes'); }, 300);
 let dailyWas = null;   // null = noch nicht gesehen: beim Laden kein Ton
@@ -592,11 +598,12 @@ function updateCity() {
 /* ---------- 3D-Stadt ---------- */
 const CITY_3D = false;   // 3D-Stadt ist abgeschaltet (Text-Stadt); Code bleibt für später
 let cv = null, cvLoop = 0, cvFail = !CITY_3D;
+let gfxQ = 'std'; try { gfxQ = localStorage.getItem('zk.gfx') === 'high' ? 'high' : 'std'; } catch (e) { /* ohne Speicher: Standard */ }
 const colNum = c => typeof c === 'number' ? c : parseInt(String(c || '#3a6fd0').replace('#', ''), 16) || 0x3a6fd0;
 function ensureCity() {
   if (cv || cvFail || !S || !window.THREE) return !!cv;
   try {
-    cv = new CityView(THREE, $('cityStage'), { onPick: id => { if (id) openSheet(id); else if (sel && !msel) closeSheet(); } });
+    cv = new CityView(THREE, $('cityStage'), { onPick: id => { if (id) openSheet(id); else if (sel && !msel) closeSheet(); } }); cv.setQuality(gfxQ);
     cv.configure({ color: colNum(PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length]), slot: S.slot || 0, layout: Object.fromEntries(Object.keys(B).map(k => [k, [B[k].x, B[k].y, B[k].w]])) });
     let last = performance.now();
     const loop = now => { cvLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode === 'city' && !document.hidden) cv.frame(dt); };
@@ -846,7 +853,8 @@ function moreHTML() {
   const ps = pushOn === 'unsupported' ? '<p class="note">Dein Browser unterstützt keine Benachrichtigungen. Auf dem iPhone: Seite zum Home-Bildschirm hinzufügen und von dort öffnen.</p>'
     : `<div class="row">${pushOn === 'on' ? '<button class="btn ghost" data-act="pushOff" type="button">Benachrichtigungen ausschalten</button>' : '<button class="btn" data-act="pushOn" type="button">Benachrichtigungen einschalten</button>'}</div><p class="note">${pushMsg || 'Du bekommst eine Meldung, wenn dich jemand angreift, ein Heer zurückkehrt oder das Bündnis dich braucht. Auf dem iPhone: zuerst zum Home-Bildschirm hinzufügen.'}</p>`;
   const sc = snd.cfg;
-  const settings = `<div class="block"><h3>Ton und Musik</h3><div class="row"><button class="btn ${sc.sfx ? '' : 'ghost'}" data-snd="sfx" type="button">🔊 Töne: ${sc.sfx ? 'an' : 'aus'}</button><button class="btn ${sc.music ? '' : 'ghost'}" data-snd="music" type="button">🎵 Musik: ${sc.music ? 'an' : 'aus'}</button></div>
+  const settings = `<div class="block"><h3>Grafik</h3><div class="row"><button class="btn ${gfxQ === 'high' ? 'ghost' : ''}" data-gfx="std" type="button">Standard</button><button class="btn ${gfxQ === 'high' ? '' : 'ghost'}" data-gfx="high" type="button">Hoch</button></div><p class="note">Hoch: schärferes Bild, weichere Schatten, mehr Licht – braucht mehr Akku und ein schnelleres Gerät. Wird das Spiel zu langsam, schaltet es automatisch zurück.</p></div>
+    <div class="block"><h3>Ton und Musik</h3><div class="row"><button class="btn ${sc.sfx ? '' : 'ghost'}" data-snd="sfx" type="button">🔊 Töne: ${sc.sfx ? 'an' : 'aus'}</button><button class="btn ${sc.music ? '' : 'ghost'}" data-snd="music" type="button">🎵 Musik: ${sc.music ? 'an' : 'aus'}</button></div>
     <div class="field"><label for="vs">Lautstärke Töne</label><input id="vs" type="range" min="0" max="1" step=".05" value="${sc.vs}" data-sndv="vs"></div><div class="field"><label for="vm">Lautstärke Musik</label><input id="vm" type="range" min="0" max="1" step=".05" value="${sc.vm}" data-sndv="vm"></div></div>
     <div class="block"><h3>Benachrichtigungen</h3>${ps}</div>
     <div class="block"><h3>Passwort ändern</h3><div class="field"><label for="pwOld">Altes Passwort</label><input id="pwOld" type="password" autocomplete="current-password"></div>
@@ -1817,7 +1825,7 @@ async function buildMap() {
   try {
     const r = await api('/api/map'); if (!r.ok) throw new Error(r.data.error || 'Karte nicht verfügbar');
     document.body.classList.add('mode-map');   // damit die Zeichenfläche eine Größe hat
-    wm = new WorldMap(THREE, $('stage')); wm.onFlash = () => { const f = document.createElement('div'); f.className = 'tpflash'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }; wm.load(r.data); mapReady = true; wm.sync(view, me.id, offset);
+    wm = new WorldMap(THREE, $('stage')); wm.setQuality(gfxQ); wm.onFlash = () => { const f = document.createElement('div'); f.className = 'tpflash'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }; wm.load(r.data); mapReady = true; wm.sync(view, me.id, offset);
     const own = wm.map.starts[S.slot] || { x: 48, y: 48 };
     focusMap(own.x + .5, own.y + .5, Math.min(60, Math.max(34, 26000 / Math.max(360, window.innerWidth) * 1.2)));
     setupInput();

@@ -292,8 +292,8 @@ export class CityView {
     const sky = 0xb4d4ea; this.scene = new T.Scene(); this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(0xc4dcec, 70, 230);
     this.camera = new T.PerspectiveCamera(32, 1, 1, 600);
     r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 1.28;
-    this.scene.add(new T.HemisphereLight(0xd6e8ff, 0x7e7648, .8));
-    const fill = new T.DirectionalLight(0xa9c2ff, .35); fill.position.set(18, 10, -14); this.scene.add(fill);
+    this.hemiL = new T.HemisphereLight(0xd6e8ff, 0x7e7648, .8); this.scene.add(this.hemiL);
+    const fill = this.fillL = new T.DirectionalLight(0xa9c2ff, .35); fill.position.set(18, 10, -14); this.scene.add(fill);
     this.sun = new T.DirectionalLight(0xffe9c2, 1.55); this.sun.position.set(-16, 26, 14); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera; sc.left = -19; sc.right = 19; sc.top = 19; sc.bottom = -19; sc.near = 4; sc.far = 80; this.sun.shadow.bias = -.0006; this.sun.shadow.normalBias = .05;
     this.scene.add(this.sun, this.sun.target);
@@ -303,6 +303,14 @@ export class CityView {
     this.time = 0; this.units = []; this.flagMeshes = []; this.bld = {}; this.pick = []; this.smokeList = []; this.bump = {};
     this.build(); this.setupInput(); this.resize(); window.addEventListener('resize', () => this.resize());
     this.updateCamera();
+  }
+  // Grafik: 'std' = bisheriger Look, 'high' = volle Pixeldichte, feinere weichere Schatten, kräftigeres Gegenlicht
+  setQuality(q) {
+    this.q = q; const hi = q === 'high', r = this.renderer, dpr = window.devicePixelRatio || 1, sh = this.sun.shadow;
+    r.setPixelRatio(hi ? Math.min(dpr, 3) : Math.min(dpr, 2)); if (this.W) r.setSize(this.W, this.H);
+    const sz = hi ? 4096 : 2048; if (sh.mapSize.x !== sz) { sh.mapSize.set(sz, sz); if (sh.map) { sh.map.dispose(); sh.map = null; } }
+    sh.radius = hi ? 2.5 : 1; sh.bias = hi ? -.0004 : -.0006;
+    this.fillL.intensity = hi ? .55 : .35; this.hemiL.intensity = hi ? .72 : .8; this.sun.intensity = hi ? 1.65 : 1.55; r.toneMappingExposure = hi ? 1.34 : 1.28;
   }
   resize() {
     const w = window.innerWidth, h = window.innerHeight; this.W = w; this.H = h; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
