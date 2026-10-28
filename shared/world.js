@@ -118,7 +118,7 @@ function migrate(ctx) {
 
 /* ---------- Abgleich der ganzen Partie ---------- */
 /* ---------- Räuber: kleine KI-Armeen auf der Karte (Stufe 1 bis 30) ---------- */
-const RAID_LIFE = 3 * 3600, RAID_EVERY = 90, RAID_WANT = 36;
+const RAID_LIFE = 3 * 3600, RAID_EVERY = 60, RAID_WANT = 80, RAID_GRID = 10;   // 10 x 10 Abschnitte, in jedem höchstens ein Räuber
 export const raidLevel = (mut, r) => Math.max(1, Math.min(30, Math.round(mut / 110 * (0.65 + r * 0.55))));   // Räuberstufe folgt der Stärke des nächsten Spielers
 const rnd1 = s => { const x = Math.sin(s * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 function manageRaiders(ctx, players, depth = 0) {
@@ -126,20 +126,27 @@ function manageRaiders(ctx, players, depth = 0) {
   w.raiders = (w.raiders || []).filter(r => r.until > w.gt || fightAt(w, r.id) || w.marches.some(m => !m.dead && m.tid === r.id && m.tk === 'raider' && m.phase === 'out'));
   const want = alive ? RAID_WANT : 0;
   if (w.raiders.length >= want || w.gt < (w.raidNext || 0)) return;
-  const starts = map.objects.filter(o => o.k === 'start');
-  for (let i = 0; i < 40; i++) {
-    const sd = w.nextRaider * 977 + i * 131 + Math.floor(w.gt / 60), pl = players.filter(q => q.state.slot >= 0 && !q.state.out && q.state.pos), hs = pl.length ? { x: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[0], y: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[1] } : { x: N / 2, y: N / 2 }, ang = rnd1(sd) * 6.2832, rad = 9 + rnd1(sd + 7) * 50,
-      x = Math.round(hs.x + Math.cos(ang) * rad), y = Math.round(hs.y + Math.sin(ang) * rad);
-    if (x < 0 || y < 0 || x >= N || y >= N) continue;
-    if (!map.pass[y * N + x] || !SITE_OK(map, x, y)) continue;
-    if (starts.some(o => Math.hypot(o.x - x, o.y - y) < 9)) continue;   // nicht direkt an einer Burg
-    if (map.objects.some(o => Math.hypot(o.x - x, o.y - y) < 4) || w.raiders.some(r => Math.hypot(r.x - x, r.y - y) < 5)) continue;
-    let near = pl[0], nd = 1e9; for (const q of pl) { const d = Math.hypot(q.state.pos[0] - x, q.state.pos[1] - y); if (d < nd) { nd = d; near = q; } }
-    const lv = raidLevel(near ? powerOf(near.state) : 0, rnd1(sd + 13));
-    w.raiders.push({ id: 'raider' + w.nextRaider++, lv, x, y, until: w.gt + RAID_LIFE });
-    // Solange weniger als die Hälfte der Wunschzahl da ist, kommen sie schnell nach (Spielstart), danach gemächlich
-    if (w.raiders.length < Math.ceil(want * .7) && depth < 30) { w.raidNext = 0; return manageRaiders(ctx, players, depth + 1); }   // Spielstart / lange Pause: in einem Schwung auffüllen
-    w.raidNext = w.gt + RAID_EVERY; return;
+  const starts = map.objects.filter(o => o.k === 'start'), pl = players.filter(q => q.state.slot >= 0 && !q.state.out && q.state.pos);
+  // Gerecht über die ganze Karte: ein Raster aus Abschnitten, in jedem höchstens ein Räuber. Neue kommen in einem leeren Abschnitt (zufällige Reihenfolge) auf.
+  const SEC = Math.ceil(N / RAID_GRID), taken = new Set(w.raiders.map(r => Math.floor(r.x / SEC) + Math.floor(r.y / SEC) * RAID_GRID));
+  const empty = []; for (let k = 0; k < RAID_GRID * RAID_GRID; k++) if (!taken.has(k)) empty.push(k);
+  const sd0 = w.nextRaider * 977 + Math.floor(w.gt / 60);
+  empty.sort((a, b) => rnd1(sd0 + a * 7.31) - rnd1(sd0 + b * 7.31));
+  for (const k of empty) {
+    const gx = k % RAID_GRID, gy = Math.floor(k / RAID_GRID);
+    for (let i = 0; i < 12; i++) {
+      const sd = sd0 + k * 131 + i * 17, x = Math.floor(gx * SEC + rnd1(sd + 1) * SEC), y = Math.floor(gy * SEC + rnd1(sd + 2) * SEC);
+      if (x < 0 || y < 0 || x >= N || y >= N) continue;
+      if (!map.pass[y * N + x] || !SITE_OK(map, x, y)) continue;
+      if (starts.some(o => Math.hypot(o.x - x, o.y - y) < 9)) continue;   // nicht direkt an einer Burg
+      if (map.objects.some(o => Math.hypot(o.x - x, o.y - y) < 4) || w.raiders.some(r => Math.hypot(r.x - x, r.y - y) < 5)) continue;
+      let near = pl[0], nd = 1e9; for (const q of pl) { const d = Math.hypot(q.state.pos[0] - x, q.state.pos[1] - y); if (d < nd) { nd = d; near = q; } }
+      const lv = raidLevel(near ? powerOf(near.state) : 0, rnd1(sd + 13));   // Stärke folgt dem nächsten Spieler
+      w.raiders.push({ id: 'raider' + w.nextRaider++, lv, x, y, until: w.gt + RAID_LIFE });
+      // Beim Spielstart oder nach langer Pause wird in einem Schwung aufgefüllt
+      if (w.raiders.length < want && depth < 100) { w.raidNext = 0; return manageRaiders(ctx, players, depth + 1); }
+      w.raidNext = w.gt + RAID_EVERY; return;
+    }
   }
   w.raidNext = w.gt + 10;
 }

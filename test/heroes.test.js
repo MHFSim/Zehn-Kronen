@@ -55,7 +55,11 @@ assert.equal(S.heroes.aldric.xp, 0);
 
 // Räuber erscheinen, bleiben begrenzt und verschwinden wieder
 syncMatch(match, players, t + 30 * 3600_000);
-assert.ok(w.raiders.length >= 20 && w.raiders.length <= 40, 'Räuber: ' + w.raiders.length);
+assert.ok(w.raiders.length >= 50 && w.raiders.length <= 100, 'Räuber: ' + w.raiders.length);
+{ // gerecht über die ganze Karte verteilt: höchstens einer je Abschnitt, alle vier Kartenviertel belegt
+  const sec = new Set(), q = [0, 0, 0, 0];
+  for (const r of w.raiders) { const k = Math.floor(r.x / 28) + 10 * Math.floor(r.y / 28); assert.ok(!sec.has(k), 'zwei Räuber im selben Abschnitt'); sec.add(k); q[(r.x >= 140 ? 1 : 0) + (r.y >= 140 ? 2 : 0)]++; }
+  assert.ok(q.every(n => n >= 8), 'Räuber in jedem Viertel: ' + q.join('/')); }
 assert.ok(w.raiders.every(r => r.lv >= 1 && r.lv <= 30));
 assert.ok(viewFor(match, players, p1, t + 30 * 3600_000).world.raiders.length === w.raiders.length);
 

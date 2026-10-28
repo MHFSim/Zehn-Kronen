@@ -985,7 +985,17 @@ function setupPanel() {
     }
     if (act === 'back') { moreSub = ''; if (moreFrom) { moreFrom = ''; return closePanel(); } return go(); }
     if (act === 'claimDaily') { const ok = await command({ type: 'claimDaily' }); if (ok) toast('3 Stunden Speedups erhalten!', 'info'); return renderPanel(true); }
-    if (act === 'openPack') { const ok = await command({ type: 'openPack', pid: Number(d.pid) }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
+    if (act === 'openPack') {
+      const pk = (S.packs || []).find(x => x.id === Number(d.pid)), room = cap(S);
+      const lost = pk ? RES.map(r => [r, Math.max(0, S.res[r] + pk.res[r] - room)]).filter(x => x[1] > 0) : [];
+      if (lost.length && !d.sure) {   // Hinweis vor dem Einlösen: ein Teil würde verfallen
+        const nm = { food: 'Nahrung', wood: 'Holz', stone: 'Stein', ore: 'Erz' };
+        $('modalIn').innerHTML = `<h2>Lager würde überlaufen</h2><p class="desc">Dein Lager fasst ${fmtN(room)} je Rohstoff. Wenn du „${esc(pk.name)}“ jetzt einlöst, verfällt ein Teil:</p><div class="block">${lost.map(([r, n]) => `<div class="mrow"><span>${nm[r] || r}</span><b>${fmtN(n)} verfallen</b></div>`).join('')}</div><p class="note">Tipp: Erst Rohstoffe ausgeben (bauen, ausbilden, forschen) und das Paket danach einlösen.</p><div class="row" style="margin-top:12px"><button class="btn ghost" type="button" id="packNo">Abbrechen</button><button class="btn" type="button" id="packYes">Trotzdem einlösen</button></div>`;
+        $('modal').hidden = false; $('packNo').onclick = () => { $('modal').hidden = true; };
+        $('packYes').onclick = async () => { $('modal').hidden = true; const ok2 = await command({ type: 'openPack', pid: pk.id }); if (ok2) toast('Ressourcenpaket eingelöst.', 'info'); renderPanel(true); };
+        return;
+      }
+      const ok = await command({ type: 'openPack', pid: Number(d.pid) }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
     if (act === 'donate') { const amounts = {}; for (const r of RES) { const v = Math.floor(Number(val('dn_' + r)) || 0); if (v > 0) amounts[r] = v; } if (!Object.keys(amounts).length) return void toast('Gib an, wie viel du einzahlen willst.'); return void command({ type: 'donate', amounts }).then(ok => { if (ok) { for (const r of RES) { const i = document.getElementById('dn_' + r); if (i) i.value = ''; } toast('Eingezahlt. Danke!', 'info'); } }); }
     if (act === 'shopBuy') return void command({ type: 'buy', item: d.i, n: 1 }).then(ok => ok && toast(ITEMS[d.i].name + ' gekauft.', 'info'));
     if (act === 'opGoto') { closePanel(); await setMode('map'); if (mode === 'map') selectMap({ type: 'op', id: d.id }, false); return; }
