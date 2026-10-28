@@ -106,3 +106,9 @@ Unter `/impressum` und `/datenschutz` liegen Vorlagen. Eigene Texte legst du als
 ## Online stellen
 
 Siehe [docs/BETRIEB.md](docs/BETRIEB.md) (Server, https, Push, Docker).
+
+## Tägliche Aufgaben, Ressourcenpakete, Bündnishilfe, Punkte
+- **Tägliche Aufgaben** (Mehr → 📅 oder Button in der Stadt): jeden (UTC-)Tag neue Liste, angepasst an den Stand (Sammeln skaliert mit dem Rathaus; Forschung nur mit Akademie; Ausbildung nur mit Kaserne/Schießstand/Stall; „Mitgliedern helfen“ nur mit Bündnispartnern, höchstens so viele wie vorhanden; Lager räumen erst ab 15 Truppen). Jede erledigte Aufgabe gibt ein **Ressourcenpaket** (≈1,5 Std. deiner Produktion, jederzeit einlösbar). Alle Aufgaben erledigt → **3 Std. Speedups**.
+- **Hilfe erbitten**: beim Bau im Gebäudemenü. Bündnismitglieder bekommen ein Popup mit 🤝; jede Hilfe bringt den Bau um 15 % voran (je Mitglied einmal).
+- **Punkte** (Karte, oben links): Gebäudestufen, Truppen, Eroberungen, Kills und Forschungsstufen.
+- Im Kampf sieht man die Truppenzahl des Gegners nie, nur Lebensbalken und den eigenen Stand.

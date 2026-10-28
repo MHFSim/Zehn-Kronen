@@ -13,7 +13,7 @@ import {
 import { startCampFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
-import { RES, gatherFinds, findsText } from './rules.js';
+import { RES, gatherFinds, findsText, ensureDaily, questAdd, speedUp, inQueue } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
 
@@ -91,7 +91,7 @@ function onHome(ctx, m, bt, realT) {
   for (const u in m.troops) { S.away[u] = (S.away[u] || 0) - m.troops[u]; if (S.away[u] <= 0) delete S.away[u]; }
   const load = { ...(m.carry || {}) }; for (const r in (m.load || {})) load[r] = (load[r] || 0) + m.load[r];
   { const home = mapOf(match).objects.find(x => x.k === 'start' && x.slot === S.slot); if (home) joinDefenders(match.world, home.id, m.troops); }
-  for (const r of Object.keys(load)) S.res[r] = (S.res[r] || 0) + load[r];
+  for (const r of Object.keys(load)) { S.res[r] = (S.res[r] || 0) + load[r]; if (RES.includes(r)) questAdd(S, r, load[r]); }
   if (Object.keys(load).length) pushReport(S, { kind: 'return', title: 'Heer zurück mit Beute', win: true, loot: load, target: { kind: m.tk, id: m.tid } }, realT);
 }
 
@@ -139,6 +139,11 @@ export function syncMatch(match, players, now) {
   clanIncome(ctx, dt);
   applyBonuses(ctx);
   for (const p of players) { advanceTo(p.state, now, speed); }
+  for (const p of players) {   // Tägliche Aufgaben: neuer Tag, neue Liste
+    if (p.state.slot < 0 || p.state.out) continue;
+    const al = allianceOf(w, p.id); ensureDaily(p.state, now, al ? al.members.length - 1 : 0);
+  }
+  w.help = (w.help || []).filter(h => { const hp = players.find(x => x.id === h.pid); return hp && inQueue(hp.state, h.bid) && (w.gt - h.t) < 86400 * 30; });
   vassalStep(ctx, dt, w.gt);
   for (const p of players) {   // Schutz läuft bald aus: einmal Bescheid geben
     const S = p.state;
@@ -227,6 +232,28 @@ export function command(match, players, player, cmd, now) {
   const S = player.state, w = match.world, ctx = mkCtx(match, players, now);
   if (!cmd || typeof cmd !== 'object') return 'Ungültiger Befehl';
   if (cmd.type === 'readReports') { S.reports.forEach(r => { r.read = true; }); return ''; }
+  if (cmd.type === 'askHelp') {   // Bündnis um Hilfe beim Bauen bitten
+    const al = allianceOf(w, player.id), q = inQueue(S, cmd.id);
+    if (!al || al.members.length < 2) return 'Du brauchst ein Bündnis mit mindestens einem weiteren Mitglied.';
+    if (!q) return 'Dieses Gebäude wird nicht gebaut.';
+    w.help = w.help || []; w.nextHelp = w.nextHelp || 1;
+    if (w.help.some(h => h.pid === player.id && h.bid === cmd.id)) return 'Du hast schon um Hilfe gebeten.';
+    w.help.push({ id: w.nextHelp++, pid: player.id, bid: cmd.id, t: w.gt, by: [] });
+    return '';
+  }
+  if (cmd.type === 'giveHelp') {   // einem Bündnismitglied helfen: sein Bau kommt um 15 % voran
+    const h = (w.help || []).find(x => x.id === cmd.rid); if (!h) return 'Die Bitte ist nicht mehr offen.';
+    const al = allianceOf(w, player.id), op = players.find(x => x.id === h.pid), q = op && inQueue(op.state, h.bid);
+    if (!al || !al.members.includes(h.pid) || h.pid === player.id) return 'Dem kannst du nicht helfen.';
+    if (h.by.includes(player.id)) return 'Du hast schon geholfen.';
+    if (!q) { w.help = w.help.filter(x => x !== h); return 'Der Bau ist schon fertig.'; }
+    advanceTo(op.state, ctx.now, match.speed);
+    h.by.push(player.id);
+    const tot = q.total, before = q.left; speedUp(op.state, 'build', h.bid, 0.15 * tot);
+    questAdd(S, 'help', 1);
+    note(ctx, op.id, 'help', player.name + ' hilft dir', 'Dein Bau ging um ' + Math.round(Math.min(before, 0.15 * tot) / tot * 100) + ' % voran.');
+    return '';
+  }
   if (cmd.type === 'readFeed') { S.feedSeen = S.nextFeed - 1; return ''; }
   if (cmd.type === 'globalChat') {   // Weltchat: alle Spieler der Partie
     if (S.out) return 'Du bist ausgeschieden.';
@@ -380,6 +407,14 @@ export function command(match, players, player, cmd, now) {
 }
 
 /* ---------- Sicht für einen Spieler ---------- */
+// Im Kampf sieht man nie, wie viele Einheiten der Gegner hat: nur die Lebensbalken und die eigene Seite
+function hideFoe(pw, side) {
+  if (!pw) return pw;
+  const o = { ...pw }; delete o.pk;
+  if (side !== 'att') { o.na = null; o.na0 = null; o.pa = null; }
+  if (side !== 'def') { o.nd = null; o.nd0 = null; o.pd = null; }
+  return o;
+}
 export function viewFor(match, players, me, now) {
   const w = match.world, S = me.state, gt = w.gt, map = mapOf(match), myAl = allianceOf(w, me.id);
   const friends = myAl ? myAl.members : [me.id];
@@ -402,7 +437,7 @@ export function viewFor(match, players, me, now) {
       const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null, kind = op ? 'op' : dp ? 'city' : 'other';
       const involved = kind !== 'other' || m.owner === me.id || w.marches.some(x => x.lead === m.id && x.owner === me.id);
       const mineF = m.owner === me.id || friends.includes(m.owner) || (dp && friends.includes(dp.id)) || (op && myAl && op.al === myAl.id) || w.marches.some(x => x.lead === m.id && x.owner === me.id);
-      if (involved) sieges.push({ mine: !!mineF, id: m.id, tid: m.tid, kind, tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : bo && bo.k === 'camp' ? 'Banditenlager Stufe ' + bo.lv : bo && bo.k === 'throne' ? 'den Thron' : bo && bo.k === 'sanct' ? 'ein Heiligtum' : 'ein Heer auf dem Feld', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, n: sum(m.troops), pw: fightView(mkCtx(match, players, now), m), px: marchPos(m, gt).x, py: marchPos(m, gt).y });
+      if (involved) sieges.push({ mine: !!mineF, id: m.id, tid: m.tid, kind, tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : bo && bo.k === 'camp' ? 'Banditenlager Stufe ' + bo.lv : bo && bo.k === 'throne' ? 'den Thron' : bo && bo.k === 'sanct' ? 'ein Heiligtum' : 'ein Heer auf dem Feld', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, pw: hideFoe(fightView(mkCtx(match, players, now), m), (m.owner === me.id || friends.includes(m.owner) || w.marches.some(x => x.lead === m.id && x.side === 'att' && (x.owner === me.id || friends.includes(x.owner)))) ? 'att' : ((dp && friends.includes(dp.id)) || (op && myAl && op.al === myAl.id) || w.marches.some(x => x.lead === m.id && x.side === 'def' && x.owner === me.id)) ? 'def' : ''), px: marchPos(m, gt).x, py: marchPos(m, gt).y });
     }
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
@@ -435,6 +470,7 @@ export function viewFor(match, players, me, now) {
       alliances: Object.values(w.alliances).map(a => ({ id: a.id, name: a.name, tag: a.tag, leader: a.leader, members: a.members, color: a.color || '' })),
       holds, chron: w.chron.slice(0, 40), result: w.result, ranking: rankingOf(match, players)
     },
+    help: (w.help || []).filter(h => h.pid === me.id || (friends.includes(h.pid) && !h.by.includes(me.id))).map(h => { const hp = players.find(x => x.id === h.pid); return { id: h.id, pid: h.pid, name: hp ? hp.name : '?', bid: h.bid, mine: h.pid === me.id, n: h.by.length }; }),
     ally, invites: mineInv, requests: myReq, incoming, sieges, gchat: (w.chat || []).slice(-60), myStations,
     state: S,
     world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches, outposts }

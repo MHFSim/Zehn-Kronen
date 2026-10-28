@@ -1077,7 +1077,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       else { b.el.style.display = 'none'; b.vis = false; continue; }
       place(b, x, y, z, sb);
       const left = Math.max(0, (b.left || 0) - (gt - (b.gt0 || gt))) / sp, mm = Math.floor(left / 60), ss = Math.floor(left % 60);
-      const tx = '⚔ ' + (b.na || 0) + ' | ' + (b.nd || 0) + ' · ⏱ ' + (mm >= 60 ? Math.floor(mm / 60) + ':' + String(mm % 60).padStart(2, '0') + ':' : mm + ':') + String(ss).padStart(2, '0');
+      const tx = '⚔ ' + (b.na == null ? '?' : b.na) + ' | ' + (b.nd == null ? '?' : b.nd) + ' · ⏱ ' + (mm >= 60 ? Math.floor(mm / 60) + ':' + String(mm % 60).padStart(2, '0') + ':' : mm + ':') + String(ss).padStart(2, '0');
       if (b.tx !== tx) { b.tx = tx; b.t.textContent = tx; }
     }
   }

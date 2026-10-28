@@ -7,6 +7,6 @@
   "engines": { "node": ">=22.13" },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
-    "test": "node --disable-warning=ExperimentalWarning test/rules.test.js && node --disable-warning=ExperimentalWarning test/world.test.js && node --disable-warning=ExperimentalWarning test/war.test.js && node --disable-warning=ExperimentalWarning test/push.test.js && node --disable-warning=ExperimentalWarning test/tech.test.js && node --disable-warning=ExperimentalWarning test/outpost.test.js && node --disable-warning=ExperimentalWarning test/cheat.test.js"
+    "test": "node --disable-warning=ExperimentalWarning test/rules.test.js && node --disable-warning=ExperimentalWarning test/world.test.js && node --disable-warning=ExperimentalWarning test/war.test.js && node --disable-warning=ExperimentalWarning test/push.test.js && node --disable-warning=ExperimentalWarning test/tech.test.js && node --disable-warning=ExperimentalWarning test/outpost.test.js && node --disable-warning=ExperimentalWarning test/cheat.test.js && node --disable-warning=ExperimentalWarning test/daily.test.js"
   }
 }

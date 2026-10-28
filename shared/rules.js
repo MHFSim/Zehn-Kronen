@@ -151,6 +151,7 @@ export const ITEMS = {
   sp1:   { name: 'Beschleuniger 1 Min.', icon: '⚡', sec: 60, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Minute.' },
   sp5:   { name: 'Beschleuniger 5 Min.', icon: '⚡', sec: 300, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 5 Minuten.' },
   sp15:  { name: 'Beschleuniger 15 Min.', icon: '⚡', sec: 900, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 15 Minuten.' },
+  pack:  { name: 'Ressourcenpaket', icon: '🎁', desc: 'Enthält Nahrung, Holz, Stein und Gold – so viel, wie deine Burg gerade in anderthalb Stunden erzeugt.' },
   sp60:  { name: 'Beschleuniger 1 Std.', icon: '⚡', sec: 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Stunde.' }
 };
 export const SPEED_IDS = ['sp1', 'sp5', 'sp15', 'sp60'];
@@ -184,12 +185,12 @@ export const TELEPORT_COOLDOWN = 12 * 3600;
 export function speedUp(S, kind, ref, sec) {
   if (kind === 'build') {
     const q = B[ref] && inQueue(S, ref); if (!q) return 'Dieses Gebäude wird nicht gebaut.';
-    q.left -= sec; if (q.left <= 0) { S.lv[q.id] = q.target; S.queue = S.queue.filter(x => x !== q); }
+    q.left -= sec; if (q.left <= 0) { S.lv[q.id] = q.target; S.queue = S.queue.filter(x => x !== q); questAdd(S, 'build', 1); }
     return '';
   }
   if (kind === 'research') {
     const r = S.research; if (!r) return 'Es wird nichts erforscht.';
-    r.left -= sec; if (r.left <= 0) { S.tech = S.tech || {}; S.tech[r.id] = r.target; S.research = null; }
+    r.left -= sec; if (r.left <= 0) { S.tech = S.tech || {}; S.tech[r.id] = r.target; S.research = null; questAdd(S, 'research', 1); }
     return '';
   }
   if (kind === 'train') {
@@ -198,7 +199,7 @@ export function speedUp(S, kind, ref, sec) {
     while (list.length && rem > 0) {
       const o = list[0];
       if (o.left > rem) { o.left -= rem; rem = 0; break; }
-      rem -= o.left; S.troops[o.unit]++; o.count--; o.left = o.per;
+      rem -= o.left; S.troops[o.unit]++; o.count--; o.left = o.per; if (!o.heal) questAdd(S, 'train', 1);
       if (o.count <= 0) list.shift();
     }
     if (!list.length) delete S.train[ref];
@@ -217,18 +218,18 @@ function step(S, g) {
   }
   S.res.gold += rate(S, 'gold') / 3600 * g;
   for (const q of S.queue) q.left -= g;
-  for (const q of S.queue.filter(q => q.left <= 0)) S.lv[q.id] = q.target;
+  for (const q of S.queue.filter(q => q.left <= 0)) { S.lv[q.id] = q.target; questAdd(S, 'build', 1); }
   S.queue = S.queue.filter(q => q.left > 0);
   if (S.research) {
     S.research.left -= g;
-    if (S.research.left <= 0) { S.tech = S.tech || {}; S.tech[S.research.id] = S.research.target; S.research = null; }
+    if (S.research.left <= 0) { S.tech = S.tech || {}; S.tech[S.research.id] = S.research.target; S.research = null; questAdd(S, 'research', 1); }
   }
   for (const bid of Object.keys(S.train)) {
     const list = S.train[bid]; let rem = g;
     while (list.length && rem > 0) {
       const o = list[0];
       if (o.left > rem) { o.left -= rem; rem = 0; break; }
-      rem -= o.left; S.troops[o.unit]++; o.count--; o.left = o.per;
+      rem -= o.left; S.troops[o.unit]++; o.count--; o.left = o.per; if (!o.heal) questAdd(S, 'train', 1);
       if (o.count <= 0) list.shift();
     }
     if (!list.length) delete S.train[bid];
@@ -276,6 +277,19 @@ export function applyCommand(S, cmd) {
     if (!((S.items || {})[cmd.item] > 0)) return 'Du hast keinen solchen Beschleuniger';
     const why = speedUp(S, String(cmd.kind), String(cmd.ref), it.sec); if (why) return why;
     S.items[cmd.item]--; return '';
+  }
+  if (cmd.type === 'openPack') {   // ein Ressourcenpaket einlösen
+    if (!((S.items || {}).pack > 0)) return 'Du hast kein Ressourcenpaket';
+    const c = packContent(S), room = cap(S); S.items.pack--;
+    for (const r of RES) S.res[r] = Math.min(Math.max(S.res[r], room), S.res[r] + c[r]);
+    S.res.gold += c.gold; return '';
+  }
+  if (cmd.type === 'claimDaily') {
+    if (!dailyDone(S)) return 'Noch nicht alle Aufgaben erledigt';
+    if (S.daily.claimed) return 'Die Belohnung ist schon abgeholt';
+    S.daily.claimed = true; S.items = S.items || {};
+    for (const id in DAILY_SPEED_GIFT) S.items[id] = (S.items[id] || 0) + DAILY_SPEED_GIFT[id];
+    return '';
   }
   if (cmd.type === 'useSpeeds') {   // mehrere Beschleuniger auf einmal (automatisch angepasst)
     const use = cmd.items && typeof cmd.items === 'object' ? cmd.items : {}; let tot = 0;
@@ -330,6 +344,54 @@ export function applyCommand(S, cmd) {
     return '';
   }
   return 'Unbekannter Befehl';
+}
+
+/* ---------- Tägliche Aufgaben ---------- */
+export const DAY_MS = 86400000;
+export const DAILY_SPEED_GIFT = { sp60: 1, sp15: 4, sp5: 6, sp1: 30 };   // zusammen genau 3 Stunden
+export const PACK_HOURS = 1.5;   // ein Ressourcenpaket entspricht so vielen Stunden deiner jetzigen Produktion
+export const QUEST_INFO = {
+  food:  { icon: '🌾', title: 'Nahrung sammeln', text: n => 'Bringe ' + n + ' Nahrung von den Feldern nach Hause.' },
+  wood:  { icon: '🪵', title: 'Holz sammeln', text: n => 'Bringe ' + n + ' Holz aus den Wäldern nach Hause.' },
+  stone: { icon: '🪨', title: 'Stein sammeln', text: n => 'Bringe ' + n + ' Stein aus den Steinbrüchen nach Hause.' },
+  build: { icon: '🔨', title: 'Fleißiger Baumeister', text: n => 'Schließe ' + n + (n === 1 ? ' Gebäudeausbau' : ' Gebäudeausbauten') + ' ab.' },
+  train: { icon: '🛡️', title: 'Truppen ausbilden', text: n => 'Bilde ' + n + ' Einheiten aus.' },
+  research: { icon: '📜', title: 'Zeitalter des Wissens', text: n => 'Schließe ' + n + (n === 1 ? ' Forschung' : ' Forschungen') + ' in der Akademie ab.' },
+  help:  { icon: '🤝', title: 'Hilfreiche Hand', text: n => 'Hilf ' + n + (n === 1 ? ' Bündnismitglied' : ' Bündnismitgliedern') + ' beim Bauen.' },
+  camp:  { icon: '⚔️', title: 'Lagerräumer', text: n => 'Besiege ' + n + ' Banditenlager.' }
+};
+const r100 = n => Math.max(100, Math.round(n / 100) * 100);
+// Welche Aufgaben heute sinnvoll sind, hängt vom Stand des Spielers ab (mates = andere Mitglieder im Bündnis)
+export function makeQuests(S, mates) {
+  const R = Math.max(1, S.lv.rathaus || 1), q = [];
+  const add = (t, target) => q.push({ t, target, prog: 0, done: false });
+  add('food', r100(800 + 300 * R)); add('wood', r100(800 + 300 * R)); add('stone', r100(600 + 250 * R));
+  add('build', R >= 6 ? 2 : 1);
+  if (S.lv.kaserne || S.lv.schiess || S.lv.stall) add('train', 15 + 5 * R);
+  if (S.lv.akademie >= 1) add('research', 1);
+  if (mates >= 1) add('help', Math.min(3, mates));
+  if (troopCount(S) >= 15) add('camp', 1);
+  return q;
+}
+// Neuen Tag beginnen, wenn das Datum gewechselt hat
+export function ensureDaily(S, nowMs, mates) {
+  const day = Math.floor(nowMs / DAY_MS);
+  if (S.daily && S.daily.day === day) return false;
+  S.daily = { day, quests: makeQuests(S, mates), claimed: false };
+  return true;
+}
+export function questAdd(S, t, n) {
+  const d = S && S.daily; if (!d || !(n > 0)) return;
+  for (const q of d.quests) if (q.t === t && !q.done) { q.prog = Math.min(q.target, q.prog + n); if (q.prog >= q.target) { q.done = true; S.items = S.items || {}; S.items.pack = (S.items.pack || 0) + 1; } }
+}
+export const dailyDone = S => !!(S.daily && S.daily.quests.length && S.daily.quests.every(q => q.done));
+export const secUntilNextDay = nowMs => (DAY_MS - (nowMs % DAY_MS)) / 1000;
+// Inhalt eines Ressourcenpakets: so viel, wie deine Burg gerade in PACK_HOURS Stunden erzeugt (mindestens ein Sockel), nur so viel, wie ins Lager passt
+export function packContent(S) {
+  const out = {};
+  for (const r of RES) out[r] = Math.max(0, Math.round(Math.max(150, rate(S, r) * PACK_HOURS) / 10) * 10);
+  out.gold = Math.max(0, Math.round(Math.max(20, rate(S, 'gold') * PACK_HOURS) / 5) * 5);
+  return out;
 }
 
 // Fund von Beschleunigern beim Sammeln: im Schnitt je Stunde Sammelzeit so viele Stück (zufällig, aber reproduzierbar).

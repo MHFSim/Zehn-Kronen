@@ -55,7 +55,7 @@ export function cheat(match, players, c, now) {
     case 'items':
       for (const p of targets) {
         const S = p.state; S.items = S.items || {};
-        for (const id of ['teleport', 'sp1', 'sp5', 'sp15', 'sp60']) if (num(c[id])) S.items[id] = (S.items[id] || 0) + num(c[id], 0, 999);
+        for (const id of ['teleport', 'sp1', 'sp5', 'sp15', 'sp60', 'pack']) if (num(c[id])) S.items[id] = (S.items[id] || 0) + num(c[id], 0, 999);
         if (c.resetTp) S.tpAt = -1e9;
       }
       return '';

@@ -3,10 +3,10 @@
 import {
   RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, buildTime, techTimeFor, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
+  T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, packContent, DAILY_SPEED_GIFT
 } from '/shared/rules.js';
 import { PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
-import { castleSafe } from '/shared/war.js';
+import { castleSafe, scoreOf } from '/shared/war.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
@@ -66,7 +66,7 @@ function soundTick() {
     const sg = (view.sieges || []).filter(x => x.mine), ids = new Set(sg.map(x => x.id));
     for (const x of sg) if (!fightIds.has(x.id) && x.tpid !== me.id) snd.sfx('war');
     for (const id of fightIds) if (!ids.has(id)) { const r = S.reports[0]; snd.sfx(r && r.win ? 'win' : 'lose'); }
-    const tot = sg.reduce((a, x) => a + ((x.pw && (x.pw.na + x.pw.nd)) || 0), 0); battleLv = ids.size ? Math.min(1, .25 + Math.log10(1 + tot) / 4.5) : 0;
+    const tot = sg.reduce((a, x) => a + ((x.pw && ((x.pw.na || 0) + (x.pw.nd || 0)) * (x.pw.na != null && x.pw.nd != null ? 1 : 2)) || 0), 0); battleLv = ids.size ? Math.min(1, .25 + Math.log10(1 + tot) / 4.5) : 0;
     fightIds = ids; snd.mood(ids.size ? 'battle' : 'calm');
     const lv = Object.values(S.lv || {}).reduce((a, b) => a + (+b || 0), 0), tc = Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
     if (sndPrev) { if (lv > sndPrev.lv) snd.sfx('done'); if (tc > sndPrev.tc) snd.sfx('research'); if (S.reports.length > sndPrev.rep && !ids.size) snd.sfx('report'); }
@@ -249,6 +249,23 @@ function renderHud() {
   for (const m of ownMarches()) { const st = marchState(m); parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}${st.moving ? `<span class="mini"><i style="width:${Math.round(st.pct * 100)}%"></i></span>` : ''}</button>`); }
   if (ownMarches().filter(m => m.phase !== 'back').length >= 2) parts.push('<button class="chip go" type="button" data-recallall="1">⌂ Alle heimrufen</button>');
   $('hud').innerHTML = parts.join('');
+  renderPts(); renderHelpPop();
+}
+function renderPts() {
+  let el = $('ptsChip'); if (!el) { el = document.createElement('div'); el.id = 'ptsChip'; el.className = 'ptschip'; document.body.appendChild(el); }
+  const tb = document.querySelector('.topbar');
+  el.hidden = mode !== 'map' || !S; if (el.hidden) return;
+  el.style.top = ((tb ? tb.offsetHeight : 60) + 6) + 'px';
+  const t = `🏅 <b>${fmtN(scoreOf(S))}</b> Punkte`; if (el.innerHTML !== t) el.innerHTML = t;
+}
+// Bündnishilfe: kleine Popups mit Hilfe-Symbol
+function renderHelpPop() {
+  let el = $('helpPop'); if (!el) { el = document.createElement('div'); el.id = 'helpPop'; el.className = 'helppop'; document.body.appendChild(el);
+    el.addEventListener('click', async e => { const b = e.target.closest('[data-help]'); if (!b) return; b.disabled = true; const ok = await command({ type: 'giveHelp', rid: Number(b.dataset.help) }); if (ok) toast('Du hast geholfen: +15 % Baufortschritt.', 'info'); }); }
+  const list = ((view && view.help) || []).filter(h => !h.mine);
+  const t = list.slice(0, 3).map(h => `<button type="button" class="hp" data-help="${h.id}"><span class="hpi">🤝</span><span><b>${esc(h.name)}</b><small>${esc((B[h.bid] || {}).name || '')} · Hilfe geben</small></span></button>`).join('');
+  if (el.innerHTML !== t) el.innerHTML = t;
+  el.hidden = !t || !S;
 }
 function statsHTML(id) {
   const L = S.lv[id], b = B[id], n = L + 1, rows = [];
@@ -261,11 +278,16 @@ function statsHTML(id) {
   if (b.units && L) rows.push(['Ausbildungszeit', '−' + Math.round((1 - Math.pow(.95, L - 1)) * 100) + ' %']);
   return rows.length ? `<dl class="stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : '';
 }
+function helpRowHTML(id) {
+  const al = view.ally; if (!al || (al.members || []).length < 2) return '';
+  const h = (view.help || []).find(x => x.mine && x.bid === id);
+  return `<div class="row">${h ? `<span class="note">🤝 Hilfe erbeten · ${h.n} ${h.n === 1 ? 'Mitglied hat' : 'Mitglieder haben'} geholfen (je +15 %)</span>` : '<button class="btn ghost" data-act="askHelp" type="button">🤝 Hilfe erbitten</button>'}</div>`;
+}
 function upgradeHTML(id) {
   const L = S.lv[id], t = L + 1, q = inQueue(S, id);
   if (q) return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + q.target : 'Wird gebaut'}</h3>
     <div class="row"><div class="prog"><i id="upProg" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" id="upTime">${fmtT(real(q.left))}</span></div>
-    <div class="row"><button class="btn" data-speed="build:${id}" type="button">⚡ Beschleunigen</button><button class="btn ghost" data-act="cancel" type="button">Abbrechen (volle Erstattung)</button></div></div>`;
+    <div class="row"><button class="btn" data-speed="build:${id}" type="button">⚡ Beschleunigen</button><button class="btn ghost" data-act="cancel" type="button">Abbrechen (volle Erstattung)</button></div>${helpRowHTML(id)}</div>`;
   if (id === 'rathaus' && L >= 30) return '<div class="block"><h3>Ausbau</h3><p class="note">Höchststufe erreicht.</p></div>';
   const c = costOf(id, t), why = blocker(S, id), tm = buildTime(S, id, t);
   return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + t : 'Bauen'}</h3>
@@ -354,6 +376,7 @@ function setupSheet() {
     if (act === 'upgrade') return command({ type: 'upgrade', id });
     if (act === 'upgradeSp') { const ok = await command({ type: 'upgrade', id }); if (ok) openSpeed('build', id); return; }
     if (act === 'cancel') return command({ type: 'cancel', id });
+    if (act === 'askHelp') { const ok = await command({ type: 'askHelp', id }); if (ok) toast('Dein Bündnis wurde um Hilfe gebeten.', 'info'); return renderSheet(); }
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
     if (act === 'plus' || act === 'minus') {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
@@ -427,7 +450,7 @@ function techPlateHTML(id) {
 function citySig() {
   return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
     Object.keys(B).map(id => locked_(id) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name, cityCat, S.stationed, match.phase,
-    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id)), S.items]);
+    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id)), S.items, S.daily && S.daily.quests.map(q => q.done)]);
 }
 let citySigV = '';
 function renderCity(force) {
@@ -447,7 +470,7 @@ function renderCity(force) {
   const body = BORDER.map(plateHTML).join('');
   $('cityList').innerHTML = `<div class="city-in">
     <div class="burg" data-b="rathaus"><b>Burg von ${esc(me.name)}</b><span>Rathaus Stufe ${L} · „${esc(match.name)}“</span></div>
-    <button class="bagbtn" type="button" data-bag="1" aria-label="Speedups">⚡ Speedups<b>${SPEED_IDS.reduce((a, i) => a + itemN(i), 0)}</b></button>
+    <div class="bagrow"><button class="bagbtn" type="button" data-bag="1" aria-label="Speedups">⚡ Speedups<b>${SPEED_IDS.reduce((a, i) => a + itemN(i), 0)}</b></button><button class="bagbtn" type="button" data-daily="1" aria-label="Tägliche Aufgaben">📅 Aufgaben<b>${dailyBadge()}</b></button></div>
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
     <div class="tabbody parch">${body}</div>
@@ -721,14 +744,14 @@ function moreHTML() {
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
   const SUBS = {
     dev: ['🛠', 'Entwickler', devHTML()], game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], daily: ['📅', 'Tägliche Aufgaben', dailyHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('daily', '📅', 'Tägliche Aufgaben', dailyDone(S) && !(S.daily || {}).claimed ? 'Belohnung bereit!' : dailySub(), dailyBadge())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -847,7 +870,7 @@ function panelSignature() {
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
-  return JSON.stringify([moreSub, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
+  return JSON.stringify([moreSub, moreSub === 'daily' ? [S.daily, Math.floor(serverNow() / 30000)] : 0, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
@@ -892,6 +915,8 @@ function setupPanel() {
     if (act === 'sub' && d.t === 'reports') return openReports();
     if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; return go(); }
+    if (act === 'claimDaily') { const ok = await command({ type: 'claimDaily' }); if (ok) toast('3 Stunden Speedups erhalten!', 'info'); return renderPanel(true); }
+    if (act === 'openPack') { const ok = await command({ type: 'openPack' }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
     if (act === 'donate') { const amounts = {}; for (const r of RES) { const v = Math.floor(Number(val('dn_' + r)) || 0); if (v > 0) amounts[r] = v; } if (!Object.keys(amounts).length) return void toast('Gib an, wie viel du einzahlen willst.'); return void command({ type: 'donate', amounts }).then(ok => { if (ok) { for (const r of RES) { const i = document.getElementById('dn_' + r); if (i) i.value = ''; } toast('Eingezahlt. Danke!', 'info'); } }); }
     if (act === 'shopBuy') return void command({ type: 'buy', item: d.i, n: 1 }).then(ok => ok && toast(ITEMS[d.i].name + ' gekauft.', 'info'));
     if (act === 'opGoto') { closePanel(); await setMode('map'); if (mode === 'map') selectMap({ type: 'op', id: d.id }, false); return; }
@@ -1004,6 +1029,7 @@ function setupModal() {
   document.addEventListener('click', async e => {
     const sp = e.target.closest('[data-speed]'); if (sp) { const [k, r] = sp.dataset.speed.split(':'); return openSpeed(k, r); }
     if (e.target.closest('[data-bag]')) return openSpeed('bag', '');
+    if (e.target.closest('[data-daily]')) { openPanel('more'); moreSub = 'daily'; return renderPanel(true); }
     const el = e.target.closest('#modalIn [data-act]'); if (!el || !speedCtx) return;
     const act = el.dataset.act, i = el.dataset.i;
     if (act === 'mClose') { $('modal').hidden = true; speedCtx = null; }
@@ -1020,6 +1046,23 @@ function setupModal() {
     else if (act === 'mBuy') { await command({ type: 'buy', item: i, n: 1 }); refreshSpeed(); }
     else if (act === 'mUse') { const ok = await command({ type: 'useSpeed', item: i, kind: speedCtx.kind, ref: speedCtx.ref }); if (ok) toast('Beschleunigt um ' + ITEMS[i].name.replace('Beschleuniger ', '') + '.', 'info'); refreshSpeed(); }
   });
+}
+const dailySub = () => { const d = S.daily; return d ? d.quests.filter(q => q.done).length + ' von ' + d.quests.length + ' erledigt' : 'heute'; };
+const dailyBadge = () => ((S.items || {}).pack || 0) + (dailyDone(S) && !(S.daily || {}).claimed ? 1 : 0);
+function dailyHTML() {
+  const d = S.daily; if (!d) return '<p class="note">Die Aufgaben für heute werden gerade vorbereitet.</p>';
+  const done = d.quests.filter(q => q.done).length, n = d.quests.length, left = secUntilNextDay(serverNow()), all = dailyDone(S);
+  const gift = Object.keys(DAILY_SPEED_GIFT).map(id => DAILY_SPEED_GIFT[id] + '× ' + ITEMS[id].name.replace('Beschleuniger ', '')).join(', ');
+  const pk = packContent(S), packs = (S.items || {}).pack || 0;
+  const cards = d.quests.map(q => { const I = QUEST_INFO[q.t], pct = Math.round(q.prog / q.target * 100);
+    return `<div class="dq${q.done ? ' done' : ''}"><span class="dqi">${I.icon}</span><div class="dqm"><b>${I.title}</b><small>${I.text(fmtN(q.target))}</small>
+      <div class="dqb"><i style="width:${pct}%"></i><span>${fmtN(q.prog)}/${fmtN(q.target)}</span></div></div><div class="dqr">${q.done ? '✔' : '🎁'}<small>${q.done ? 'erledigt' : 'Paket'}</small></div></div>`; }).join('');
+  return `<div class="dhead"><div><b>Heute erledigt</b><div class="dbig">${done}<small>/${n}</small></div></div><div class="dtime">Neue Aufgaben in<b>${fmtT(left)}</b></div></div>
+    <div class="dfin${all ? ' ready' : ''}"><span class="dqi">🏆</span><div class="dqm"><b>Alle Aufgaben geschafft</b><small>Belohnung: 3 Stunden Speedups (${gift}).</small></div>
+      ${d.claimed ? '<span class="note">abgeholt ✔</span>' : `<button class="btn small" type="button" data-act="claimDaily" ${all ? '' : 'disabled'}>Abholen</button>`}</div>
+    <h3>Aufgaben</h3>${cards}
+    <h3>Ressourcenpakete</h3><div class="block flat"><p class="note">Für jede erledigte Aufgabe gibt es ein Paket. Du kannst es jederzeit einlösen. Der Inhalt passt sich deiner Wirtschaft an: Er entspricht anderthalb Stunden deiner Produktion (jetzt: ${RES.map(r => fmtN(pk[r]) + ' ' + RES_DE[r]).join(', ')}, ${fmtN(pk.gold)} Gold).</p>
+      <div class="row"><b>Im Beutel: ${packs}×</b><button class="btn small" type="button" data-act="openPack" ${packs ? '' : 'disabled'}>🎁 Paket einlösen</button></div></div>`;
 }
 function speedupsHTML() {
   return `<p class="note">${findsLine()}</p><div class="block"><h3>Deine Speedups</h3>${bagList()}
@@ -1197,8 +1240,8 @@ function siteSheet(w) {
 function powBars(pw) {
   if (!pw) return '';
   const pa = Math.round(100 * pw.fa), pd = Math.round(100 * pw.fd);
-  return `<div class="pbars fight"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${fmtN(pw.na)}</b></div>`
-    + `<div class="pb def"><span>Verteidiger</span><div class="bar"><i style="width:${pd}%"></i></div><b>${fmtN(pw.nd)}</b></div>`
+  return `<div class="pbars fight"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${pw.na == null ? '?' : fmtN(pw.na)}</b></div>`
+    + `<div class="pb def"><span>Verteidiger</span><div class="bar"><i style="width:${pd}%"></i></div><b>${pw.nd == null ? '?' : fmtN(pw.nd)}</b></div>`
     + (pw.wall != null ? `<div class="pb wall"><span>Mauer</span><div class="bar"><i style="width:${Math.round(100 * pw.wall)}%"></i></div><b>${Math.round(100 * pw.wall)}%</b></div>` : '')
     + `<div class="pv">${pw.fa >= pw.fd ? '⚔ Die Angreifer sind vorn' : '🛡 Die Verteidiger sind vorn'} · ⏱ noch ca. ${fmtT(real(pw.left))}</div></div>`;
 }
@@ -1414,27 +1457,30 @@ function repTable(head, start, left, w, dd) {
   return `<table class="rep"><thead><tr><th>${esc(head)}</th><th>Vor</th><th>Übrig</th>${w ? '<th>Verw.</th><th>Gef.</th>' : ''}</tr></thead><tbody>${us.map(u => `<tr><td>${U[u].name}</td><td>${fmtN(start[u])}</td><td>${fmtN((left || {})[u] || 0)}</td>${w ? `<td>${fmtN(w[u] || 0)}</td><td>${fmtN((dd || {})[u] || 0)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
 }
 const KIND_DE = { city: 'Sturm auf die Burg', raid: 'Angriff auf einen Außenposten', camp: 'Kampf um ein Banditenlager', field: 'Überfall auf dem Feld', hold: 'Kampf um eine Festung' };
+const sumO = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
+// Gegner-Truppen werden nie in Zahlen gezeigt, nur wie viel Prozent von ihnen gefallen sind
+const foeLine = (label, start, left) => { const a = sumO(start), l = sumO(left); return a ? `<p class="note">${esc(label)}: <b>${Math.round(100 * (1 - l / a))} %</b> der Truppen verloren.</p>` : ''; };
 function fxHTML(r) {
   const x = r.fx; if (!x) return '';
   const pc = (a, b) => Math.round(Math.max(0, Math.min(1, b ? a / b : 0)) * 100), sm = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
   const bar = (cls, v) => `<div class="fxbar"><i class="${cls}" style="width:${v}%"></i></div>`;
   const mine = r.role === 'def' ? 'def' : 'att', wd = r.att ? sm(r.att.wounded) : 0, dd = r.att ? sm(r.att.dead) : 0;
   const helpers = (list, lab) => list && list.length ? `<dt>${lab}</dt><dd>${list.map(esc).join(', ')}</dd>` : '';
+  const row = (lab, n0, nL, cls, own) => `<div class="fxrow"><span>${lab}</span><b>${own ? fmtN(n0) + ' → ' + fmtN(nL) : pc(nL, n0) + ' % übrig'}</b></div>${bar(cls, pc(nL, n0))}`;
   return `<div class="fx"><div class="fxh"><b>${KIND_DE[x.kind] || 'Kampf'}</b><span>${r.win ? '🏆 Sieg' : '💀 Niederlage'} · ${fmtT(real(x.dur))} Kampfdauer</span></div>
-    <div class="fxrow"><span>Angreifer${x.att ? ' (' + esc(x.att) + ')' : ''}</span><b>${fmtN(x.na0)} → ${fmtN(x.naL)}</b></div>${bar('a', pc(x.naL, x.na0))}
-    <div class="fxrow"><span>Verteidiger</span><b>${fmtN(x.nd0)} → ${fmtN(x.ndL)}</b></div>${bar('d', pc(x.ndL, x.nd0))}
+    ${row('Angreifer' + (x.att ? ' (' + esc(x.att) + ')' : ''), x.na0, x.naL, 'a', mine === 'att')}${row('Verteidiger', x.nd0, x.ndL, 'd', mine === 'def')}
     ${x.wall0 != null ? `<div class="fxrow"><span>Mauer</span><b>${Math.round(x.wall0 * 100)} % → ${Math.round(x.wall * 100)} %</b></div>${bar('w', Math.round(x.wall * 100))}` : ''}
-    <dl class="stats"><dt>Gefallen Angreifer</dt><dd>${fmtN(x.killD)}</dd><dt>Gefallen Verteidiger</dt><dd>${fmtN(x.killA)}</dd>
+    <dl class="stats"><dt>Deine Gefallenen</dt><dd>${fmtN(mine === 'att' ? x.killD : x.killA)}</dd>
     ${mine === 'att' && (wd || dd) ? `<dt>Dein Heer: tot / verwundet</dt><dd>${fmtN(dd)} / ${fmtN(wd)}</dd>` : ''}
-    <dt>Größte Stärke</dt><dd>${fmtN(Math.round(x.pkA))} (Angreifer) · ${fmtN(Math.round(x.pkD))} (Verteidiger)</dd>
+    <dt>Kampfdauer</dt><dd>${fmtT(real(x.dur))}</dd>
     ${helpers(x.helpA, 'Helfer des Angreifers')}${helpers(x.helpD, 'Helfer der Verteidiger')}</dl></div>`;
 }
 function reportHTML(r) {
   let d = fxHTML(r);
   if (r.att && r.def) {
-    if (r.role === 'def') { d += repTable('Angreifer', r.att.start, r.att.left); for (const g of r.def.groups || []) d += repTable(g.label, g.start, g.left, g.wounded, g.dead); }
-    else if (r.role === 'att') d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + repTable('Verteidiger', r.def.start, r.def.left);
-    else d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + repTable(r.defLabel || (r.kind === 'camp' ? 'Banditen' : 'Verteidiger'), r.def.start, r.def.left);
+    if (r.role === 'def') { d += foeLine('Angreifer', r.att.start, r.att.left); for (const g of r.def.groups || []) d += repTable(g.label, g.start, g.left, g.wounded, g.dead); }
+    else if (r.role === 'att') d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + foeLine('Verteidiger', r.def.start, r.def.left);
+    else d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + foeLine(r.defLabel || (r.kind === 'camp' ? 'Banditen' : 'Verteidiger'), r.def.start, r.def.left);
   }
   if (r.spy) {
     const sp = r.spy;

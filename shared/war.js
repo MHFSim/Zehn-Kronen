@@ -554,7 +554,7 @@ export function spy(ctx, me, targetId) {
 }
 
 /* ---------- Punkte, Rangliste, Spielende ---------- */
-export const scoreOf = S => S.out ? 0 : Math.round(Object.keys(S.lv).reduce((a, k) => a + S.lv[k], 0) * 10 + troopCount(S) * 2 + S.stats.conquests * 200 + S.stats.kills * 0.5);
+export const scoreOf = S => S.out ? 0 : Math.round(Object.keys(S.lv).reduce((a, k) => a + S.lv[k], 0) * 10 + troopCount(S) * 2 + S.stats.conquests * 200 + S.stats.kills * 0.5 + Object.values(S.tech || {}).reduce((a, b) => a + b, 0) * 15);
 export function rankingOf(match, players) {
   const w = match.world, rows = players.map(p => {
     const S = p.state, a = allianceOf(w, p.id);
