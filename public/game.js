@@ -13,7 +13,7 @@ import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, for
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
 import { HERO_PIC } from '/public/heropics.js';
-import { HERO_ART } from '/public/heroart.js';
+import { HERO_ART, HERO_POS } from '/public/heroart.js';
 import { snd } from '/public/sound.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
@@ -905,7 +905,7 @@ function heroStageHTML(id) {
   const how = H.role === 'gather' ? 'Lernt beim <b>Sammeln</b> auf Feldern (1 Erfahrung je 4 Rohstoffe).' : 'Lernt im <b>Kampf</b>: Lager, Räuber, Spieler, Außenposten. Zu schwache Ziele geben kaum Erfahrung.';
   const nxt = lv >= HERO_MAX ? '' : sk.map(x => `<span>+${pct(x.max * .75 / (HERO_MAX - 1))} ${x.name}</span>`).join('');
   return `<div class="hscene fx-${H.fx}" style="--hc:${H.col}" key="${id}">
-      <img class="hart" src="${HERO_ART[id] || HERO_PIC[id] || ''}" alt="" draggable="false"><span class="hglow"></span>
+      <img class="hart" src="${HERO_ART[id] || HERO_PIC[id] || ''}" alt="" draggable="false"${HERO_POS[id] ? ' style="object-position:' + HERO_POS[id] + '"' : ''}><span class="hglow"></span>
       <i></i><i></i><i></i><i></i><i></i><i></i>
       <div class="hover"><div class="htags"><span>${H.role === 'gather' ? 'Sammler' : 'Kämpfer'}</span>${sk.map(x => `<span>${SK_ICO[x.k] || ''} ${x.name}</span>`).join('')}</div>
         <h2>${H.name}</h2><div class="hsub">${H.title}</div></div>
