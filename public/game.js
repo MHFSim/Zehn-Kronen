@@ -1043,12 +1043,12 @@ function planFor(o) {
   if (sendFromOp) { const t0 = sendOpAll(), q = (view.world.outposts || []).find(x => x.id === sendFromOp); if (!q || !sum(t0)) return null; const k0 = o.id + 'op' + sendFromOp + JSON.stringify(t0) + wm.roadSig.length; if (planCache.key !== k0) planCache = { key: k0, plan: planFrom(wm.map, [q.x, q.y], o.x, o.y, t0, S) }; return planCache.plan; }
   const t = sendList(), key = o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
   if (!sum(t)) return null;
-  if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, sm.phase === 'post' ? cellXY(sm.path[sm.path.length - 1]) : (q => [Math.floor(q.x), Math.floor(q.y)])(marchPos(sm, gtNow())), o.x, o.y, t, S) : planMarch(wm.map, S, o, t) }; }
+  if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, (sm.phase === 'post' || sm.phase === 'gather') ? cellXY(sm.path[sm.path.length - 1]) : (q => [Math.floor(q.x), Math.floor(q.y)])(marchPos(sm, gtNow())), o.x, o.y, t, S) : planMarch(wm.map, S, o, t) }; }
   return planCache.plan;
 }
 function pickerHTML() {
   if (sendFromOp) return `<div class="block picker"><h3>Besatzung weiterschicken</h3><p class="note">${troopsLine(sendOpAll())} ziehen vom Außenposten zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`;
-  if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); return `<div class="block picker"><h3>Aufgestelltes Heer weiterschicken</h3><p class="note">${sm ? (sm.troops.n != null ? fmtN(sm.troops.n) + ' Einheiten' : troopsLine(sm.troops)) : ''} ziehen von ihrem Standort zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`; }
+  if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); return `<div class="block picker"><h3>Marschieren</h3><p class="note">${sm ? (sm.troops.n != null ? fmtN(sm.troops.n) + ' Einheiten' : troopsLine(sm.troops)) : ''} ziehen von ihrem Standort zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`; }
   const us = Object.keys(U).filter(u => S.troops[u] > 0);
   if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
   const tot = sendList(), cp = capacityOf(tot, S);
@@ -1076,10 +1076,10 @@ function siteSheet(w) {
   if (msel.post) {
     wm.setPreview(null);
     const plan2 = planFor({ id: 'post', x: msel.x, y: msel.y }), ok = view.match.phase === 'running';
-    return `<div class="sh-head"><h2>Heer hierhin schicken</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>
+    return `<div class="sh-head"><h2>Marschieren</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>
       <p class="note">Das Heer bleibt dort stehen, bis du es zurückrufst. Feinde können es angreifen.</p>${pickerHTML()}`
       + (plan2 && !plan2.error ? `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan2.duration))}</dd></dl>` : '')
-      + actionRow('Heer aufstellen', ok ? plan2 : null, ok ? '' : 'Die Partie läuft nicht.', free, '', 'post');
+      + actionRow('Marschieren', ok ? plan2 : null, ok ? '' : 'Die Partie läuft nicht.', free, '', 'post');
   }
   let body = '';
   body += `<p class="desc">Ein Außenposten gehört eurem Bündnis und erweitert das gemeinsame Revier um ein Viereck (13×13 Felder). Es gibt nur eine Stufe. Mitglieder können ihn mit Truppen bewachen. Feinde können ihn zerstören, wenn ihr Außenposten an seinen grenzt.</p>
@@ -1089,12 +1089,12 @@ function siteSheet(w) {
   if (why) {
     body += `<h3>Heer hier aufstellen</h3><p class="note">Das Heer bleibt auf dem Feld stehen, bis du es zurückrufst. Feinde können es angreifen.</p>` + pickerHTML();
     if (plan2 && !plan2.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan2.duration))}</dd></dl>`;
-    body += actionRow('Heer aufstellen', postOk ? plan2 : null, postOk ? '' : 'Die Partie läuft nicht.', free, '', 'post');
+    body += actionRow('Marschieren', postOk ? plan2 : null, postOk ? '' : 'Die Partie läuft nicht.', free, '', 'post');
   } else {
     body += pickerHTML();
     if (plan && !plan.error) body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd></dl>`;
     body += actionRow('Außenposten bauen', plan, poor ? 'Im Bündnislager fehlen Rohstoffe (Bündnis → Revier & Lager).' : '', free, '', 'build', OP_MIN_TROOPS) + `<p class="note">Die Einheiten bleiben als Besatzung dort (beliebig viele). Du kannst sie jederzeit abziehen.</p>`;
-    body += actionRow('Nur Heer aufstellen', plan2, '', free, 'ghost', 'post') + `<p class="note">Das Heer bleibt ohne Bau auf dem Feld stehen. Feinde können es angreifen.</p>`;
+    body += actionRow('Nur Marschieren', plan2, '', free, 'ghost', 'post') + `<p class="note">Das Heer bleibt ohne Bau auf dem Feld stehen. Feinde können es angreifen.</p>`;
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
@@ -1149,7 +1149,7 @@ function renderMapSheet() {
     const eta = st.moving ? Date.now() + offset + real(Math.max(0, marchRemain(m))) * 1000 : 0;
     const btn = (act, label, cls = '') => `<button class="btn ${cls}" type="button" data-act="${act}">${label}</button>`;
     const acts = mine ? [
-      (m.phase === 'post' || (m.phase === 'out' && m.mode !== 'build')) ? btn('sfStart', '➜ Weiterschicken') : '',
+      (m.phase !== 'siege' && !(m.phase === 'out' && m.mode === 'build')) ? btn('sfStart', '➜ Marschieren') : '',
       m.phase === 'out' && m.mode !== 'build' ? btn('halt', '✋ Anhalten', 'ghost') : '',
       m.phase !== 'back' ? btn('recall', m.phase === 'gather' ? '⌂ Heimrufen (mit Beute)' : '⌂ Heimrufen', 'ghost') : ''
     ].filter(Boolean).join('') : '';

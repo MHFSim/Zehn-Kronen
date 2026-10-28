@@ -98,7 +98,7 @@ function onHome(ctx, m, bt, realT) {
   const S = p.state; advanceTo(S, realT, match.speed);
   addTroops(S, m.troops, +1);
   for (const u in m.troops) { S.away[u] = (S.away[u] || 0) - m.troops[u]; if (S.away[u] <= 0) delete S.away[u]; }
-  const load = m.load || {};
+  const load = { ...(m.carry || {}) }; for (const r in (m.load || {})) load[r] = (load[r] || 0) + m.load[r];
   for (const r of Object.keys(load)) S.res[r] = (S.res[r] || 0) + load[r];
   if (Object.keys(load).length) pushReport(S, { kind: 'return', title: 'Heer zurück mit Beute', win: true, loot: load, target: { kind: m.tk, id: m.tid } }, realT);
 }
@@ -274,10 +274,10 @@ export function command(match, players, player, cmd, now) {
       if (mode === 'build') return 'Aus dem Außenposten kann man keinen neuen bauen';
       if (mode === 'garrison' && opx && opx.id === fromOp.id) return 'Die Truppen sind schon dort';
     }
-    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && (x.phase === 'post' || (x.phase === 'out' && x.mode !== 'build'))) : null;
+    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && (['post', 'gather', 'back'].includes(x.phase) || (x.phase === 'out' && x.mode !== 'build'))) : null;
     if (cmd.from != null && !src) return 'Dieses Heer kann gerade nicht umgeleitet werden';
     if (!src && w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
-    if (src && src.phase === 'post' && mode === 'post' && o.id === src.tid) return 'Das Heer steht schon dort';
+    if (src && (src.phase === 'post' || src.phase === 'gather') && o.id === src.tid) return 'Das Heer ist schon dort';
     const troops = src ? { ...src.troops } : {};
     if (!src) for (const u of Object.keys(U)) {
       const n = Math.floor(Number((cmd.troops || {})[u] || 0));
@@ -316,12 +316,25 @@ export function command(match, players, player, cmd, now) {
     const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S) : planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
     if (assistSiege && w.gt + plan.arr[plan.arr.length - 1] >= assistSiege.tSiege) return 'Zu spät: Die Belagerung ist vorbei, bevor deine Truppen ankommen.';
-    if (src) w.marches.splice(w.marches.indexOf(src), 1);
+    let carry = null;
+    if (src) {
+      if (src.aux && src.aux.length) releaseAux(ctx, src);
+      if (src.phase === 'gather') {   // bisher Gesammeltes nimmt das Heer mit
+        const go = map.byId[src.tid], frac = Math.max(0, Math.min(1, (w.gt - src.tStart) / (src.tEnd - src.tStart || 1)));
+        const amount = Math.floor(src.amount * frac), n = w.nodes[go.id] || { left: nodeLeft(w, go, w.gt), t: w.gt }, rest = n.left - amount;
+        w.nodes[go.id] = { left: rest < NODE_EMPTY ? 0 : rest, t: w.gt };
+        if (amount > 0) src.load = { [src.res]: amount };
+        gatherFinds(S, src.id, (w.gt - src.tStart));
+      }
+      carry = {}; for (const l of [src.carry, src.load]) for (const r in (l || {})) carry[r] = (carry[r] || 0) + l[r];
+      w.marches.splice(w.marches.indexOf(src), 1);
+    }
     else if (fromOp) { const g = fromOp.garr[player.id]; for (const u in troops) { g[u] -= troops[u]; if (g[u] <= 0) delete g[u]; } if (!sum(g)) delete fromOp.garr[player.id]; }
     else for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'assist' ? { tk: o.k, tid: o.id, mode, side: assistSide, siegeId: assistSiege.id } : { tk: o.k, tid: o.id, mode });
     if (src || fromOp) m.redir = true;
+    if (carry && Object.keys(carry).length) m.carry = carry;
     if (mode === 'assist' && assistSide === 'att') { if (isProtected(S, w.gt)) S.protUntil = w.gt; S.stats.attacks++; }
     if (mode === 'raid') noteRaid(ctx, player, opx, m);
     else if (mode !== 'normal' && mode !== 'build' && mode !== 'garrison' && mode !== 'post' && mode !== 'assist') afterLaunch(ctx, player, m, target, mode);

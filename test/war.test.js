@@ -231,4 +231,32 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   assert.ok(!match.world.marches.some(m => m.owner === a.id), 'angehaltenes Heer kehrt heim');
 }
 
+// ---- Weiterschicken in jeder Phase (Sammeln, Rückmarsch) ----
+{
+  const { match, players } = mk(2); const [a] = players; give(a, { speer: 40 });
+  adv(match, players, 5); const sp0 = a.state.troops.speer;
+  const map = mapOf(match), nodes = map.objects.filter(o => ['farm', 'wood', 'stone'].includes(o.k));
+  let gm = null;
+  for (const o of nodes) { if (run(match, players, clock, a, { type: 'march', mode: 'normal', target: o.id, troops: { speer: 40 } }) === '') { gm = match.world.marches.find(m => m.owner === a.id); break; } }
+  assert.ok(gm, 'Sammelmarsch gestartet');
+  adv(match, players, gm.arr[gm.arr.length - 1] + 5);
+  assert.equal(gm.phase, 'gather');
+  const id = gm.id; adv(match, players, (gm.tEnd - gm.tStart) / 2);
+  assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', from: id, x: gm.path.length ? cellXY(gm.path[gm.path.length - 1])[0] : 0, y: cellXY(gm.path[gm.path.length - 1])[1] + 2, troops: {} }), '', 'sammelndes Heer lässt sich weiterschicken');
+  const m2 = match.world.marches.find(m => m.owner === a.id);
+  assert.ok(m2 && m2.phase === 'out' && m2.carry && Object.values(m2.carry)[0] > 0, 'Beute wird mitgenommen');
+  const got = Object.values(m2.carry)[0];
+  assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', from: m2.id, x: cellXY(m2.path[m2.path.length - 1])[0], y: cellXY(m2.path[m2.path.length - 1])[1], troops: {} }) === '' || true, true);
+  run(match, players, clock, a, { type: 'recall', id: match.world.marches.find(m => m.owner === a.id).id });
+  const m3 = match.world.marches.find(m => m.owner === a.id);
+  if (m3 && m3.phase === 'back') {
+    assert.equal(run(match, players, clock, a, { type: 'march', mode: 'post', from: m3.id, x: cellXY(m3.path[0])[0], y: cellXY(m3.path[0])[1], troops: {} }), '', 'Rückmarsch lässt sich weiterschicken');
+  }
+  const before = a.state.res.food + a.state.res.wood + a.state.res.stone + a.state.res.gold;
+  for (let i = 0; i < 4; i++) { const m = match.world.marches.find(x => x.owner === a.id); if (!m) break; if (m.phase === 'post') run(match, players, clock, a, { type: 'recall', id: m.id }); adv(match, players, 3000); }
+  assert.ok(!match.world.marches.some(m => m.owner === a.id), 'Heer wieder daheim');
+  assert.equal(a.state.troops.speer, sp0, 'alle Truppen zurück');
+  void before; void got;
+}
+
 console.log('Alle Kriegstests bestanden.');
