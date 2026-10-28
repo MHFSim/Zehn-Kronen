@@ -1069,9 +1069,9 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         for (const q of [bring, bdisc, bedge]) { q.rotation.x = -Math.PI / 2; bg.add(q); } bring.renderOrder = 3; bdisc.renderOrder = 1; bedge.renderOrder = 2;
         bg.position.set(0, .05, (zmin + zmax) / 2); s.grp.add(bg); s.big = { g: bg, ring: bring, disc: bdisc, edge: bedge };
       }
-      if (s.big) { const c3 = [LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255)]; s.big.ring.material.color.setRGB(...c3); s.big.disc.material.color.setRGB(...c3); s.big.edge.material.color.setRGB(m.own ? .07 : .55, m.own ? .05 : .03, m.own ? .03 : .03); }
+      if (s.big) { const c3 = [LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255)]; s.big.ring.material.color.setRGB(...c3); s.big.disc.material.color.setRGB(...c3); s.big.edge.material.color.setRGB(.07, .05, .03); }
       for (const u of s.units) { const c3 = u.hero ? [LIN(255), LIN(205), LIN(70)] : [LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255)]; u.ring.material.color.setRGB(...c3); const d = u.ring.userData; if (d.disc) d.disc.material.color.setRGB(...c3); if (d.edge) d.edge.material.color.setRGB(m.own ? .07 : .55, m.own ? .05 : .03, m.own ? .03 : .03); u.ring.scale.setScalar(m.own ? 1.15 : 1); }
-      s.pre = (m.hero && HEROES[m.hero] ? HEROES[m.hero].name + ' · ' : '') + (m.own ? '' : m.name + ' · ') + (m.phase === 'fight' || m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
+      s.pre = (m.hero && HEROES[m.hero] ? HEROES[m.hero].name + ' · ' : '') + (m.own ? '' : m.name + ' · ') + (m.phase === 'fight' || m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + (m.own ? n : ''); s.pre = s.pre.replace(/ · $/, '').trim(); s.lt = 0;
       this.setBadge(s.lab, this.badgeTxt(s, this.gtNow()), 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
     }
     for (const id in this.marchObjs) if (!keep.has(Number(id))) { const s = this.marchObjs[id]; this.scene.remove(s.grp); s.lab.el.remove(); delete this.marchObjs[id]; }
