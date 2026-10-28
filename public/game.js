@@ -691,7 +691,7 @@ function showLvUp() {
   let el = $('lvUp'); if (!el) { el = document.createElement('div'); el.id = 'lvUp'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   el.innerHTML = `<span class="lvpic">${H ? hpic(id, H) : '⭐'}</span><div><b>STUFE ${esc(lv)}</b><small>${esc(H ? H.name : 'Held')} ist aufgestiegen</small></div>`;
   el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
-  clearTimeout(lvTimer); lvTimer = setTimeout(() => { el.hidden = true; lvQueue.shift(); if (lvQueue.length) setTimeout(showLvUp, 300); }, 8000);
+  clearTimeout(lvTimer); lvTimer = setTimeout(() => { el.hidden = true; lvQueue.shift(); if (lvQueue.length) setTimeout(showLvUp, 300); }, 3800);
 }
 function checkFeed() {
   const top = S.feed.length ? S.feed[0].id : 0;
