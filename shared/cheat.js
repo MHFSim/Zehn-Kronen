@@ -1,5 +1,5 @@
 // Cheats für den Admin-Bereich (Tests und Vorführung). Nur über den Admin-Zugang erreichbar, nie über Spielerbefehle.
-import { B, U, RES, cap } from './rules.js';
+import { B, U, RES, cap, addPack } from './rules.js';
 import { ensureState, reveal, flushBits } from './core.js';
 import { N } from './mapgen.js';
 import { syncMatch } from './world.js';
@@ -55,7 +55,8 @@ export function cheat(match, players, c, now) {
     case 'items':
       for (const p of targets) {
         const S = p.state; S.items = S.items || {};
-        for (const id of ['teleport', 'sp1', 'sp5', 'sp15', 'sp60', 'pack']) if (num(c[id])) S.items[id] = (S.items[id] || 0) + num(c[id], 0, 999);
+        for (const id of ['teleport', 'sp1', 'sp5', 'sp15', 'sp60']) if (num(c[id])) S.items[id] = (S.items[id] || 0) + num(c[id], 0, 999);
+        for (let i = 0; i < num(c.pack, 0, 20); i++) addPack(S, ['', 'food', 'wood', 'stone'][i % 4]);
         if (c.resetTp) S.tpAt = -1e9;
       }
       return '';

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { newWorld } from '../shared/core.js';
 import { syncMatch, addPlayer, command, viewFor } from '../shared/world.js';
-import { questAdd, dailyDone, packContent, makeQuests, DAILY_SPEED_GIFT, ITEMS, SPEED_IDS } from '../shared/rules.js';
+import { questAdd, dailyDone, packContent, addPack, makeQuests, DAILY_SPEED_GIFT, ITEMS, SPEED_IDS } from '../shared/rules.js';
 import { scoreOf } from '../shared/war.js';
 
 const T0 = 1_000_000_000_000 + 3 * 3600_000;
@@ -19,12 +19,12 @@ assert.equal(makeQuests({ ...p1.state, lv: { ...p1.state.lv, akademie: 1 } }, 1)
 
 // Aufgabe fertig → ein Ressourcenpaket; Paket einlösen
 const q0 = p1.state.daily.quests[0]; questAdd(p1.state, q0.t, q0.target * 2);
-assert.ok(q0.done && q0.prog === q0.target && p1.state.items.pack === 1);
-const food = p1.state.res.food, c = packContent(p1.state);
+assert.ok(q0.done && q0.prog === q0.target && p1.state.packs.length === 1 && p1.state.packs[0].res.food >= 100);
+const food = p1.state.res.food, c = p1.state.packs[0].res, pid = p1.state.packs[0].id;
 assert.ok(c.food >= 150 && c.gold >= 20);
-assert.equal(command(match, players, p1, { type: 'openPack' }, T0 + 2000), '');
-assert.ok(p1.state.res.food > food - 1 && !p1.state.items.pack);
-assert.match(command(match, players, p1, { type: 'openPack' }, T0 + 2000), /kein Ressourcenpaket/);
+assert.equal(command(match, players, p1, { type: 'openPack', pid }, T0 + 2000), '');
+assert.ok(p1.state.res.food > food - 1 && !p1.state.packs.length);
+assert.match(command(match, players, p1, { type: 'openPack', pid }, T0 + 2000), /gibt es nicht/);
 
 // Belohnung erst nach allen Aufgaben, und zwar genau 3 Stunden
 assert.match(command(match, players, p1, { type: 'claimDaily' }, T0 + 2000), /Noch nicht/);

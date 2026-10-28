@@ -3,7 +3,7 @@
 import {
   RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, buildTime, techTimeFor, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, packContent, DAILY_SPEED_GIFT
+  T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, PACK_NAME, DAILY_SPEED_GIFT
 } from '/shared/rules.js';
 import { PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe, scoreOf } from '/shared/war.js';
@@ -450,7 +450,7 @@ function techPlateHTML(id) {
 function citySig() {
   return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
     Object.keys(B).map(id => locked_(id) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name, cityCat, S.stationed, match.phase,
-    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id)), S.items, S.daily && S.daily.quests.map(q => q.done)]);
+    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id)), S.items, S.packs && S.packs.length, S.daily && S.daily.quests.map(q => q.done)]);
 }
 let citySigV = '';
 function renderCity(force) {
@@ -470,7 +470,7 @@ function renderCity(force) {
   const body = BORDER.map(plateHTML).join('');
   $('cityList').innerHTML = `<div class="city-in">
     <div class="burg" data-b="rathaus"><b>Burg von ${esc(me.name)}</b><span>Rathaus Stufe ${L} · „${esc(match.name)}“</span></div>
-    <div class="bagrow"><button class="bagbtn" type="button" data-bag="1" aria-label="Speedups">⚡ Speedups<b>${SPEED_IDS.reduce((a, i) => a + itemN(i), 0)}</b></button><button class="bagbtn" type="button" data-daily="1" aria-label="Tägliche Aufgaben">📅 Aufgaben<b>${dailyBadge()}</b></button></div>
+    <div class="bagrow"><button class="bagbtn" type="button" data-bag="1" aria-label="Speedups">⚡ Speedups<b>${SPEED_IDS.reduce((a, i) => a + itemN(i), 0)}</b></button><button class="bagbtn" type="button" data-daily="daily" aria-label="Tägliche Aufgaben">📅 Aufgaben<b>${dailyBadge()}</b></button><button class="bagbtn" type="button" data-daily="packs" aria-label="Ressourcenpakete">🎁 Ressourcen<b>${packN()}</b></button></div>
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
     <div class="tabbody parch">${body}</div>
@@ -744,14 +744,14 @@ function moreHTML() {
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
   const SUBS = {
     dev: ['🛠', 'Entwickler', devHTML()], game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
-    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], daily: ['📅', 'Tägliche Aufgaben', dailyHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
+    feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], daily: ['📅', 'Tägliche Aufgaben', dailyHTML()], packs: ['🎁', 'Ressourcen', packsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
   const myRank = rk.players.findIndex(r => r.id === me.id), mine = rk.players[myRank], al = view.ally;
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('daily', '📅', 'Tägliche Aufgaben', dailyDone(S) && !(S.daily || {}).claimed ? 'Belohnung bereit!' : dailySub(), dailyBadge())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('daily', '📅', 'Tägliche Aufgaben', dailyDone(S) && !(S.daily || {}).claimed ? 'Belohnung bereit!' : dailySub(), dailyBadge())}${tile('packs', '🎁', 'Ressourcen', packN() ? packN() + ' Pakete' : 'keine Pakete', packN())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -870,7 +870,7 @@ function panelSignature() {
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
-  return JSON.stringify([moreSub, moreSub === 'daily' ? [S.daily, Math.floor(serverNow() / 30000)] : 0, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
+  return JSON.stringify([moreSub, moreSub === 'daily' ? [S.daily, S.packs && S.packs.length, Math.floor(serverNow() / 30000)] : 0, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
@@ -916,7 +916,7 @@ function setupPanel() {
     if (act === 'sub') { moreFrom = ''; moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'back') { moreSub = ''; if (moreFrom) { moreFrom = ''; return closePanel(); } return go(); }
     if (act === 'claimDaily') { const ok = await command({ type: 'claimDaily' }); if (ok) toast('3 Stunden Speedups erhalten!', 'info'); return renderPanel(true); }
-    if (act === 'openPack') { const ok = await command({ type: 'openPack' }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
+    if (act === 'openPack') { const ok = await command({ type: 'openPack', pid: Number(d.pid) }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
     if (act === 'donate') { const amounts = {}; for (const r of RES) { const v = Math.floor(Number(val('dn_' + r)) || 0); if (v > 0) amounts[r] = v; } if (!Object.keys(amounts).length) return void toast('Gib an, wie viel du einzahlen willst.'); return void command({ type: 'donate', amounts }).then(ok => { if (ok) { for (const r of RES) { const i = document.getElementById('dn_' + r); if (i) i.value = ''; } toast('Eingezahlt. Danke!', 'info'); } }); }
     if (act === 'shopBuy') return void command({ type: 'buy', item: d.i, n: 1 }).then(ok => ok && toast(ITEMS[d.i].name + ' gekauft.', 'info'));
     if (act === 'opGoto') { closePanel(); await setMode('map'); if (mode === 'map') selectMap({ type: 'op', id: d.id }, false); return; }
@@ -1029,7 +1029,7 @@ function setupModal() {
   document.addEventListener('click', async e => {
     const sp = e.target.closest('[data-speed]'); if (sp) { const [k, r] = sp.dataset.speed.split(':'); return openSpeed(k, r); }
     if (e.target.closest('[data-bag]')) return openSpeed('bag', '');
-    if (e.target.closest('[data-daily]')) { openPanel('more'); moreSub = 'daily'; moreFrom = mode; return renderPanel(true); }
+    if (e.target.closest('[data-daily]')) { const sub = e.target.closest('[data-daily]').dataset.daily; openPanel('more'); moreSub = sub; moreFrom = mode; return renderPanel(true); }
     const el = e.target.closest('#modalIn [data-act]'); if (!el || !speedCtx) return;
     const act = el.dataset.act, i = el.dataset.i;
     if (act === 'mClose') { $('modal').hidden = true; speedCtx = null; }
@@ -1048,12 +1048,12 @@ function setupModal() {
   });
 }
 const dailySub = () => { const d = S.daily; return d ? d.quests.filter(q => q.done).length + ' von ' + d.quests.length + ' erledigt' : 'heute'; };
-const dailyBadge = () => ((S.items || {}).pack || 0) + (dailyDone(S) && !(S.daily || {}).claimed ? 1 : 0);
+const packN = () => (S.packs || []).length;
+const dailyBadge = () => (dailyDone(S) && !(S.daily || {}).claimed ? 1 : 0);
 function dailyHTML() {
   const d = S.daily; if (!d) return '<p class="note">Die Aufgaben für heute werden gerade vorbereitet.</p>';
   const done = d.quests.filter(q => q.done).length, n = d.quests.length, left = secUntilNextDay(serverNow()), all = dailyDone(S);
   const gift = Object.keys(DAILY_SPEED_GIFT).map(id => DAILY_SPEED_GIFT[id] + '× ' + ITEMS[id].name.replace('Beschleuniger ', '')).join(', ');
-  const pk = packContent(S), packs = (S.items || {}).pack || 0;
   const cards = d.quests.map(q => { const I = QUEST_INFO[q.t], pct = Math.round(q.prog / q.target * 100);
     return `<div class="dq${q.done ? ' done' : ''}"><span class="dqi">${I.icon}</span><div class="dqm"><b>${I.title}</b><small>${I.text(fmtN(q.target))}</small>
       <div class="dqb"><i style="width:${pct}%"></i><span>${fmtN(q.prog)}/${fmtN(q.target)}</span></div></div><div class="dqr">${q.done ? '✔' : '🎁'}<small>${q.done ? 'erledigt' : 'Paket'}</small></div></div>`; }).join('');
@@ -1061,8 +1061,15 @@ function dailyHTML() {
     <div class="dfin${all ? ' ready' : ''}"><span class="dqi">🏆</span><div class="dqm"><b>Alle Aufgaben geschafft</b><small>Belohnung: 3 Stunden Speedups (${gift}).</small></div>
       ${d.claimed ? '<span class="note">abgeholt ✔</span>' : `<button class="btn small" type="button" data-act="claimDaily" ${all ? '' : 'disabled'}>Abholen</button>`}</div>
     <h3>Aufgaben</h3>${cards}
-    <h3>Ressourcenpakete</h3><div class="block flat"><p class="note">Für jede erledigte Aufgabe gibt es ein Paket. Du kannst es jederzeit einlösen. Der Inhalt passt sich deiner Wirtschaft an: Er entspricht anderthalb Stunden deiner Produktion (jetzt: ${RES.map(r => fmtN(pk[r]) + ' ' + RES_DE[r]).join(', ')}, ${fmtN(pk.gold)} Gold).</p>
-      <div class="row"><b>Im Beutel: ${packs}×</b><button class="btn small" type="button" data-act="openPack" ${packs ? '' : 'disabled'}>🎁 Paket einlösen</button></div></div>`;
+    <p class="note">Für jede erledigte Aufgabe bekommst du ein Ressourcenpaket. Du findest sie unter „🎁 Ressourcen“ (jetzt ${packN()}).</p>`;
+}
+function packsHTML() {
+  const list = S.packs || [], room = cap(S);
+  if (!list.length) return '<p class="note">Du hast keine Ressourcenpakete. Für jede erledigte tägliche Aufgabe bekommst du eines. Der Inhalt richtet sich nach deiner Produktion zum Zeitpunkt der Aufgabe.</p>';
+  const ico = { food: '🌾', wood: '🪵', stone: '🪨', gold: '🪙' };
+  return '<p class="note">Wähle, welches Paket du einlösen willst. Was nicht ins Lager passt (Grenze ' + fmtN(room) + '), verfällt.</p>' + list.map(pk => {
+    const lost = RES.some(r => S.res[r] + pk.res[r] > room);
+    return `<div class="dq"><span class="dqi">🎁</span><div class="dqm"><b>${esc(pk.name)}</b><small>${[...RES, 'gold'].map(r => ico[r] + ' ' + fmtN(pk.res[r])).join(' · ')}</small>${lost ? '<small>⚠ Lager würde überlaufen</small>' : ''}</div><button class="btn small" type="button" data-act="openPack" data-pid="${pk.id}">Einlösen</button></div>`; }).join('');
 }
 function speedupsHTML() {
   return `<p class="note">${findsLine()}</p><div class="block"><h3>Deine Speedups</h3>${bagList()}

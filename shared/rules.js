@@ -151,7 +151,6 @@ export const ITEMS = {
   sp1:   { name: 'Beschleuniger 1 Min.', icon: '⚡', sec: 60, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Minute.' },
   sp5:   { name: 'Beschleuniger 5 Min.', icon: '⚡', sec: 300, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 5 Minuten.' },
   sp15:  { name: 'Beschleuniger 15 Min.', icon: '⚡', sec: 900, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 15 Minuten.' },
-  pack:  { name: 'Ressourcenpaket', icon: '🎁', desc: 'Enthält Nahrung, Holz, Stein und Gold – so viel, wie deine Burg gerade in anderthalb Stunden erzeugt.' },
   sp60:  { name: 'Beschleuniger 1 Std.', icon: '⚡', sec: 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Stunde.' }
 };
 export const SPEED_IDS = ['sp1', 'sp5', 'sp15', 'sp60'];
@@ -278,11 +277,11 @@ export function applyCommand(S, cmd) {
     const why = speedUp(S, String(cmd.kind), String(cmd.ref), it.sec); if (why) return why;
     S.items[cmd.item]--; return '';
   }
-  if (cmd.type === 'openPack') {   // ein Ressourcenpaket einlösen
-    if (!((S.items || {}).pack > 0)) return 'Du hast kein Ressourcenpaket';
-    const c = packContent(S), room = cap(S); S.items.pack--;
-    for (const r of RES) S.res[r] = Math.min(Math.max(S.res[r], room), S.res[r] + c[r]);
-    S.res.gold += c.gold; return '';
+  if (cmd.type === 'openPack') {   // ein bestimmtes Ressourcenpaket einlösen
+    const i = (S.packs || []).findIndex(x => x.id === cmd.pid); if (i < 0) return 'Dieses Paket gibt es nicht (mehr)';
+    const pk = S.packs[i], room = cap(S); S.packs.splice(i, 1);
+    for (const r of RES) S.res[r] = Math.min(Math.max(S.res[r], room), S.res[r] + pk.res[r]);
+    S.res.gold += pk.res.gold; return '';
   }
   if (cmd.type === 'claimDaily') {
     if (!dailyDone(S)) return 'Noch nicht alle Aufgaben erledigt';
@@ -375,25 +374,32 @@ export function makeQuests(S, mates) {
 }
 // Neuen Tag beginnen, wenn das Datum gewechselt hat
 export function ensureDaily(S, nowMs, mates) {
+  if (S.items && S.items.pack > 0) { for (let i = 0; i < S.items.pack; i++) addPack(S, ''); delete S.items.pack; }
   const day = Math.floor(nowMs / DAY_MS);
   if (S.daily && S.daily.day === day) return false;
   S.daily = { day, quests: makeQuests(S, mates), claimed: false };
   return true;
 }
+export function addPack(S, theme) {
+  S.packs = S.packs || []; S.packSeq = (S.packSeq || 0) + 1;
+  const c = packContent(S, theme);
+  S.packs.push({ id: S.packSeq, theme: theme || '', name: PACK_NAME[theme] || 'Ressourcenpaket', res: c });
+}
 export function questAdd(S, t, n) {
   const d = S && S.daily; if (!d || !(n > 0)) return;
-  for (const q of d.quests) if (q.t === t && !q.done) { q.prog = Math.min(q.target, q.prog + n); if (q.prog >= q.target) { q.done = true; S.items = S.items || {}; S.items.pack = (S.items.pack || 0) + 1; } }
+  for (const q of d.quests) if (q.t === t && !q.done) { q.prog = Math.min(q.target, q.prog + n); if (q.prog >= q.target) { q.done = true; addPack(S, t); } }
 }
 export const dailyDone = S => !!(S.daily && S.daily.quests.length && S.daily.quests.every(q => q.done));
 export const secUntilNextDay = nowMs => (DAY_MS - (nowMs % DAY_MS)) / 1000;
 // Inhalt eines Ressourcenpakets: so viel, wie deine Burg gerade in PACK_HOURS Stunden erzeugt (mindestens ein Sockel), nur so viel, wie ins Lager passt
-export function packContent(S) {
-  const out = {};
-  for (const r of RES) out[r] = Math.max(0, Math.round(Math.max(150, rate(S, r) * PACK_HOURS) / 10) * 10);
-  out.gold = Math.max(0, Math.round(Math.max(20, rate(S, 'gold') * PACK_HOURS) / 5) * 5);
+export const PACK_NAME = { food: 'Nahrungspaket', wood: 'Holzpaket', stone: 'Steinpaket', build: 'Baumeisterpaket', train: 'Truppenpaket', research: 'Gelehrtenpaket', help: 'Helferpaket', camp: 'Beutepaket' };
+// Inhalt eines Pakets: richtet sich nach der Produktion zum Zeitpunkt der Aufgabe. Ein Nahrungs-/Holz-/Steinpaket ist auf seine Ressource ausgerichtet, die übrigen sind ausgewogen (zusammen etwa gleich viel Wert).
+export function packContent(S, theme) {
+  const out = {}, big = RES.includes(theme) ? theme : '';
+  for (const r of RES) { const h = big ? (r === big ? 3 : 0.5) : PACK_HOURS; out[r] = Math.max(0, Math.round(Math.max(big ? 100 : 150, rate(S, r) * h) / 10) * 10); }
+  out.gold = Math.max(0, Math.round(Math.max(20, rate(S, 'gold') * (big ? 0.5 : PACK_HOURS)) / 5) * 5);
   return out;
 }
-
 // Fund von Beschleunigern beim Sammeln: im Schnitt je Stunde Sammelzeit so viele Stück (zufällig, aber reproduzierbar).
 export const FINDS = { sp1: 3, sp5: 1.5, sp15: .75, sp60: .1 };
 const rnd01 = k => { const x = Math.sin(k * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
