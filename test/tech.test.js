@@ -1,6 +1,6 @@
 // Prüfung der Forschung: `npm test`
 import assert from 'node:assert/strict';
-import { freshState, applyCommand, advanceTo, rate, techCost, techTime, techMult, T_MAX, T } from '../shared/rules.js';
+import { unitTime, U, cap, catchUpOf, freshState, applyCommand, advanceTo, rate, techCost, techTime, techMult, T_MAX, T } from '../shared/rules.js';
 import { battle, capacityOf, forceOf } from '../shared/combat.js';
 const S = freshState(0); S.res = { food: 1e5, wood: 1e5, stone: 1e5, gold: 0 };
 assert.match(applyCommand(S, { type: 'research', tech: 'ackerbau' }), /Akademie/);
@@ -25,8 +25,12 @@ assert.equal(forceOf(S), 1.2); assert.equal(capacityOf({ speer: 100 }, S), 2860)
 const att = { speer: 100 }, def = { speer: 100 };
 assert.equal(battle(att, def, 1, 1).win, false);
 assert.equal(battle(att, def, 1, 1.5).win, true);
-assert.equal(Object.keys(T).length, 7);
+assert.equal(Object.keys(T).length, 14);
 const S2 = freshState(0); S2.lv.akademie = 9; S2.res = { food: 1e6, wood: 1e6, stone: 1e6, gold: 1e6 };
 assert.match(applyCommand(S2, { type: 'research', tech: 'forst' }), /Erst Ackerbau/);
 S2.tech.ackerbau = 2; assert.equal(applyCommand(S2, { type: 'research', tech: 'forst' }), '');
+S2.tech.forst = 2; S2.tech.drill = 5; S2.tech.festungsbau = 0;
+assert.ok(Math.abs(unitTime(S2, 'speer', 'kaserne') - U.speer.t / 1.3) < 1e-6, 'Drill beschleunigt');
+assert.ok(cap(S2) >= 1500);
+assert.equal(catchUpOf(2, 10) > 0, true); assert.equal(catchUpOf(10, 10), 0); assert.ok(catchUpOf(0, 10) <= .4);
 console.log('Alle Forschungstests bestanden.');

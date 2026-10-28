@@ -65,6 +65,6 @@ export const power = (t, m = 1) => grp(t, m).reduce((s, g) => s + g.n * (U[g.u].
 /* ---------- Stadtwache und Wächter ---------- */
 // Jede Burg hat eine kleine Stadtwache, damit sie nie ganz leer ist (wächst mit Rathaus und Mauer).
 export const guardOf = S => ({ speer: Math.round(10 + 8 * S.lv.rathaus + 15 * S.lv.mauer) });
-export const wallMult = S => 1 + 0.05 * S.lv.mauer;
+export const wallMult = S => 1 + 0.05 * S.lv.mauer * techMult(S, 'wall');
 // Neutrale Wächter von Thron und Heiligtümern, solange sie niemand hält
 export const holdGuard = kind => kind === 'throne' ? { troops: campTroops(10), mult: 2.0 } : { troops: campTroops(6), mult: 1.5 };

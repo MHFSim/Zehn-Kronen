@@ -51,10 +51,17 @@ export const T = {
   ackerbau:    { col: 0, row: 0, pre: null, name: 'Ackerbau',      icon: 'farm',    per: .08, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
   forst:       { col: 1, row: 0, pre: 'ackerbau', name: 'Forstwirtschaft', icon: 'saege', per: .08, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
   steinmetz:   { col: 1, row: 1, pre: 'ackerbau', name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
-  handel:      { col: 2, row: 1, pre: 'steinmetz', name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
-  kriegskunst: { col: 0, row: 2, pre: null, name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
-  marsch:      { col: 1, row: 2, pre: 'kriegskunst', name: 'Marschordnung',  icon: 'stall',  per: .06, steps: [.06, .08, .10, .12, .14], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
-  lasten:      { col: 1, row: 3, pre: 'kriegskunst', name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
+  handel:      { col: 2, row: 1, pre: 'steinmetz', name: 'Handel',         icon: 'gold', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
+  kriegskunst: { col: 0, row: 3, pre: null, name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
+  marsch:      { col: 1, row: 3, pre: 'kriegskunst', name: 'Marschordnung',  icon: 'stall',  per: .06, steps: [.06, .08, .10, .12, .14], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
+  lasten:      { col: 1, row: 4, pre: 'kriegskunst', name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' },
+  bauwesen:    { col: 2, row: 0, pre: 'forst', name: 'Bauwesen', icon: 'bau', per: .05, unit: 'Bautempo', eff: 'build', base: [150, 200, 150], time: 80, desc: 'Gebäude werden schneller gebaut und ausgebaut' },
+  lagerhaltung: { col: 3, row: 1, pre: 'handel', name: 'Lagerhaltung', icon: 'lager', per: .08, unit: 'Lagerplatz', eff: 'cap', base: [200, 200, 220], time: 85, desc: 'Mehr Platz im Lager: es passen mehr Rohstoffe hinein' },
+  schriftkunde: { col: 2, row: 2, pre: 'steinmetz', name: 'Schriftkunde', icon: 'akademie', per: .05, unit: 'Forschungstempo', eff: 'rsp', base: [180, 160, 200], time: 90, desc: 'Die Akademie forscht schneller' },
+  taktik:      { col: 2, row: 3, pre: 'marsch', name: 'Taktik', icon: 'taktik', per: .03, unit: 'Kraft aller Truppen', eff: 'force', base: [300, 200, 350], time: 120, desc: 'Bessere Gefechtsführung: noch mehr Angriff und Verteidigung' },
+  drill:       { col: 1, row: 5, pre: 'kriegskunst', name: 'Drill', icon: 'drill', per: .06, unit: 'Ausbildungstempo', eff: 'train', base: [200, 150, 200], time: 80, desc: 'Truppen werden schneller ausgebildet' },
+  heilkunde:   { col: 2, row: 5, pre: 'drill', name: 'Heilkunde', icon: 'lazarett', per: .12, unit: 'Verwundetenrate', eff: 'wound', base: [200, 120, 160], time: 95, desc: 'Mehr Gefallene werden nur verwundet und kommen ins Lazarett' },
+  festungsbau: { col: 3, row: 5, pre: 'heilkunde', name: 'Festungsbau', icon: 'mauer', per: .06, unit: 'Mauerstärke', eff: 'wall', base: [150, 250, 350], time: 110, desc: 'Deine Stadtmauer schützt stärker' }
 };
 export const T_MAX = 5;
 export const T_PRE_LV = 2;   // Vorgänger im Techtree muss mindestens auf dieser Stufe sein
@@ -65,6 +72,10 @@ export const techMult = (S, eff) => { let m = 1; for (const k in T) if (T[k].eff
 export const techReq = lv => Math.max(1, 2 * lv - 1);                       // nötige Akademiestufe für Forschungsstufe lv
 export const techCost = (id, lv) => T[id].base.map(c => Math.max(0, Math.round(c * Math.pow(1.7, lv - 1) / 5) * 5));
 export const techTime = (id, lv) => T[id].time * 60 * Math.pow(1.7, lv - 1);
+// Aufholhilfe: wer bei der Forschung hinter dem Durchschnitt liegt, forscht schneller (bis zu 40 % kürzere Dauer). Die Welt setzt S.techCatch.
+export const techTotal = S => Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
+export const catchUpOf = (mine, avg) => avg < 4 ? 0 : Math.min(.4, Math.max(0, (avg - mine) / avg) * .6);
+export const techTimeFor = (S, id, lv) => techTime(id, lv) / techMult(S, 'rsp') / (1 + (S.techCatch || 0));
 export function techBlocker(S, id) {
   const t = T[id]; if (!t) return 'Unbekannte Forschung';
   const lv = techLv(S, id) + 1;
@@ -91,7 +102,7 @@ const round5 = n => Math.max(0, Math.round(n / 5) * 5);
 export const costOf = (id, t) => B[id].base.map(c => round5(c * 0.85 * Math.pow(1.27, t - 1)));
 export const timeOf = (id, t) => B[id].time * Math.pow(1.3, t - 1);
 export const capFor = l => Math.round(1500 * Math.pow(1.25, l));
-export const cap = S => capFor(S.lv.lager);
+export const cap = S => Math.round(capFor(S.lv.lager) * techMult(S, 'cap'));
 export const protectedPct = S => S.lv.lager ? Math.min(40, 20 + S.lv.lager) : 20;
 export const prodAt = (id, l) => l <= 0 ? 0 : Math.round(120 * l * Math.pow(1.04, l - 1));
 export const homeTroops = S => Object.values(S.troops).reduce((a, b) => a + b, 0);
@@ -104,7 +115,9 @@ export const queuedTroops = S => Object.values(S.train).flat().reduce((a, o) => 
 export const maxQueues = S => S.lv.rathaus >= 5 ? 2 : 1;
 export const inQueue = (S, id) => S.queue.find(q => q.id === id);
 export const afford = (S, c) => c.every((v, i) => S.res[RES[i]] >= v);
-export const unitTime = (S, u, bid) => U[u].t * Math.pow(0.95, Math.max(0, S.lv[bid] - 1));
+export const unitTime = (S, u, bid) => U[u].t * Math.pow(0.95, Math.max(0, S.lv[bid] - 1)) / techMult(S, 'train');
+export const buildTime = (S, id, t) => timeOf(id, t) / techMult(S, 'build');
+export const woundRate = S => Math.min(.8, .3 * techMult(S, 'wound'));   // Anteil der Gefallenen, die verwundet ins Lazarett kommen
 
 // Boni (S.bonus) kommen von gehaltenen Heiligtümern und vom Thron und werden von der Welt gesetzt
 export const bonusOf = (S, r) => 1 + ((S.bonus && S.bonus[r]) || 0);
@@ -207,7 +220,7 @@ export function applyCommand(S, cmd) {
   if (cmd.type === 'upgrade') {
     if (!B[id]) return 'Unbekanntes Gebäude';
     const why = blocker(S, id); if (why) return why;
-    const t = S.lv[id] + 1, tm = timeOf(id, t);
+    const t = S.lv[id] + 1, tm = buildTime(S, id, t);
     costOf(id, t).forEach((v, i) => S.res[RES[i]] -= v);
     S.queue.push({ id, target: t, left: tm, total: tm });
     return '';
@@ -233,7 +246,7 @@ export function applyCommand(S, cmd) {
   }
   if (cmd.type === 'research') {
     const why = techBlocker(S, cmd.tech); if (why) return why;
-    const lv = techLv(S, cmd.tech) + 1, tm = techTime(cmd.tech, lv);
+    const lv = techLv(S, cmd.tech) + 1, tm = techTimeFor(S, cmd.tech, lv);
     techCost(cmd.tech, lv).forEach((v, i) => S.res[RES[i]] -= v);
     S.research = { id: cmd.tech, target: lv, left: tm, total: tm };
     return '';

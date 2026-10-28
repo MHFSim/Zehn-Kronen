@@ -1,7 +1,7 @@
 // Zehn Kronen – Spiel im Browser. Der Server ist maßgeblich; hier wird nur angezeigt
 // und zwischen zwei Server-Antworten mit denselben Regeln flüssig weitergerechnet.
 import {
-  RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
+  RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, buildTime, techTimeFor, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, T_PRE_LV, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
@@ -267,7 +267,7 @@ function upgradeHTML(id) {
     <div class="row"><div class="prog"><i id="upProg" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" id="upTime">${fmtT(real(q.left))}</span></div>
     <div class="row"><button class="btn" data-speed="build:${id}" type="button">⚡ Beschleunigen</button><button class="btn ghost" data-act="cancel" type="button">Abbrechen (volle Erstattung)</button></div></div>`;
   if (id === 'rathaus' && L >= 30) return '<div class="block"><h3>Ausbau</h3><p class="note">Höchststufe erreicht.</p></div>';
-  const c = costOf(id, t), why = blocker(S, id), tm = timeOf(id, t);
+  const c = costOf(id, t), why = blocker(S, id), tm = buildTime(S, id, t);
   return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + t : 'Bauen'}</h3>
     <div class="costs">${costHTML(c)}</div>
     <div class="time">Bauzeit ${fmtT(real(tm))}${speed > 1 ? ' · ohne Testtempo ' + fmtT(tm) : ''}</div>
@@ -367,7 +367,7 @@ function setupSheet() {
 const BGROUPS = [['eco', 'Wirtschaft', '🌾', ['farm', 'saege', 'stein', 'lager']], ['mil', 'Militär', '⚔️', ['kaserne', 'schiess', 'stall', 'lazarett']], ['adm', 'Verwaltung', '🏛️', ['rathaus', 'akademie', 'mauer']], ['tech', 'Forschung', '📜', []]];
 let cityCat = 'eco';
 // Gebäude-Symbole im Stil der Ressourcen-Zeichen (🌾 Nahrung, 🪵 Holz, 🪨 Stein, 🪙 Gold)
-const BICON = { rathaus: '🏰', farm: '🌾', saege: '🪵', stein: '🪨', lager: '📦', kaserne: '⚔️', schiess: '🏹', stall: '🐎', lazarett: '🩹', akademie: '📜', mauer: '🧱' };
+const BICON = { rathaus: '🏰', farm: '🌾', saege: '🪵', stein: '🪨', lager: '📦', kaserne: '⚔️', schiess: '🏹', stall: '🐎', lazarett: '🩹', akademie: '📜', mauer: '🧱', bau: '🔨', gold: '💰', taktik: '♟️', drill: '🛡️' };
 const BORDER = ['rathaus', 'farm', 'saege', 'stein', 'lager', 'kaserne', 'schiess', 'stall', 'lazarett', 'akademie', 'mauer'];
 const bico = id => `<span class="bi">${BICON[id] || '🏠'}</span>`;
 const tierOf = L => L >= 14 ? 3 : L >= 7 ? 2 : 1;
@@ -407,7 +407,7 @@ function plateHTML(id) {
   if (q) act = `<div class="bprog"><div class="prog"><i data-qprog="${id}" style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></div><span class="time" data-qtime="${id}">${fmtT(real(q.left))}</span></div>`;
   else if (locked) act = `<span class="why">Rathaus Stufe ${b.unlock} nötig</span>`;
   else if (id === 'rathaus' && L >= 30) act = '<span class="note">Höchststufe</span>';
-  else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}<span class="cost bt" title="Bauzeit">⏱ ${fmtT(real(timeOf(id, L + 1)))}</span></span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
+  else act = `<span class="costs sm">${costHTML(costOf(id, L + 1))}<span class="cost bt" title="Bauzeit">⏱ ${fmtT(real(buildTime(S, id, L + 1)))}</span></span><button class="btn small" type="button" data-up="${id}" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<div class="why one">${why}</div>` : ''}`;
   const extra = t ? `<div class="pmeta"><span data-tinfo="${id}">${t.count}× ${U[t.unit].name}${t.heal ? ' (Heilung)' : ''} · ${fmtT(real(t.left + (t.count - 1) * t.per))}</span></div>` : '';
   return `<article class="plate ${locked ? 'locked' : L ? '' : 'empty'}" data-b="${id}"><div class="pimg">${bico(id)}<span class="ribbon">${L || '–'}</span>${q ? '<span class="btag">Bau</span>' : ''}</div>
     <div class="ptext"><div class="pname">${b.name}</div><div class="pmeta">${cityMeta(id)}</div>${extra}</div><div class="pact">${act}</div></article>`;
@@ -818,7 +818,7 @@ function techTreeHTML() {
   const nodes = ids.map(id => {
     const t = T[id], L = techLv(S, id), run = S.research && S.research.id === id, locked = t.pre && techLv(S, t.pre) < T_PRE_LV, max = L >= T_MAX;
     return `<button type="button" class="tn ${id === techSel ? 'sel' : ''} ${run ? 'run' : ''} ${locked ? 'lock' : ''} ${max ? 'max' : ''}" data-act="techSel" data-id="${id}" style="left:${px(id)}px;top:${py(id)}px;width:${TN.w}px;height:${TN.h}px">
-      <span class="tni">${bico(t.icon)}</span><span class="tnt"><b>${t.name}</b><span class="tnb"><i style="width:${L / T_MAX * 100}%"></i></span><small ${run ? 'data-rtime="1"' : ''}>${locked ? '🔒 ' + T[t.pre].name + ' ' + T_PRE_LV : run ? '⏳ ' + fmtT(real(S.research.left)) : L + ' / ' + T_MAX}</small></span></button>`;
+      <span class="tni">${bico(t.icon)}</span><span class="tnt"><b>${t.name}</b><span class="tnb"><i style="width:${L / T_MAX * 100}%"></i></span><small ${run ? 'data-rtime="1"' : ''}>${locked ? '🔒 ' + T[t.pre].name : run ? '⏳ ' + fmtT(real(S.research.left)) : L + ' / ' + T_MAX}</small></span></button>`;
   }).join('');
   return `<div class="tree"><div class="treein" style="width:${W}px;height:${H}px"><svg width="${W}" height="${H}">${lines}</svg>${nodes}</div></div>`;
 }
@@ -827,7 +827,7 @@ function techPopHTML(id) {
   let act;
   if (run) act = `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><div class="row"><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span><button class="btn small" type="button" data-speed="research:1">⚡ Beschleunigen</button></div>`;
   else if (L >= T_MAX) act = '<p class="note">Höchststufe erreicht ✓</p>';
-  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTime(id, next)))} · braucht Akademie ${techReq(next)}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button>${why ? `<p class="why">${why}</p>` : ''}`;
+  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTimeFor(S, id, next)))} · braucht Akademie ${techReq(next)}${S.techCatch > .02 ? ' · Aufholbonus −' + Math.round(S.techCatch / (1 + S.techCatch) * 100) + ' %' : ''}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button>${why ? `<p class="why">${why}</p>` : ''}`;
   return `<div class="tpop" data-act="techClose"><div class="tpin"><div class="uhead"><div><b>${t.name}</b> <span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span></div><button class="pback" type="button" data-act="techClose">✕</button></div>
     <p class="note">${t.desc}</p><p class="tbo"><b>+${now} %</b>${L < T_MAX ? ` → <b>+${nx} %</b> ${t.unit}` : ' ' + t.unit}</p>${act}</div></div>`;
 }

@@ -1,7 +1,7 @@
 // Zehn Kronen – Grundlagen der Welt: Zustand, Märsche, Berichte, Meldungen, Bündnis-Abfragen.
 // Wird von world.js (Ablauf), social.js (Bündnisse) und war.js (Kriege) gemeinsam benutzt.
 import { N, generateMap, findPath, pathTimes, NODE_MAX } from './mapgen.js';
-import { lazarettCap, woundedCount, techMult, U } from './rules.js';
+import { lazarettCap, woundedCount, techMult, woundRate, U } from './rules.js';
 import { forestCostFor, armySpeed, capacityOf, sum } from './combat.js';
 
 /* ---------- Regeln der Welt (alle Zeiten in Spielsekunden) ---------- */
@@ -235,7 +235,7 @@ export function settleAway(S, start, left) {
   const lost = {}, wounded = {}, dead = {};
   for (const u in start) {
     const l = start[u] - (left[u] || 0); if (l <= 0) continue;
-    lost[u] = l; const wd = U[u] && U[u].g === 'trans' ? 0 : Math.round(l * 0.3);   // Karren werden nicht verwundet
+    lost[u] = l; const wd = U[u] && U[u].g === 'trans' ? 0 : Math.round(l * woundRate(S));   // Karren werden nicht verwundet
     const room = Math.max(0, lazarettCap(S) - woundedCount(S) - sum(wounded));
     const keep = Math.min(wd, room);
     if (keep > 0) wounded[u] = keep;
@@ -253,7 +253,7 @@ export function settleHome(S, lost) {
     const l = Math.min(lost[u], S.troops[u] || 0); if (l <= 0) continue;
     S.troops[u] -= l;
     const room = Math.max(0, lazarettCap(S) - woundedCount(S) - sum(wounded));
-    const keep = Math.min(Math.round(l * 0.3), room);
+    const keep = Math.min(Math.round(l * woundRate(S)), room);
     if (keep > 0) wounded[u] = keep;
     dead[u] = l - keep;
   }
