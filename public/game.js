@@ -822,14 +822,20 @@ function techTreeHTML() {
   }).join('');
   return `<div class="tree"><div class="treein" style="width:${W}px;height:${H}px"><svg width="${W}" height="${H}">${lines}</svg>${nodes}</div></div>`;
 }
+function techPopHTML(id) {
+  const t = T[id], L = techLv(S, id), run = S.research && S.research.id === id, next = L + 1, why = L >= T_MAX || run ? '' : techBlocker(S, id), now = Math.round(techBonus(id, L) * 100), nx = Math.round(techBonus(id, Math.min(T_MAX, next)) * 100);
+  let act;
+  if (run) act = `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><div class="row"><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span><button class="btn small" type="button" data-speed="research:1">⚡ Beschleunigen</button></div>`;
+  else if (L >= T_MAX) act = '<p class="note">Höchststufe erreicht ✓</p>';
+  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTime(id, next)))} · braucht Akademie ${techReq(next)}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button>${why ? `<p class="why">${why}</p>` : ''}`;
+  return `<div class="tpop" data-act="techClose"><div class="tpin"><div class="uhead"><div><b>${t.name}</b> <span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span></div><button class="pback" type="button" data-act="techClose">✕</button></div>
+    <p class="note">${t.desc}</p><p class="tbo"><b>+${now} %</b>${L < T_MAX ? ` → <b>+${nx} %</b> ${t.unit}` : ' ' + t.unit}</p>${act}</div></div>`;
+}
 function techHTML() {
   const A = S.lv.akademie, r = S.research;
-  if (!techSel || !T[techSel]) techSel = r ? r.id : Object.keys(T)[0];
-  const strip = `<div class="strip"><div><b>${A}</b><span>Akademie</span></div><div><b>${Object.keys(T).reduce((a, id) => a + techLv(S, id), 0)}</b><span>Stufen erforscht</span></div><div><b>${Object.keys(T).length * T_MAX}</b><span>Stufen gesamt</span></div></div>`;
-  const run = r ? `<div class="trun"><span class="tni">${bico(T[r.id].icon)}</span><div class="trb"><div class="trt"><b>${T[r.id].name} → Stufe ${r.target}</b><span class="time" data-rtime="1">${fmtT(real(r.left))}</span></div><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div></div><button class="btn small" type="button" data-speed="research:1">⚡ Beschleunigen</button></div>` : '';
-  const note = A ? `<div class="note-box">Es wird immer nur eine Forschung gleichzeitig bearbeitet. Eine Forschung wird frei, wenn ihr Vorgänger auf Stufe ${T_PRE_LV} ist. Stufe n braucht Akademie 2n−1.</div>`
-    : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`;
-  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut') + strip + run + techTreeHTML() + note + techCardHTML(techSel);
+  const run = r ? `<div class="trun"><span class="tni">${bico(T[r.id].icon)}</span><div class="trb"><div class="trt"><b>${T[r.id].name} → Stufe ${r.target}</b><span class="time" data-rtime="1">${fmtT(real(r.left))}</span></div><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div></div><button class="btn small" type="button" data-speed="research:1">⚡</button></div>` : '';
+  const note = A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'}</div>`;
+  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut') + note + run + techTreeHTML() + (techSel && T[techSel] ? techPopHTML(techSel) : '');
 }
 
 /* ---------- Panels (Bündnis, Mehr) ---------- */
@@ -867,7 +873,8 @@ function setupPanel() {
     const go = () => { $('sidePanel').scrollTop = 0; renderPanel(true); };
     if (act === 'ttab') { trainTab = d.t; return go(); }
     if (act === 'techSel') { techSel = d.id; return renderPanel(true); }
-    if (act === 'techGo') return void command({ type: 'research', tech: d.id });
+    if (act === 'techClose') { if (el.classList.contains('tpop') && e.target !== el) return; techSel = ''; return renderPanel(true); }
+    if (act === 'techGo') { techSel = ''; renderPanel(true); return void command({ type: 'research', tech: d.id }); }
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
     if (act === 'train') return void command({ type: 'train', id: d.b, unit: d.u, count: pick[d.u] || 10 });
     if (act === 'plus' || act === 'minus') { const n = pick[d.u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5; pick[d.u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); return renderPanel(true); }
