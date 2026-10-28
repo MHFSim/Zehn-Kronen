@@ -271,8 +271,6 @@ function renderHud() {
   if (S.scout) parts.push(`<div class="chip">🧭 Erkunder · Feld ${fieldName(S.scout.f)} · ${gtNow() < S.scout.t0 + S.scout.go ? 'unterwegs' : 'erkundet'} ${fmtT(real(Math.max(0, S.scout.end - gtNow())))}</div>`);
   const tq = queuedTroops(S);
   parts.push(`<div class="chip">Truppen ${fmtN(troopCount(S))}${tq ? ' · ' + fmtN(tq) + ' in Ausbildung' : ''}</div>`);
-  for (const m of ownMarches()) { const st = marchState(m); parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}${st.moving ? `<span class="mini"><i style="width:${Math.round(st.pct * 100)}%"></i></span>` : ''}</button>`); }
-  if (ownMarches().filter(m => m.phase !== 'back').length >= 2) parts.push('<button class="chip go" type="button" data-recallall="1">⌂ Alle heimrufen</button>');
   $('hud').innerHTML = parts.join('');
   renderPts(); renderHelpPop(); renderArmyBtns(); if (view && S) placeStep();
 }
