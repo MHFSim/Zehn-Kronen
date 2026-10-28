@@ -3,7 +3,7 @@
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
 import { battle, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf, power } from './combat.js';
 import {
-  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
+  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, FIGHT_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY
 } from './core.js';
@@ -153,6 +153,7 @@ export function checkAssist(ctx, me, tid, side, siegeId, defGroupHas) {
   const w = ctx.match.world;
   const sm = w.marches.find(g => !g.dead && g.phase === 'siege' && g.tid === String(tid) && (siegeId == null || g.id === Number(siegeId)));
   if (!sm) return 'Dort läuft gerade keine Belagerung.';
+  if (w.gt >= fightStart(sm)) return 'Der Kampf hat schon begonnen, jetzt kommt keine Verstärkung mehr an.';
   if (side !== 'att' && side !== 'def') return 'Wähle eine Seite: Angreifer oder Verteidiger.';
   const att = byId(ctx.players, sm.owner);
   if (side === 'att') {
@@ -163,8 +164,8 @@ export function checkAssist(ctx, me, tid, side, siegeId, defGroupHas) {
   if (!att) return 'Der Angreifer ist nicht mehr da.';
   return sm;
 }
-// Kräfte beider Seiten einer laufenden Belagerung (Anzeige): Stärke von Angreifern und Verteidigern samt Helfern und Prognose
-export function siegeStrength(ctx, m) {
+// Aufstellung beider Seiten einer laufenden Belagerung
+function sides(ctx, m) {
   const { match, players } = ctx, w = match.world, o = mapOf(match).byId[m.tid];
   const auxA = auxOf(m, 'att'), auxD = auxOf(m, 'def'), attAll = merge({ ...m.troops }, sumAux(auxA)), am = attMultOf(ctx, m, auxA);
   let def = {}, dm = 1;
@@ -178,12 +179,39 @@ export function siegeStrength(ctx, m) {
     for (const pid in SD.stationed) def = merge(def, SD.stationed[pid]);
   }
   def = merge(def, sumAux(auxD));
-  const r = battle(attAll, def, dm, am);
-  return { pa: Math.round(power(attAll, am)), pd: Math.round(power(def, dm)), win: r.win, na: sum(attAll), nd: sum(def) };
+  return { attAll, am, def, dm };
+}
+export const fightStart = m => m.tSiege - FIGHT_TIME;
+// Kampf in Echtzeit: Die Runden des Rundenkampfs laufen über FIGHT_TIME verteilt ab. Gibt Stärke beider Seiten zu Beginn und jetzt zurück.
+export function siegeStrength(ctx, m, gt) {
+  const sd = sides(ctx, m); if (!sd) return null;
+  const { attAll, am, def, dm } = sd, r = battle(attAll, def, dm, am);
+  const pa0 = power(attAll, am), pd0 = power(def, dm);
+  let pa = pa0, pd = pd0, na = sum(attAll), nd = sum(def), fight = false, frac = 0;
+  if (gt >= fightStart(m)) {
+    fight = true; frac = Math.max(0, Math.min(1, (gt - fightStart(m)) / FIGHT_TIME));
+    const k = Math.min(r.rounds.length, Math.floor(frac * r.rounds.length));
+    if (k > 0) { const st = r.rounds[k - 1]; pa = power(st.a, am); pd = power(st.d, dm); na = sum(st.a); nd = sum(st.d); }
+  }
+  return { pa: Math.round(pa), pd: Math.round(pd), pa0: Math.round(pa0), pd0: Math.round(pd0), win: r.win, na, nd, fight, frac };
+}
+// Heer wird mitten im Kampf abgezogen: Es nimmt die bisherigen Verluste mit, die Verteidiger bleiben unberührt.
+export function abortFight(ctx, player, m, gt) {
+  if (m.phase !== 'siege' || gt < fightStart(m)) return;
+  const sd = sides(ctx, m); if (!sd) return;
+  const r = battle(sd.attAll, sd.def, sd.dm, sd.am), frac = Math.max(0, Math.min(1, (gt - fightStart(m)) / FIGHT_TIME)), k = Math.min(r.rounds.length, Math.floor(frac * r.rounds.length));
+  if (k <= 0) return;
+  const st = r.rounds[k - 1].a, left = {};
+  for (const u in m.troops) { const n = sd.attAll[u] ? Math.round(m.troops[u] * (st[u] || 0) / sd.attAll[u]) : 0; if (n > 0) left[u] = n; }
+  const start = { ...m.troops }, sa = settleAway(player.state, start, left);
+  m.troops = left; m.load = {};
+  pushReport(player.state, { kind: 'pvp', role: 'att', title: 'Rückzug aus dem Kampf', win: false, target: { kind: m.tk, id: m.tid },
+    att: { start, left, wounded: sa.wounded, dead: sa.dead }, text: 'Du hast dein Heer mitten im Kampf abgezogen und ' + (sum(start) - sum(left)) + ' Einheiten verloren.' }, ctx.realT || ctx.now);
+  if (!sum(left)) m.dead = true;
 }
 export function arriveAssist(ctx, m, bt, realT, back) {
   const { match, players } = ctx, w = match.world, P = byId(players, m.owner);
-  const sm = w.marches.find(g => g.id === m.siegeId && !g.dead && g.phase === 'siege' && g.tSiege > bt);
+  const sm = w.marches.find(g => g.id === m.siegeId && !g.dead && g.phase === 'siege' && fightStart(g) > bt);
   if (!sm) { pushReport(P.state, { kind: 'pvp', role: 'att', title: 'Zu spät', win: false, target: { kind: m.tk, id: m.tid }, text: 'Die Belagerung ist schon vorbei. Dein Heer kehrt um.' }, realT); return back(); }
   sm.aux = sm.aux || []; sm.aux.push({ pid: m.owner, side: m.side, troops: { ...m.troops } });
   m.dead = true;

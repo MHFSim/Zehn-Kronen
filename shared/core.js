@@ -18,6 +18,7 @@ export const VASSAL_TIME = 7 * DAY;      // so lange bleibt ein Vasall Vasall
 export const TRIBUTE = 0.2;              // Anteil der Erzeugung, den ein Vasall abgibt
 export const LEAVE_LOCK = 24 * 3600;     // nach dem Austritt keine Angriffe auf die früheren Verbündeten
 export const SIEGE_TIME = 5400;           // Belagerung: so lange (Spielsekunden, 1:30 h) steht ein Heer vor Burg oder Außenposten, bevor gekämpft wird
+export const FIGHT_TIME = 900;            // die letzten 15 Spielminuten jeder Belagerung sind der sichtbare Kampf (Verstärkung kommt dann nicht mehr an)
 export const SIEGE_OP_TIME = 7200;        // Kampf um einen Außenposten: immer 2 Stunden Zeit für Verstärkung
 export const THRONE_HOLD = 2 * DAY;      // so lange muss der Thron gehalten werden
 export const SANCT_BONUS = 0.15;         // Produktionsbonus je gehaltenem Heiligtum

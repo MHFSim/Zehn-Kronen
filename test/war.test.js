@@ -273,8 +273,14 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
     assert.equal(m.phase, 'siege');
     const v = viewFor(match, players, b, clock), sg = v.sieges.find(x => x.id === m.id);
     assert.ok(sg && sg.pw && sg.pw.pa > 0 && sg.pw.pd > 0 && sg.pw.na === 60, 'Kräfteanzeige');
-    assert.equal(run(match, players, clock, a, { type: 'recall', id: m.id }), '', 'Abzug aus der Belagerung');
-    assert.equal(match.world.marches.find(x => x.id === m.id).phase, 'back');
+    assert.equal(sg.pw.fight, false);
+    adv(match, players, m.tSiege - 400 - match.world.gt);   // mitten im Kampf
+    const v2 = viewFor(match, players, b, clock), sg2 = v2.sieges.find(x => x.id === m.id);
+    assert.ok(sg2.pw.fight && sg2.pw.na <= sg.pw.na && sg2.pw.pa0 === sg.pw.pa0, 'Kampf läuft in Echtzeit');
+    assert.match(run(match, players, clock, b, { type: 'march', mode: 'assist', target: cityOf(b).id, side: 'def', siege: m.id, troops: { speer: 1 } }), /Kampf hat schon begonnen/);
+    assert.equal(run(match, players, clock, a, { type: 'recall', id: m.id }), '', 'Abzug aus dem Kampf');
+    const mm = match.world.marches.find(x => x.id === m.id);
+    assert.ok(!mm || mm.phase === 'back', 'zieht heim');
   } else console.log('Belagerungstest übersprungen:', r);
 }
 

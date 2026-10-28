@@ -5,7 +5,7 @@ import {
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
-import { PLAYER_COLORS, SIEGE_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
+import { PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe } from '/shared/war.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
@@ -505,7 +505,7 @@ function renderBanner() {
   else if (m.phase === 'running') {
     for (const i of view.incoming || []) L.push(['bad', `⚔ ${i.fromTag ? '[' + esc(i.fromTag) + '] ' : ''}${esc(i.from)} ${i.siege ? 'belagert' : 'greift'} ${i.mine ? 'dich' : esc(i.target)}${i.siege ? '' : ' an'} · ${i.siege ? 'Kampf beginnt in ' : 'Ankunft in '}${fmtT(real(i.eta - gt))}${i.siege ? ' – jetzt Hilfe holen!' : ''}`]);
     const seen = new Set((view.incoming || []).map(i => i.id));
-    for (const sg of view.sieges || []) if (!seen.has(sg.id) && sg.tSiege > gt) L.push(['warn', `<span data-goto="${esc(sg.kind)}:${esc(String(sg.tid))}" style="cursor:pointer">⚔ ${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(sg.tname)} · Kampf in ${fmtT(real(sg.tSiege - gt))} – tippen und helfen</span>`]);
+    for (const sg of view.sieges || []) if (!seen.has(sg.id) && sg.tSiege > gt) L.push(['warn', `<span data-goto="${esc(sg.kind)}:${esc(String(sg.tid))}" style="cursor:pointer">⚔ ${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(sg.tname)} · ${gt >= sg.tSiege - FIGHT_TIME ? 'Kampf läuft' : 'Kampf in ' + fmtT(real(sg.tSiege - FIGHT_TIME - gt))} – tippen und ansehen</span>`]);
     if (S.protUntil > gt) L.push(['good', `🛡 ${S.protKind === 'fall' ? 'Schutz nach dem Fall deiner Burg' : 'Neulingsschutz'}: noch ${fmtT(real(S.protUntil - gt))}`]);
     if (S.vassalOf) L.push(['warn', `Du bist Vasall von ${esc(pname(S.vassalOf))} (20 % Tribut) · frei in ${fmtT(real(S.vassalUntil - gt))}. Fällt deine Burg noch einmal, scheidest du aus.`]);
     const vs = m.players.filter(p => p.vassalOf === me.id); if (vs.length) L.push(['good', `Deine Vasallen: ${vs.map(p => esc(p.name)).join(', ')}`]);
@@ -1101,16 +1101,16 @@ function siteSheet(w) {
 // Kräfte beider Seiten als zwei Balken: wer länger ist, gewinnt eher
 function powBars(pw) {
   if (!pw) return '';
-  const mx = Math.max(pw.pa, pw.pd, 1), pa = Math.max(3, Math.round(100 * pw.pa / mx)), pd = Math.max(3, Math.round(100 * pw.pd / mx));
-  return `<div class="pbars"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${fmtN(pw.na)}</b></div>`
+  const mx = Math.max(pw.pa0, pw.pd0, 1), pa = Math.max(2, Math.round(100 * pw.pa / mx)), pd = Math.max(2, Math.round(100 * pw.pd / mx));
+  return `<div class="pbars${pw.fight ? ' fight' : ''}"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${fmtN(pw.na)}</b></div>`
     + `<div class="pb def"><span>Verteidiger</span><div class="bar"><i style="width:${pd}%"></i></div><b>${fmtN(pw.nd)}</b></div>`
-    + `<div class="pv">${pw.win ? '⚔ Die Angreifer sind im Vorteil' : '🛡 Die Verteidiger sind im Vorteil'}</div></div>`;
+    + `<div class="pv">${pw.fight ? '⚔ Der Kampf läuft – ' : ''}${pw.pa >= pw.pd ? 'Die Angreifer sind vorn' : 'Die Verteidiger sind vorn'}</div></div>`;
 }
 function siegeBlock(tid, defName) {
   const sg = (view.sieges || []).find(x => x.tid === tid); if (!sg || view.match.phase !== 'running') return '';
   const free = sendFrom || sendFromOp || ownMarches().length < armySlots(S), none = !sum(sendList()) ? 'Wähle Truppen aus.' : !free ? 'Alle Heere sind unterwegs.' : '';
-  return `<div class="block"><h3>⚔ Belagerung · Kampf in ${fmtT(real(Math.max(0, sg.tSiege - gtNow())))}</h3><p class="note">${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(defName)}. Wer rechtzeitig eintrifft, kämpft mit – auch aus anderen Bündnissen.</p>${powBars(sg.pw)}`
-    + `<div class="row"><button class="btn ghost" type="button" data-act="assistD" ${none ? 'disabled' : ''}>Verteidigern helfen</button><button class="btn ghost" type="button" data-act="assistA" ${none ? 'disabled' : ''}>Angreifern helfen</button></div>${none ? `<span class="why">${none}</span>` : ''}</div>`;
+  return `<div class="block"><h3>⚔ ${sg.pw && sg.pw.fight ? 'Kampf läuft · noch ' : 'Belagerung · Kampf in '}${fmtT(real(Math.max(0, (sg.pw && sg.pw.fight ? sg.tSiege : sg.tSiege - FIGHT_TIME) - gtNow())))}</h3><p class="note">${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(defName)}. Wer rechtzeitig eintrifft, kämpft mit – auch aus anderen Bündnissen.</p>${powBars(sg.pw)}`
+    + `<div class="row"><button class="btn ghost" type="button" data-act="assistD" ${none || (sg.pw && sg.pw.fight) ? 'disabled' : ''}>Verteidigern helfen</button><button class="btn ghost" type="button" data-act="assistA" ${none || (sg.pw && sg.pw.fight) ? 'disabled' : ''}>Angreifern helfen</button></div>${none ? `<span class="why">${none}</span>` : ''}</div>`;
 }
 function opSheet(w) {
   const o = (w.outposts || []).find(x => x.id === msel.id); if (!o) return '';

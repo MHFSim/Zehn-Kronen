@@ -10,7 +10,7 @@ import {
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur, cellXY, planFrom, allied, isProtected
 } from './core.js';
-import { siegeStrength, beginSiege, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { siegeStrength, abortFight, fightStart, beginSiege, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText } from './rules.js';
@@ -315,9 +315,10 @@ export function command(match, players, player, cmd, now) {
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
     const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S) : planMarch(map, S, o, troops);
     if (plan.error) return plan.error;
-    if (assistSiege && w.gt + plan.arr[plan.arr.length - 1] >= assistSiege.tSiege) return 'Zu spät: Die Belagerung ist vorbei, bevor deine Truppen ankommen.';
+    if (assistSiege && w.gt + plan.arr[plan.arr.length - 1] >= fightStart(assistSiege)) return 'Zu spät: Die Belagerung ist vorbei, bevor deine Truppen ankommen.';
     let carry = null;
     if (src) {
+      abortFight(ctx, player, src, w.gt); if (src.dead) { w.marches.splice(w.marches.indexOf(src), 1); syncMatch(match, players, now); return ''; }
       if (src.aux && src.aux.length) releaseAux(ctx, src);
       if (src.phase === 'gather') {   // bisher Gesammeltes nimmt das Heer mit
         const go = map.byId[src.tid], frac = Math.max(0, Math.min(1, (w.gt - src.tStart) / (src.tEnd - src.tStart || 1)));
@@ -345,6 +346,7 @@ export function command(match, players, player, cmd, now) {
     const m = w.marches.find(x => x.id === Number(cmd.id) && x.owner === player.id);
     if (!m) return 'Dieses Heer gibt es nicht';
     if (m.phase === 'back') return 'Das Heer ist schon auf dem Rückweg';
+    abortFight(ctx, player, m, w.gt); if (m.dead) { w.marches = w.marches.filter(x => x !== m); return ''; }
     if (m.aux && m.aux.length) releaseAux(ctx, m);
     if (m.phase === 'post') { m.load = {}; return sendBack(ctx, player, m, w.gt); }
     if (m.phase === 'gather') {
@@ -403,7 +405,7 @@ export function viewFor(match, players, me, now) {
       if (op && myAl && op.al === myAl.id) incoming.push({ id: m.id, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', target: 'einen Außenposten', targetId: 0, mine: false, op: true, siege: m.phase === 'siege', eta: m.phase === 'siege' ? m.tSiege : m.t0 + m.arr[m.arr.length - 1] });
     }
     if (m.phase === 'siege' && (m.mode === 'attack' || m.mode === 'raid')) { const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null;
-      sieges.push({ id: m.id, tid: m.tid, kind: op ? 'op' : 'city', tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : '?', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops), pw: siegeStrength(mkCtx(match, players, now), m) }); }
+      sieges.push({ id: m.id, tid: m.tid, kind: op ? 'op' : 'city', tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : '?', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops), pw: siegeStrength(mkCtx(match, players, now), m, gt) }); }
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
       tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, tSiege: m.tSiege, amount: m.amount, res: m.res, load: own ? m.load : undefined });
