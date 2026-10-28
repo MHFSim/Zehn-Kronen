@@ -402,8 +402,8 @@ function exchangeHTML() {
   const rows = [['food', 'Nahrung'], ['wood', 'Holz'], ['stone', 'Stein'], ['gold', 'Gold']].map(([r, n]) => {
     const k = Math.floor(S.res[r] / 1000), v = Math.min(k, exchAmt[r] || 0);
     return `<div class="urow exrow"><div class="un"><b>${n}</b><small>${fmtN(S.res[r])} da · <span data-exl="${r}">${v} Silber für ${fmtN(v * 1000)}</span></small>
-      <input type="range" class="exr" data-exr="${r}" min="0" max="${k}" step="1" value="${v}" ${k > 0 ? '' : 'disabled'} aria-label="Silber aus ${n}"></div>
-      <button class="btn small" type="button" data-act="exch" data-r="${r}" ${v > 0 ? '' : 'disabled'}>Tauschen</button></div>`; }).join('');
+      </div><div class="exline"><input type="range" class="exr" data-exr="${r}" min="0" max="${k}" step="1" value="${v}" ${k > 0 ? '' : 'disabled'} aria-label="Silber aus ${n}">
+      <button class="btn small exok" type="button" data-act="exch" data-r="${r}" ${v > 0 ? '' : 'disabled'}>OK</button></div></div>`; }).join('');
   return `<div class="block exch"><h3>Silber <span class="silv">🥈 ${fmtN(S.silver || 0)}</span></h3><p class="note">1000 Rohstoffe, egal welche, werden zu 1 Silber. Mit Silber schickst du Späher los. Regler einstellen, dann tauschen.</p>${rows}</div>`;
 }
 document.addEventListener('input', e => {
