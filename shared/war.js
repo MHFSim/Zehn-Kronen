@@ -127,7 +127,7 @@ export function arriveField(ctx, m, o, bt, realT, back) {
    Ein Angriff beginnt sofort bei der Ankunft. Der Kampf läuft in Runden (je nach Heergröße 1 bis 20 Minuten Spielzeit insgesamt).
    Der erste Angreifer ("Anführer") trägt den Kampfstand m.fight; weitere Angreifer und Helfer hängen als Marsch in der Phase 'fight' daran (m.lead, m.side).
    Beide Seiten können jederzeit Verstärkung schicken oder ihr Heer abziehen; die Lebensbalken folgen dem Stand der Truppen. */
-const SUB = 4, MAXT = 180;   // je Kampfrunde vier kleine Schritte, damit sich die Balken gleichmäßig leeren
+const NT = 600, MAXT = 1000;   // Der Kampf läuft in sehr kleinen Zeitschritten (alle paar Sekunden), die Einheiten fallen also laufend
 let CX = null;               // Kontext des laufenden Kampfbefehls (für den Heimweg)
 const multOf = (ctx, list) => { let n = 0, f = 0; for (const x of list) { const P = byId(ctx.players, x.owner), k = sum(x.fc || x.troops); n += k; f += k * (P ? forceOf(P.state) : 1); } return n ? f / n : 1; };
 const cOf = (lead, x) => x === lead ? lead.troops : (x.fc || x.troops);
@@ -136,18 +136,18 @@ const ratio = (P, P0) => { const k = {}; for (const u in P0) k[u] = P0[u] > 0 ? 
 const goBack = (x, bt) => { delete x.lead; delete x.side; delete x.fc; delete x.fight; delete x.ft; delete x.pre; homeBack(CX, x, bt); };
 export const fightMembers = (w, lead, side) => w.marches.filter(x => !x.dead && x.phase === 'fight' && x.lead === lead.id && x.side === side);
 // Wie viele Schritte braucht dieser Kampf noch? (Schätzung für Dauer und Restzeit)
-function ticksLeft(A, D, am, dm, from = 0) {
+function ticksLeft(A, D, am, dm, k, from = 0, cap = MAXT) {
   let a = { ...A }, d = { ...D }, n = from;
-  while (n < MAXT && sum(a) >= 0.5 && sum(d) >= 0.5) { const r = roundStep(a, d, am, dm, 1 / SUB); a = r.A; d = r.D; n++; }
+  while (n < cap && sum(a) >= 0.5 && sum(d) >= 0.5) { const r = roundStep(a, d, am, dm, k); a = r.A; d = r.D; n++; }
   return n - from;
 }
 
 function startFight(ctx, m, def, dm, bt, kind) {
   const A = { ...m.troops }, D = { ...def }, n0 = sum(A) + sum(D), P = byId(ctx.players, m.owner), am = P ? forceOf(P.state) : 1;
   const dur = Math.max(600, Math.min(7200, 600 + 6600 * Math.min(1, n0 / 3000)));   // mindestens 10 Minuten, höchstens 2 Stunden
-  const ticks = Math.max(8, Math.min(120, ticksLeft(A, D, am, dm)));
-  m.phase = 'fight'; m.side = 'att'; m.tStart = bt; m.ft = bt + dur / ticks;
-  m.fight = { kind, dt: dur / ticks, round: 0, A, A0: { ...A }, D, D0: { ...D }, dm, pkA: power(A), pkD: power(D, dm) };
+  const r0 = Math.max(1, ticksLeft(A, D, am, dm, .25, 0, 120) * .25), k = r0 / NT;   // so viele Kampfrunden-Einheiten verteilen sich auf die Kampfdauer
+  m.phase = 'fight'; m.side = 'att'; m.tStart = bt; m.ft = bt + dur / NT;
+  m.fight = { kind, dt: dur / NT, k, round: 0, A, A0: { ...A }, D, D0: { ...D }, dm, pkA: power(A), pkD: power(D, dm) };
 }
 function attach(ctx, lead, m, side) {   // Heer schließt sich einem laufenden Kampf an
   const f = lead.fight, P = side === 'att' ? f.A : f.D, P0 = side === 'att' ? f.A0 : f.D0;
@@ -179,7 +179,7 @@ export function freeOrphans(ctx, bt) {
 export function stepFight(ctx, m, bt, realT) {
   CX = ctx;
   const w = ctx.match.world, f = m.fight, att = [m, ...fightMembers(w, m, 'att')], am = multOf(ctx, att);
-  const r = roundStep(f.A, f.D, am, f.dm, 1 / SUB); f.A = r.A; f.D = r.D; f.round++;
+  const r = roundStep(f.A, f.D, am, f.dm, f.k); f.A = r.A; f.D = r.D; f.round++;
   f.pkA = Math.max(f.pkA, power(f.A, am)); f.pkD = Math.max(f.pkD, power(f.D, f.dm));
   m.ft = bt + f.dt;
   const nA = sum(f.A), nD = sum(f.D);
@@ -190,7 +190,7 @@ export function fightView(ctx, m) {
   const w = ctx.match.world, f = m.fight; if (!f) return null;
   const am = multOf(ctx, [m, ...fightMembers(w, m, 'att')]), pa = power(f.A, am), pd = power(f.D, f.dm);
   return { kind: f.kind, pa: Math.round(pa), pd: Math.round(pd), pk: Math.round(Math.max(f.pkA, f.pkD, pa, pd)), na: Math.round(sum(f.A)), nd: Math.round(sum(f.D)), na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), round: f.round,
-    left: Math.max(0, ticksLeft(f.A, f.D, am, f.dm, f.round)) * f.dt, tot: (f.round + ticksLeft(f.A, f.D, am, f.dm, f.round)) * f.dt };
+    left: ticksLeft(f.A, f.D, am, f.dm, f.k, f.round) * f.dt, tot: Math.max(f.round, ticksLeft(f.A, f.D, am, f.dm, f.k, f.round) + f.round) * f.dt };
 }
 // Kampf gegen ein Banditenlager
 export function startCampFight(ctx, m, o, bt) { startFight(ctx, m, campTroops(o.lv), campMult(o.lv), bt, 'camp'); }

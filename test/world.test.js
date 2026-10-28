@@ -88,7 +88,7 @@ const cm = match.world.marches[0], cdur = cm.arr[cm.arr.length - 1];
 t += (cdur + 60) / 100 * 1000;
 syncMatch(match, players, t);
 assert.equal(match.world.marches[0].phase, 'fight', 'Kampf läuft in Echtzeit');
-assert.ok(match.world.marches[0].fight.dt * 8 >= 600, 'mindestens 10 Minuten');
+assert.ok(match.world.marches[0].fight.dt * 600 >= 600, 'mindestens 10 Minuten');
 t += 7300 / 100 * 1000;
 syncMatch(match, players, t);
 const rep = p1.state.reports.find(r => r.kind === 'camp');

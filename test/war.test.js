@@ -269,7 +269,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   adv(match, players, m.arr[m.arr.length - 1] + 1);
   assert.equal(m.phase, 'fight');
   const v0 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
-  adv(match, players, m.fight.dt * 2 + 1);
+  adv(match, players, m.fight.dt * 150 + 1);
   const v1 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
   assert.ok(v0.tot >= 600 && v0.tot <= 7200 + 60, 'Kampfdauer 10 Min bis 2 Std: ' + v0.tot);
   assert.ok(v1.na < v0.na && v1.nd < v0.nd, 'beide Balken sinken: ' + JSON.stringify([v0, v1]));
