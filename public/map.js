@@ -542,6 +542,12 @@ void main(){
 #include <fog_fragment>
 }`;
 
+// Grafik „Hoch": Wasser mit Himmelsspiegelung am flachen Blickwinkel, zweiter Wellenschicht und feinerem Glitzern
+const waterHi = fs => fs.replace('gl_FragColor=vec4(col,a);', `
+  float fr=pow(1.0-clamp(normalize(cameraPosition-vW).y,0.0,1.0),3.0); col=mix(col,vec3(.50,.64,.84),fr*.38);
+  float w2=sin(vW.x*5.1-t*1.7+n*7.0)*sin(vW.z*4.6+t*1.4+n*6.0); col+=vec3(.035,.05,.06)*w2*(1.0-d*.5);
+  float sp2=pow(max(0.0,sin((vW.x-vW.z)*6.0+t*3.1+n*13.0)),60.0)*vn(p*6.0-t*.5); col+=vec3(.8,.86,.86)*sp2*.7*(1.0-d*.5);
+  gl_FragColor=vec4(col,a);`);
 const SKIRT = { camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
 const KIND_R = { start: 2.8, tower: 2.4, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, camp: 1.9, ruin: 1.7 };
 
@@ -552,7 +558,8 @@ export class WorldMap {
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); r.outputEncoding = T.sRGBEncoding;
     r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
     this.dom = r.domElement; host.appendChild(this.dom);
-    this.scene = new T.Scene(); const sky = 0x2a3a52; this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(sky, 60, 230);
+    this.scene = new T.Scene(); const sky = MB.hi ? 0x34486a : 0x2a3a52; this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(sky, MB.hi ? 70 : 60, MB.hi ? 250 : 230);
+    if (MB.hi) { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 256; const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#1c2c4a'); gr.addColorStop(.55, '#34486a'); gr.addColorStop(1, '#5d6f88'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const tx = new T.CanvasTexture(cv); tx.encoding = T.sRGBEncoding; this.scene.background = tx; }
     this.camera = new T.PerspectiveCamera(34, 1, 2, 1800);
     this.hemi = new T.HemisphereLight(0xb4c6ea, 0x6e5f3a, .82); this.scene.add(this.hemi);
     this.sun = new T.DirectionalLight(0xffd9a0, 1.2); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
@@ -578,7 +585,7 @@ export class WorldMap {
   }
   resize() {
     const w = window.innerWidth, h = window.innerHeight; this.W = w; this.H = h;
-    this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); if (this.post) this.post.setSize(w, h);
   }
 
   /* ---------- Höhe ---------- */
@@ -683,7 +690,7 @@ float zh(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(zh(i),zh(i+vec2(1.,0.)),f.x), mix(zh(i+vec2(0.,1.)),zh(i+vec2(1.,1.)),f.x), f.y); }`).replace('#include <color_fragment>', `#include <color_fragment>
 { vec2 p = vWP.xz; float a = zn(p*2.3)*.5 + zn(p*6.1)*.3 + zn(p*17.0)*.2; float bl = zn(vec2(p.x*38.0, p.y*7.0)) * zn(vec2(p.x*5.0, p.y*41.0));
   float g = clamp(diffuseColor.g*2.2 - diffuseColor.r*1.2 - diffuseColor.b*.6, 0.0, 1.0);
-  diffuseColor.rgb *= .84 + a*.3 + g*(bl-.25)*.22; diffuseColor.rg += vec2(.012,.02)*g*a; }
+  diffuseColor.rgb *= .84 + a*.3 + g*(bl-.25)*.22; diffuseColor.rg += vec2(.012,.02)*g*a;${MB.hi ? ' float f1=zn(p*46.0), f2=zn(p*97.0), pa=zn(p*.55); diffuseColor.rgb *= .9 + f1*.12 + f2*.1; diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.1,1.04,.86), g*smoothstep(.55,.8,pa)*.55); diffuseColor.rgb *= 1.0 - g*smoothstep(.35,.1,pa)*.14;' : ''} }
 { float fk = smoothstep(.12, .9, texture2D(uFog, vWP.xz / ${N}.0).r); diffuseColor.rgb = mix(vec3(.10, .12, .17), diffuseColor.rgb, fk); }`);
     };
     this.buildTerrain(map); this.buildWater(); this.buildTrees(map); this.buildObjects(map);
@@ -773,7 +780,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       idx.push(a, c, b, b, c, d);
     }
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(wp, 3)); g.setAttribute('aDepth', new T.BufferAttribute(dp, 1)); g.setIndex(idx); g.boundingSphere = new T.Sphere(new T.Vector3(N / 2, 0, N / 2), N);
-    this.waterMat = new T.ShaderMaterial({ vertexShader: WATER_VS, fragmentShader: WATER_FS, transparent: true, depthWrite: false, fog: true, uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uTime: { value: 0 } }]) });
+    this.waterMat = new T.ShaderMaterial({ vertexShader: WATER_VS, fragmentShader: MB.hi ? waterHi(WATER_FS) : WATER_FS, transparent: true, depthWrite: false, fog: true, uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uTime: { value: 0 } }]) });
     this.waterMat.uniforms.uFog = this.fogU; const m = new T.Mesh(g, this.waterMat); m.position.y = -.01; m.renderOrder = 1; this.scene.add(m);
     const sea = new T.Mesh(new T.PlaneGeometry(2400, 2400), new T.MeshBasicMaterial({ color: new T.Color().setRGB(LIN(14), LIN(66), LIN(98)), fog: true }));
     sea.rotation.x = -Math.PI / 2; sea.position.set(N / 2, -.4, N / 2); this.scene.add(sea);
@@ -1349,7 +1356,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   /* ---------- Bild für Bild ---------- */
   frame(dt) {
     this.ema = (this.ema || .016) * .97 + Math.min(dt, .2) * .03;
-    if (this.q === 'high' && !this.hiDown && this.time > (this.grace || 3) && this.ema > .04) { this.hiDown = 1; const g = this.grace; this.setQuality('std'); this.q = 'high-lite'; this.grace = this.time + 4; void g; }
+    if (this.q === 'high' && !this.hiDown && this.time > (this.grace || 3) && this.ema > .04) { this.hiDown = 1; const g = this.grace; this.setQuality('std'); this.q = 'high-lite'; if (this.post) { this.post.dispose(); this.post = null; } this.grace = this.time + 4; void g; }
     if (this.time > Math.max(3, this.grace || 0) && !this.perf1 && this.ema > .045) { this.perf1 = 1; this.sun.castShadow = false; this.renderer.shadowMap.enabled = false; this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
     if (this.time > 6 && this.perf1 === 1 && this.ema > .055) { this.perf1 = 2; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); this.renderer.setSize(this.W, this.H); }
     dt = Math.min(dt, .1); this.time += dt; const t = this.time; this.waterMat.uniforms.uTime.value = t;
@@ -1426,7 +1433,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     if (ring) { this.ringMesh.visible = true; this.ringMesh.position.set(ring.x, Math.max(0, this.yAt(ring.x, ring.z)) + .15, ring.z); this.ringMesh.scale.setScalar(ring.r); } else this.ringMesh.visible = false;
     this.stepSmoke(t); this.animRaiders(t);
     this.projectLabels();
-    this.renderer.render(this.scene, this.camera);
+    this.drawFrame(dt);
+  }
+  drawFrame(dt) {
+    if (this.q === 'high' && !this.post && !this.postTry && T.EffectComposer) { this.postTry = 1; this.post = makePost(this.renderer, this.scene, this.camera, this.W, this.H); }
+    if (this.post) this.post.render(dt); else this.renderer.render(this.scene, this.camera);
   }
   // Funken bei Schlägen im Kampf
   spark(x, y, z) {
@@ -1498,6 +1509,29 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 }
 
 /* ---------- Baukasten für die 3D-Stadtansicht (city3d.js) ---------- */
+// Grafik „Hoch": Nachbearbeitung (Mehrfachglättung, sanftes Leuchten heller Stellen, Farbfeinschliff, Randabdunklung).
+// Die Bibliotheken dafür lädt game.js nach; fehlen sie, bleibt das normale Bild.
+function makePost(r, scene, camera, W, H) {
+  if (!T.EffectComposer || !T.RenderPass || !T.UnrealBloomPass || !T.ShaderPass) return null;
+  try {
+    const pr = r.getPixelRatio(), ms = !!(T.WebGLMultisampleRenderTarget && r.capabilities.isWebGL2);
+    const par = { type: T.HalfFloatType, format: T.RGBAFormat, minFilter: T.LinearFilter, magFilter: T.LinearFilter };
+    const rt = ms ? new T.WebGLMultisampleRenderTarget(W * pr, H * pr, par) : new T.WebGLRenderTarget(W * pr, H * pr, par);
+    if (ms) rt.samples = 4;
+    rt.texture.encoding = T.sRGBEncoding;   // Materialien schreiben wie auf dem Bildschirm sRGB-kodiert, so passen auch die eigenen Shader
+    const c = new T.EffectComposer(r, rt); c.setPixelRatio(pr); c.setSize(W, H);
+    c.addPass(new T.RenderPass(scene, camera));
+    const bloom = new T.UnrealBloomPass(new T.Vector2(W, H), .2, .5, .9); c.addPass(bloom);
+    if (!ms && T.FXAAShader) { const fx = new T.ShaderPass(T.FXAAShader); fx.material.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); c.addPass(fx); c.fxaa = fx; }
+    const grade = new T.ShaderPass({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c=texture2D(tDiffuse,vUv); vec3 col=c.rgb; float l=dot(col,vec3(.299,.587,.114)); col=mix(vec3(l),col,1.1); col=(col-.5)*1.06+.5; col*=vec3(1.02,1.0,.97); float d=distance(vUv,vec2(.5)); col*=1.0-smoothstep(.42,.95,d)*.3; gl_FragColor=vec4(col,c.a); }'
+    });
+    c.addPass(grade);
+    return { c, bloom, pr, setSize(w, h) { c.setSize(w, h); bloom.resolution.set(w, h); if (c.fxaa) c.fxaa.material.uniforms.resolution.value.set(1 / (w * this.pr), 1 / (h * this.pr)); }, render(dt) { c.render(dt); }, dispose() { try { c.renderTarget1.dispose(); c.renderTarget2.dispose(); } catch (e) { /* egal */ } } };
+  } catch (e) { return null; }
+}
 // Grafik „Hoch": mehr Segmente für runde Formen (Zylinder, Kegel, Kugeln, Ringe, Felsbrocken); muss vor dem Aufbau der Modelle gesetzt werden
 let geoWrapped = false;
 function wrapGeos(t) {
@@ -1509,4 +1543,4 @@ function wrapGeos(t) {
   w('TorusGeometry', a => { if (a[3] >= 5) a[3] = Math.min(a[3] * 2, 40); return a; });
   w('IcosahedronGeometry', a => { if ((a[1] || 0) < 2) a[1] = (a[1] || 0) + 1; return a; });
 }
-export const KIT = { use: t => { T = t; if (MB.hi) wrapGeos(t); }, setHi: on => { MB.hi = !!on; }, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };
+export const KIT = { use: t => { T = t; if (MB.hi) wrapGeos(t); }, setHi: on => { MB.hi = !!on; }, makePost, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };

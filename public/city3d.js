@@ -313,7 +313,7 @@ export class CityView {
     this.fillL.intensity = hi ? .55 : .35; this.hemiL.intensity = hi ? .72 : .8; this.sun.intensity = hi ? 1.65 : 1.55; r.toneMappingExposure = hi ? 1.34 : 1.28;
   }
   resize() {
-    const w = window.innerWidth, h = window.innerHeight; this.W = w; this.H = h; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    const w = window.innerWidth, h = window.innerHeight; this.W = w; this.H = h; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); if (this.post) this.post.setSize(w, h);
     if (!this.touched) this.cam.dist = this.fitDist(); this.cam.dist = clamp(this.cam.dist, this.minDist(), 75); this.updateCamera();
   }
   fitDist() { const a = this.W / this.H, t = Math.tan(this.camera.fov * Math.PI / 360); return clamp(14.5 / (t * Math.min(1.25, a)) * .92, 34, 62); }
@@ -634,6 +634,7 @@ export class CityView {
       if (h.crane) h.crane.rotation.y = Math.sin(t * .6 + h.cx) * .9;
     }
     this.projectLabels();
-    this.renderer.render(this.scene, this.camera);
+    if (this.q === 'high' && !this.post && !this.postTry && T.EffectComposer) { this.postTry = 1; this.post = KIT.makePost(this.renderer, this.scene, this.camera, this.W, this.H); }
+    if (this.post) this.post.render(dt); else this.renderer.render(this.scene, this.camera);
   }
 }

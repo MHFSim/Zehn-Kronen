@@ -601,6 +601,12 @@ const CITY_3D = false;   // 3D-Stadt ist abgeschaltet (Text-Stadt); Code bleibt 
 let cv = null, cvLoop = 0, cvFail = !CITY_3D;
 let gfxQ = 'std'; try { gfxQ = localStorage.getItem('zk.gfx') === 'high' ? 'high' : 'std'; } catch (e) { /* ohne Speicher: Standard */ }
 KIT.setHi(gfxQ === 'high');
+// Grafik „Hoch": Nachbearbeitung nachladen (Leuchten, Glättung); schlägt das fehl, bleibt es beim normalen Bild
+if (gfxQ === 'high') {
+  const base = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
+  ['shaders/CopyShader', 'shaders/LuminosityHighPassShader', 'shaders/FXAAShader', 'postprocessing/EffectComposer', 'postprocessing/RenderPass', 'postprocessing/ShaderPass', 'postprocessing/UnrealBloomPass']
+    .reduce((p, f) => p.then(() => new Promise(res => { const sc = document.createElement('script'); sc.src = base + f + '.js'; sc.onload = sc.onerror = () => res(); document.head.appendChild(sc); })), Promise.resolve());
+}
 const colNum = c => typeof c === 'number' ? c : parseInt(String(c || '#3a6fd0').replace('#', ''), 16) || 0x3a6fd0;
 function ensureCity() {
   if (cv || cvFail || !S || !window.THREE) return !!cv;
