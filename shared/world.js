@@ -7,13 +7,13 @@ import { U, freshState, advanceTo, applyCommand, armySlots } from './rules.js';
 import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from './combat.js';
 import {
   DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
-  reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
+  reveal, flushBits, FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldCenter, fieldUnseen, revealField, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack, standIdx
 } from './core.js';
 import { startCampFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
-import { RES, gatherFinds, findsText, ensureDaily, questAdd, speedUp, inQueue } from './rules.js';
+import { RES, gatherFinds, findsText, addPack, PACK_NAME, ensureDaily, questAdd, speedUp, inQueue } from './rules.js';
 
 const mkCtx = (match, players, now) => ({ match, players, now, realT: now, bt: null });
 
@@ -143,6 +143,13 @@ export function syncMatch(match, players, now) {
     if (p.state.slot < 0 || p.state.out) continue;
     const al = allianceOf(w, p.id); ensureDaily(p.state, now, al ? al.members.length - 1 : 0);
   }
+  for (const p of players) {   // Erkunder fertig: Feld aufdecken, Ressourcenpaket finden
+    const S = p.state, sc = S.scout; if (!sc || w.gt < sc.end) continue;
+    revealField(S, sc.f); S.scout = null;
+    const far = Math.hypot(fieldCenter(sc.f)[0] - S.pos[0], fieldCenter(sc.f)[1] - S.pos[1]) > 110, th = ['', 'food', 'wood', 'stone'][sc.f % 4], n = far ? 2 : 1, names = [];
+    for (let i = 0; i < n; i++) { addPack(S, i ? '' : th); names.push(PACK_NAME[i ? '' : th] || 'Ressourcenpaket'); }
+    note(ctx, p.id, 'scout', 'Feld ' + fieldName(sc.f) + ' erkundet', 'Dein Erkunder hat den Nebel gelichtet und gefunden: ' + names.join(', ') + '. Du findest es unter „Ressourcen“.');
+  }
   w.help = (w.help || []).filter(h => { const hp = players.find(x => x.id === h.pid); return hp && inQueue(hp.state, h.bid) && (w.gt - h.t) < 86400 * 30; });
   vassalStep(ctx, dt, w.gt);
   for (const p of players) {   // Schutz läuft bald aus: einmal Bescheid geben
@@ -232,6 +239,15 @@ export function command(match, players, player, cmd, now) {
   const S = player.state, w = match.world, ctx = mkCtx(match, players, now);
   if (!cmd || typeof cmd !== 'object') return 'Ungültiger Befehl';
   if (cmd.type === 'readReports') { S.reports.forEach(r => { r.read = true; }); return ''; }
+  if (cmd.type === 'scout') {   // Erkunder in ein Nebelfeld schicken
+    const f = Math.floor(Number(cmd.f)); if (!(f >= 0 && f < FG * FG)) return 'Dieses Feld gibt es nicht.';
+    if (S.out || S.slot < 0) return 'Du bist nicht im Spiel.';
+    if (S.scout) return 'Dein Erkunder ist schon unterwegs.';
+    if (fieldUnseen(S, f) < 0.08) return 'Dieses Feld ist schon erkundet.';
+    const [cx, cy] = fieldCenter(f), go = Math.round(Math.hypot(cx - S.pos[0], cy - S.pos[1]) / SCOUT_SPEED);
+    S.scout = { f, t0: w.gt, go, end: w.gt + go + SCOUT_SEC }; return '';
+  }
+  if (cmd.type === 'scoutCancel') { if (!S.scout) return 'Dein Erkunder ist nicht unterwegs.'; S.scout = null; return ''; }
   if (cmd.type === 'askHelp') {   // Bündnis um Hilfe beim Bauen bitten
     const al = allianceOf(w, player.id), q = inQueue(S, cmd.id);
     if (!al || al.members.length < 2) return 'Du brauchst ein Bündnis mit mindestens einem weiteren Mitglied.';

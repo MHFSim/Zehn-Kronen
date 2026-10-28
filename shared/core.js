@@ -88,6 +88,23 @@ export function reveal(S, cx, cy, r) {
       if (!(b[i >> 3] & bit)) { b[i >> 3] |= bit; S._dirty = true; }
     }
 }
+/* ---------- Erkunder: Der Nebel ist anfangs in große Felder geteilt ---------- */
+export const FIELD = 40, FG = N / FIELD;          // Feldgröße in Kacheln, Felder je Seite
+export const SCOUT_SEC = 1800;                    // Erkunden eines Feldes: 30 Minuten
+export const SCOUT_SPEED = 0.5;                   // Laufweg des Erkunders in Kacheln je Spielsekunde
+export const fieldName = f => 'ABCDEFGHIJ'[f % FG] + (Math.floor(f / FG) + 1);
+export const fieldAt = (x, y) => Math.floor(y / FIELD) * FG + Math.floor(x / FIELD);
+export const fieldCenter = f => [(f % FG) * FIELD + FIELD / 2, Math.floor(f / FG) * FIELD + FIELD / 2];
+export function fieldUnseen(S, f) {   // Anteil des Feldes, der noch im Nebel liegt (0 bis 1)
+  const x0 = (f % FG) * FIELD, y0 = Math.floor(f / FG) * FIELD; let n = 0;
+  for (let y = y0; y < y0 + FIELD; y++) for (let x = x0; x < x0 + FIELD; x++) if (!isExplored(S, x, y)) n++;
+  return n / (FIELD * FIELD);
+}
+export function revealField(S, f) {
+  const b = bits(S), x0 = (f % FG) * FIELD, y0 = Math.floor(f / FG) * FIELD;
+  for (let y = y0; y < y0 + FIELD; y++) for (let x = x0; x < x0 + FIELD; x++) { const i = y * N + x; b[i >> 3] |= 1 << (i & 7); }
+  S._dirty = true;
+}
 export function flushBits(S) {
   if (S._bits && S._dirty) { let s = ''; for (let i = 0; i < S._bits.length; i++) s += String.fromCharCode(S._bits[i]); S.explored = btoa(s); S._dirty = false; return true; }
   return false;

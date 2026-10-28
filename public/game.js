@@ -5,7 +5,7 @@ import {
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, PACK_NAME, DAILY_SPEED_GIFT
 } from '/shared/rules.js';
-import { PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
+import { FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldAt, fieldCenter, PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe, scoreOf } from '/shared/war.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
@@ -244,6 +244,7 @@ function renderTop() {
 function renderHud() {
   const parts = S.queue.map(q => `<div class="chip">${B[q.id].name} → ${q.target}<span class="mini"><i style="width:${Math.max(0, 1 - q.left / q.total) * 100}%"></i></span>${fmtT(real(q.left))}</div>`);
   if (!S.queue.length) parts.push(`<div class="chip hint">Bauschleife frei (${maxQueues(S)})</div>`);
+  if (S.scout) parts.push(`<div class="chip">🧭 Erkunder · Feld ${fieldName(S.scout.f)} · ${gtNow() < S.scout.t0 + S.scout.go ? 'unterwegs' : 'erkundet'} ${fmtT(real(Math.max(0, S.scout.end - gtNow())))}</div>`);
   const tq = queuedTroops(S);
   parts.push(`<div class="chip">Truppen ${fmtN(troopCount(S))}${tq ? ' · ' + fmtN(tq) + ' in Ausbildung' : ''}</div>`);
   for (const m of ownMarches()) { const st = marchState(m); parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}${st.moving ? `<span class="mini"><i style="width:${Math.round(st.pct * 100)}%"></i></span>` : ''}</button>`); }
@@ -352,7 +353,7 @@ function syncMoveBar() {
   if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span>➜ Ziel antippen – das Heer zieht sofort los</span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
   el.hidden = false;
 }
-function closeSheet() { if (miniEl) miniEl.hidden = true; miniTile = null; sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
+function closeSheet() { if (scoutEl) scoutEl.hidden = true; if (miniEl) miniEl.hidden = true; miniTile = null; sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
 
 async function command(cmd) {
   if (busy) return false; busy = true;
@@ -657,7 +658,7 @@ function allyHTML() {
 }
 
 /* ---------- Mehr: Partie, Rangliste, Chronik, Erste Schritte, Einstellungen ---------- */
-const FEED_ICON = { attack: '⚔', battle: '🛡', station: '🤝', ally: '🤝', hold: '👑', out: '✖', free: '🕊', protect: '🛡', start: '🏁', end: '🏆' };
+const FEED_ICON = { attack: '⚔', battle: '🛡', station: '🤝', ally: '🤝', hold: '👑', out: '✖', free: '🕊', protect: '🛡', start: '🏁', end: '🏆', scout: '🧭', help: '🤝' };
 let pushOn = null, pushMsg = '';
 async function pushStatus() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return (pushOn = 'unsupported');
@@ -1129,12 +1130,38 @@ function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
   const hit = wm.pickAt(sx, sy);
   if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
-  if (!hit) { closeSheet(); const t = wm.tileAtScreen(sx, sy); if (t && view.match.phase === 'running') miniOpen(t.x, t.y, sx, sy); return; }
+  if (!hit) {
+    closeSheet(); const t = wm.tileAtScreen(sx, sy);
+    if (t && view.match.phase === 'running') { if (!wm.exploredBit(t.x, t.y) && S.slot >= 0 && !S.out) scoutOpen(fieldAt(t.x, t.y), sx, sy); else miniOpen(t.x, t.y, sx, sy); }
+    return;
+  }
   miniClose(); selectMap(hit, false);
+}
+// Erkunder: Tipp auf ein Nebelfeld → Erkunden oder Abbrechen
+let scoutEl = null, scoutF = -1;
+function scoutOpen(f, sx, sy) {
+  if (miniEl) miniEl.hidden = true;
+  if (!scoutEl) {
+    scoutEl = document.createElement('div'); scoutEl.id = 'scoutPop'; scoutEl.className = 'scoutpop'; document.body.appendChild(scoutEl);
+    scoutEl.addEventListener('pointerdown', e => e.stopPropagation());
+    scoutEl.addEventListener('click', async e => {
+      const b = e.target.closest('[data-sc]'); if (!b) return; const a = b.dataset.sc, f2 = scoutF; scoutEl.hidden = true;
+      if (a === 'go') { const ok = await command({ type: 'scout', f: f2 }); if (ok) toast('Dein Erkunder macht sich auf den Weg zu Feld ' + fieldName(f2) + '.', 'info'); }
+      else if (a === 'stop') { const ok = await command({ type: 'scoutCancel' }); if (ok) toast('Erkundung abgebrochen.', 'info'); }
+    });
+  }
+  scoutF = f; const sc = S.scout, mine = sc && sc.f === f, [cx, cy] = fieldCenter(f), go = Math.round(Math.hypot(cx - S.pos[0], cy - S.pos[1]) / SCOUT_SPEED);
+  let t, btns;
+  if (mine) { t = `<b>Feld ${fieldName(f)}</b><small>Erkunder ${gtNow() < sc.t0 + sc.go ? 'ist unterwegs' : 'erkundet'} · noch ${fmtT(real(Math.max(0, sc.end - gtNow())))}</small>`; btns = '<button type="button" class="btn ghost small" data-sc="stop">Erkundung abbrechen</button><button type="button" class="btn small" data-sc="no">Schließen</button>'; }
+  else if (sc) { t = `<b>Feld ${fieldName(f)}</b><small>Dein Erkunder ist noch auf Feld ${fieldName(sc.f)} unterwegs.</small>`; btns = '<button type="button" class="btn small" data-sc="no">Schließen</button>'; }
+  else { t = `<b>Feld ${fieldName(f)} erkunden?</b><small>Dauer ${fmtT(real(SCOUT_SEC))} + Weg ${fmtT(real(go))} · du findest Ressourcenpakete</small>`; btns = '<button type="button" class="btn small" data-sc="go">Erkunden</button><button type="button" class="btn ghost small" data-sc="no">Abbrechen</button>'; }
+  scoutEl.innerHTML = `<span class="mp-t">${t}</span><div class="row">${btns}</div>`; scoutEl.hidden = false;
+  const W = window.innerWidth, w = scoutEl.offsetWidth || 240;
+  scoutEl.style.left = Math.max(8, Math.min(W - w - 8, sx - w / 2)) + 'px'; scoutEl.style.top = Math.max(70, sy - 96) + 'px';
 }
 // Kleines Pop-up nach kurzem Tippen aufs Gelände: Marschieren oder Abbrechen – die Karte bleibt stehen
 let miniEl = null, miniTile = null;
-function miniClose() { if (miniEl) miniEl.hidden = true; if (miniTile) { miniTile = null; if (!msel && wm) wm.select(null); } }
+function miniClose() { if (scoutEl) scoutEl.hidden = true; if (miniEl) miniEl.hidden = true; if (miniTile) { miniTile = null; if (!msel && wm) wm.select(null); } }
 function miniOpen(x, y, sx, sy) {
   if (!miniEl) {
     miniEl = document.createElement('div'); miniEl.id = 'miniPop'; miniEl.innerHTML = '<span class="mp-t"></span><button type="button" class="btn small" data-mp="go">Marschieren</button><button type="button" class="btn ghost small" data-mp="no">Abbrechen</button>';

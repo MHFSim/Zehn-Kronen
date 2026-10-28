@@ -3,7 +3,7 @@
 // Burgen, Lager, Felder, Türme und Heere sind im Code modellierte Low-Poly-Körper (Vertexfarben, keine Bilddateien).
 // Die Kamera schwebt schräg über dem Boden: ziehen = verschieben, zwei Finger = zoomen und drehen.
 import { N, G, SUB, SEA, vnoise, fbm, smooth, generateMap, roadPaths, setMapRoads } from '/shared/mapgen.js';
-import { PLAYER_COLORS, marchPos, cellXY, VIEW_ARMY } from '/shared/core.js';
+import { PLAYER_COLORS, marchPos, cellXY, VIEW_ARMY, FIELD, FG } from '/shared/core.js';
 import { ROCKS } from '/public/rockdata.js';
 import { VIKING } from '/public/vikingdata.js';
 import { RIDER } from '/public/riderdata.js';
@@ -586,6 +586,13 @@ export class WorldMap {
       f = g;
     }
     for (let i = 0; i < N * N; i++) this.fogData[i] = Math.round(f[i] * 255);
+    // Raster der Erkundungsfelder im Nebel; das Feld, das gerade erkundet wird, schimmert heller
+    const sc = this.view && this.view.state && this.view.state.scout, sf = sc ? sc.f : -1;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (this.exploredBit(x, y)) continue; const i = y * N + x;
+      const edge = x % FIELD === 0 || y % FIELD === 0 || x % FIELD === FIELD - 1 || y % FIELD === FIELD - 1, mine = Math.floor(y / FIELD) * FG + Math.floor(x / FIELD) === sf;
+      const v = edge ? (mine ? 150 : 85) : mine ? 55 : 0; if (v > this.fogData[i]) this.fogData[i] = v;
+    }
     this.fogTex.needsUpdate = true; this.dirtyLabels = true; this.fogApply = true;
   }
   // Heere decken den Weg sofort auf (der Server bestätigt es später); aufgedeckt bleibt für immer aufgedeckt
@@ -871,7 +878,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 
   /* ---------- Zustand vom Server ---------- */
   sync(view, myId, offset) {
-    this.view = view; this.myId = myId; this.offset = offset || 0; this.speed = view.match.speed; if (this.fogTex) this.setFog(view.state && view.state.explored);
+    this.view = view; this.myId = myId; this.offset = offset || 0; this.speed = view.match.speed; if (this.fogTex) { this.setFog(view.state && view.state.explored); const sk = view.state.scout ? view.state.scout.f : -1; if (sk !== this.scKey) { this.scKey = sk; this.rebuildFog(); } }
     const bySlot = {}; for (const p of view.match.players) bySlot[p.slot] = p;
     for (const id in this.obj) {
       const h = this.obj[id], o = h.o;

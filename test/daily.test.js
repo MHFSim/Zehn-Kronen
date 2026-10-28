@@ -59,4 +59,15 @@ assert.ok(p2.state.daily.quests.some(x => x.t === 'help' && x.prog === 1) || tru
 
 // Punkte steigen mit Forschung
 const sc = scoreOf(p1.state); p1.state.tech = { eco1: 2 }; assert.ok(scoreOf(p1.state) > sc);
+// Erkunder
+import { fieldAt, fieldUnseen, FG } from '../shared/core.js';
+{ const S = p1.state, far = [0, FG * FG - 1, FG - 1, FG * (FG - 1)].map(f => [f, fieldUnseen(S, f)]).find(([f, u]) => u > 0.9)[0];
+  assert.match(command(match, players, p1, { type: 'scout', f: 999 }, tn), /gibt es nicht/);
+  assert.equal(command(match, players, p1, { type: 'scout', f: far }, tn), '');
+  assert.match(command(match, players, p1, { type: 'scout', f: far }, tn), /schon unterwegs/);
+  const packs0 = S.packs.length; assert.ok(fieldUnseen(S, far) > 0.9);
+  syncMatch(match, players, tn + 5 * 60_000); assert.ok(S.scout, 'nach 5 Min. noch unterwegs'); // Tempo ×1
+  syncMatch(match, players, tn + 3 * 3600_000);
+  assert.ok(!S.scout && fieldUnseen(S, far) === 0 && S.packs.length > packs0, 'Feld aufgedeckt und Paket gefunden');
+  assert.match(command(match, players, p1, { type: 'scout', f: far }, tn + 3 * 3600_000), /schon erkundet/); }
 console.log('Alle Aufgabentests bestanden.');

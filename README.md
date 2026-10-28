@@ -112,3 +112,6 @@ Siehe [docs/BETRIEB.md](docs/BETRIEB.md) (Server, https, Push, Docker).
 - **Hilfe erbitten**: beim Bau im Gebäudemenü. Bündnismitglieder bekommen ein Popup mit 🤝; jede Hilfe bringt den Bau um 15 % voran (je Mitglied einmal).
 - **Punkte** (Karte, oben links): Gebäudestufen, Truppen, Eroberungen, Kills und Forschungsstufen.
 - Im Kampf sieht man die Truppenzahl des Gegners nie, nur Lebensbalken und den eigenen Stand.
+
+## Erkunder
+Der Nebel ist in 7×7 große Felder (A1–G7) geteilt; die Grenzen sieht man als helles Raster. Tipp auf ein Nebelfeld → Pop-up „Erkunden / Abbrechen“. Der Erkunder läuft zum Feld (Weg je nach Entfernung) und erkundet es 30 Minuten, dann ist das Feld aufgedeckt und er findet 1 Ressourcenpaket (2 bei weit entfernten Feldern). Es ist immer nur ein Erkunder gleichzeitig unterwegs; während er läuft, ist das Feld heller markiert und im HUD steht die Restzeit. Abbrechen ist jederzeit möglich (ohne Ertrag).
