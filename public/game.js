@@ -12,6 +12,7 @@ import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
+import { HERO_PIC } from '/public/heropics.js';
 import { snd } from '/public/sound.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
@@ -267,7 +268,7 @@ function renderArmyBtns() {
   }
   const show = mode === 'map' && !!S && !!view && !msel; el.hidden = !show; if (!show && !sendFrom) { /* bleibt versteckt */ }
   const ST = { out: '🚶', back: '↩', gather: '⛏', fight: '⚔', post: '⚑' };
-  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="apic">${H ? H.pic : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
+  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="apic">${H ? hpic(m.hero, H) : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 function renderPts() {
@@ -904,7 +905,8 @@ function panelSignature() {
 }
 /* ---------- Helden ---------- */
 const FX_GLYPH = { shield: '🛡', wind: '💨', leaf: '🍃', grain: '🌾', chips: '🪵', sparks: '✨', dust: '💨', ward: '✦', glow: '✦', shadow: '✦', flame: '🔥', gust: '🌀' };
-const heroPortrait = (id, cls = '') => { const H = HEROES[id]; return `<div class="hport ${cls} fx-${H.fx}" style="--hc:${H.col}"><span class="haura"></span><span class="hface">${H.pic}</span><span class="hweap">${H.icon}</span><i></i><i></i><i></i><i></i></div>`; };
+const hpic = (id, H) => HERO_PIC[id] ? `<img class="himg" src="${HERO_PIC[id]}" alt="" draggable="false">` : H.pic;
+const heroPortrait = (id, cls = '') => { const H = HEROES[id]; return `<div class="hport ${cls} fx-${H.fx}" style="--hc:${H.col}"><span class="haura"></span><span class="hface${HERO_PIC[id] ? ' img' : ''}">${hpic(id, H)}</span><span class="hweap">${H.icon}</span><i></i><i></i><i></i><i></i></div>`; };
 const keeperNow = () => [S.defHero, S.defDeputy].find(id => id && HEROES[id] && !busyHero(id)) || '';
 function heroCardHTML(id) {
   const H = HEROES[id], lv = heroLvl(id), xp = (S.heroes[id] || {}).xp || 0, need = xpNeed(lv), k = keeperNow();
@@ -1299,7 +1301,7 @@ const heroBonusText = id => skillList(S, id).map(k => '+' + (Math.round(k.val * 
 function heroPickHTML() {
   if (!sendHero || busyHero(sendHero)) sendHero = bestHero(msel);
   return `<div class="block hpick"><h3>Anführer</h3><div class="hrow">${HERO_IDS.map(id => { const H = HEROES[id], b = busyHero(id);
-    return `<button type="button" class="hchip${id === sendHero ? ' on' : ''}" data-hero="${id}" ${b ? 'disabled' : ''}><span class="hpic fx-${H.fx}" style="--hc:${H.col}">${H.pic}</span><b>${H.name}</b><small>${b ? 'unterwegs' : 'Stufe ' + heroLvl(id)}</small></button>`; }).join('')}</div>
+    return `<button type="button" class="hchip${id === sendHero ? ' on' : ''}" data-hero="${id}" ${b ? 'disabled' : ''}><span class="hpic fx-${H.fx}" style="--hc:${H.col}">${hpic(id, H)}</span><b>${H.name}</b><small>${b ? 'unterwegs' : 'Stufe ' + heroLvl(id)}</small></button>`; }).join('')}</div>
     ${sendHero ? `<p class="note">${HEROES[sendHero].name}: ${heroBonusText(sendHero)}</p>` : '<p class="why">Alle Helden sind unterwegs.</p>'}</div>`;
 }
 function pickerHTML() {
