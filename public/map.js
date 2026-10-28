@@ -539,7 +539,7 @@ void main(){
 #include <fog_fragment>
 }`;
 
-const SKIRT = { farm: [[132, 108, 66], 2.2], wood: [[104, 84, 54], 1.9], stone: [[140, 134, 120], 2.0], camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
+const SKIRT = { camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
 const KIND_R = { start: 2.8, tower: 2.4, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, camp: 1.9, ruin: 1.7 };
 
 export class WorldMap {
@@ -843,7 +843,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.mesh = mesh;
     for (const o of map.objects) {
       const hd = { o, grp: new T.Group(), flags: [], vis: true }; this.obj[o.id] = hd;
-      const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' || o.k === 'tower' ? 2.5 : o.k === 'start' ? 2 : 1.0);
+      const g = hd.grp, y = this.baseY(o.x + .5, o.y + .5, o.k === 'throne' || o.k === 'tower' ? 2.5 : o.k === 'start' ? 2 : ['farm', 'wood', 'stone'].includes(o.k) ? .45 : 1.0);
       g.position.set(o.x + .5, y, o.y + .5); g.rotation.y = ['start', 'throne', 'sanct', 'tower'].includes(o.k) ? 0 : hash(o.x, o.y, 3) * .5 - .25;
       if (o.k === 'start') { hd.slot = mesh(M.slot); g.add(hd.slot); hd.castle = null; }
       else if (o.k === 'camp') { hd.alive = mesh(M.campAlive); hd.deadM = mesh(M.campDead); hd.deadM.visible = false; g.add(hd.alive, hd.deadM); this.attachParts(hd, M.campAlive); hd.smokeOffs = M.campAlive.smoke; }
