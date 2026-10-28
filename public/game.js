@@ -806,10 +806,10 @@ function techCardHTML(id) {
     ${act}
     <details class="tdet"><summary>Alle Stufen</summary>${rows}</details></div>`;
 }
-let techSel = '';
+let techSel = '', techTab = 'eco';
 const TN = { w: 148, h: 58, gx: 34, gy: 18, pad: 10 };
 function techTreeHTML() {
-  const ids = Object.keys(T), px = id => TN.pad + T[id].col * (TN.w + TN.gx), py = id => TN.pad + T[id].row * (TN.h + TN.gy);
+  const ids = Object.keys(T).filter(i => T[i].grp === techTab), px = id => TN.pad + T[id].col * (TN.w + TN.gx), py = id => TN.pad + T[id].row * (TN.h + TN.gy);
   const W = TN.pad * 2 + (Math.max(...ids.map(i => T[i].col)) + 1) * (TN.w + TN.gx) - TN.gx, H = TN.pad * 2 + (Math.max(...ids.map(i => T[i].row)) + 1) * (TN.h + TN.gy) - TN.gy;
   const lines = ids.filter(i => T[i].pre).map(i => {
     const p = T[i].pre, x1 = px(p) + TN.w, y1 = py(p) + TN.h / 2, x2 = px(i), y2 = py(i) + TN.h / 2, mx = (x1 + x2) / 2, on = techLv(S, p) >= T_PRE_LV;
@@ -835,13 +835,13 @@ function techHTML() {
   const A = S.lv.akademie, r = S.research;
   const run = r ? `<div class="trun"><span class="tni">${bico(T[r.id].icon)}</span><div class="trb"><div class="trt"><b>${T[r.id].name} → Stufe ${r.target}</b><span class="time" data-rtime="1">${fmtT(real(r.left))}</span></div><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div></div><button class="btn small" type="button" data-speed="research:1">⚡</button></div>` : '';
   const note = A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'}</div>`;
-  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut') + note + run + techTreeHTML() + (techSel && T[techSel] ? techPopHTML(techSel) : '');
+  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut') + note + ptabs([['eco', '🌾 Wirtschaft', 0], ['mil', '⚔️ Militär', 0]], techTab, 'techTab') + run + techTreeHTML() + (techSel && T[techSel] ? techPopHTML(techSel) : '');
 }
 
 /* ---------- Panels (Bündnis, Mehr) ---------- */
 let panelName = '', panelSig = '';
 function panelSignature() {
-  if (panelName === 'tech') return JSON.stringify([techSel, S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
+  if (panelName === 'tech') return JSON.stringify([techTab, techSel, S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
@@ -876,6 +876,7 @@ function setupPanel() {
     const act = el.dataset.act, d = el.dataset, val = id => (document.getElementById(id) || {}).value || '';
     const go = () => { $('sidePanel').scrollTop = 0; renderPanel(true); };
     if (act === 'ttab') { trainTab = d.t; return go(); }
+    if (act === 'techTab') { techTab = d.t; techSel = ''; return renderPanel(true); }
     if (act === 'techSel') { techSel = d.id; return renderPanel(true); }
     if (act === 'techClose') { if (el.classList.contains('tpop') && e.target !== el) return; techSel = ''; return renderPanel(true); }
     if (act === 'techGo') { techSel = ''; renderPanel(true); return void command({ type: 'research', tech: d.id }); }
