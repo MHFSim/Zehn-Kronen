@@ -7,6 +7,7 @@ import { PLAYER_COLORS, marchPos, cellXY, VIEW_ARMY, FIELD, FG } from '/shared/c
 import { ROCKS } from '/public/rockdata.js';
 import { VIKING } from '/public/vikingdata.js';
 import { RIDER } from '/public/riderdata.js';
+import { icon } from '/public/icons.js';
 import { rectsOf, roadEdgesOf, dockPad, dockReach, touches, towersOf } from '/shared/outpost.js';
 
 const HS = 6;                 // Höhe in Feldern pro Höheneinheit über dem Meer
@@ -945,19 +946,19 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 
   /* ---------- Beschriftungen (HTML über der Karte) ---------- */
   labelEl(key, make) { let l = this.labels && this.labels[key]; if (!l) { (this.labels = this.labels || {})[key] = l = make(); } return l; }
-  mkBadge(text, color) {
-    const el = document.createElement('div'); el.className = 'mapbadge'; el.textContent = text; el.style.setProperty('--bc', '#' + color.toString(16).padStart(6, '0')); this.labelsEl.appendChild(el);
-    return { el, text, color, x: 0, y: 0, z: 0, sx: 1 };
+  mkBadge(text, color, kind) {
+    const el = document.createElement('div'); el.className = 'mapbadge' + (kind ? ' pin' : ''); if (kind) el.innerHTML = icon(kind) + '<b>' + text + '</b>'; else el.textContent = text; el.style.setProperty('--bc', '#' + color.toString(16).padStart(6, '0')); this.labelsEl.appendChild(el);
+    return { el, text, color, kind, x: 0, y: 0, z: 0, sx: 1 };
   }
-  setBadge(l, text, color, bar) {
-    if (l.text !== text) { l.text = text; l.el.textContent = text; }
+  setBadge(l, text, color, bar, kind) {
+    if (l.text !== text || (kind && l.kind !== kind)) { l.text = text; if (kind) { l.kind = kind; l.el.className = 'mapbadge pin'; l.el.innerHTML = icon(kind) + '<b>' + text + '</b>'; } else l.el.textContent = text; }
     if (l.color !== color) { l.color = color; l.el.style.setProperty('--bc', '#' + color.toString(16).padStart(6, '0')); }
     void bar;
   }
   rebuildLabels(view) {
     const RES_COL = { farm: 0xb58a22, wood: 0x7b5630, stone: 0x6b6f75 };
     for (const id in this.obj) {
-      const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, up = 1.6;
+      const h = this.obj[id], o = h.o; let txt = null, col = 0x333333, up = 1.6, kind = null;
       if (o.k === 'start' && h.player) {
         const pl = h.player, al = pl.ally && (view.match.alliances || []).find(a => a.id === pl.ally), gt = this.gtNow();
         txt = (al ? '[' + al.tag + '] ' : '') + pl.name; col = parseInt(PLAYER_COLORS[pl.slot % 10].slice(1), 16); up = (h.h || 4) + .5;
@@ -967,8 +968,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         else if (pl.protUntil > gt) txt = '🛡 ' + txt;
         if (h.castle) h.castle.visible = true;
       }
-      else if (['farm', 'wood', 'stone'].includes(o.k)) { txt = h.empty ? 'leer' : String(o.lv); col = h.empty ? 0x7a6a55 : RES_COL[o.k]; up = h.empty ? 1.2 : 2.0; }
-      else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = 0x8a2b24; up = 2.4; }
+      else if (['farm', 'wood', 'stone'].includes(o.k)) { txt = h.empty ? 'leer' : String(o.lv); col = h.empty ? 0x7a6a55 : RES_COL[o.k]; up = h.empty ? 1.2 : 2.0; kind = { farm: 'food', wood: 'wood', stone: 'stone' }[o.k]; }
+      else if (o.k === 'camp') { txt = h.isDead ? null : String(o.lv); col = 0x8a2b24; up = 2.4; kind = 'swords'; }
       else if (o.k === 'ruin') { txt = h.isDead ? 'Ruine (geplündert)' : 'Ruine ' + o.lv; col = 0x5a4a6e; up = 2.2; }
       else if (o.k === 'tower') { txt = 'Turm'; col = 0x5a6070; up = 19; }
       else if (o.k === 'sanct' || o.k === 'throne') {
@@ -978,7 +979,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       }
       if (txt !== null && !SHOW_NAMES && !/^\d+$/.test(txt) && o.k !== 'start') txt = null;
       if (txt === null) { if (h.lab) h.lab.el.style.display = 'none'; h.labOn = false; continue; }
-      if (!h.lab) h.lab = this.mkBadge(txt, col); this.setBadge(h.lab, txt, col);
+      if (!h.lab) h.lab = this.mkBadge(txt, col, kind); this.setBadge(h.lab, txt, col, null, kind);
       h.lab.up = up; h.labOn = true;
     }
   }
