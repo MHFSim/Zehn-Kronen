@@ -127,15 +127,18 @@ function manageRaiders(ctx, players) {
   if (w.raiders.length >= want || w.gt < (w.raidNext || 0)) return;
   const starts = map.objects.filter(o => o.k === 'start');
   for (let i = 0; i < 40; i++) {
-    const sd = w.nextRaider * 977 + i * 131 + Math.floor(w.gt / 60), x = Math.floor(rnd1(sd) * N), y = Math.floor(rnd1(sd + 7) * N);
+    const sd = w.nextRaider * 977 + i * 131 + Math.floor(w.gt / 60), pl = players.filter(q => q.state.slot >= 0 && !q.state.out && q.state.pos), hs = pl.length ? { x: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[0], y: pl[Math.floor(rnd1(sd + 3) * pl.length) % pl.length].state.pos[1] } : { x: N / 2, y: N / 2 }, ang = rnd1(sd) * 6.2832, rad = 10 + rnd1(sd + 7) * 34,
+      x = Math.round(hs.x + Math.cos(ang) * rad), y = Math.round(hs.y + Math.sin(ang) * rad);
+    if (x < 0 || y < 0 || x >= N || y >= N) continue;
     if (!map.pass[y * N + x] || !SITE_OK(map, x, y)) continue;
-    if (starts.some(o => Math.hypot(o.x - x, o.y - y) < 18)) continue;
+    if (starts.some(o => Math.hypot(o.x - x, o.y - y) < 9)) continue;   // nicht direkt an einer Burg
     if (map.objects.some(o => Math.hypot(o.x - x, o.y - y) < 4) || w.raiders.some(r => Math.hypot(r.x - x, r.y - y) < 12)) continue;
     const lv = 1 + Math.floor(29 * Math.pow(rnd1(sd + 13), 1.7));
     w.raiders.push({ id: 'raider' + w.nextRaider++, lv, x, y, until: w.gt + RAID_LIFE });
-    w.raidNext = w.gt + RAID_EVERY; return;
+    // Solange weniger als die Hälfte der Wunschzahl da ist, kommen sie schnell nach (Spielstart), danach gemächlich
+    w.raidNext = w.gt + (w.raiders.length < Math.ceil(want / 2) ? 5 : RAID_EVERY); return;
   }
-  w.raidNext = w.gt + 60;
+  w.raidNext = w.gt + 10;
 }
 export function syncMatch(match, players, now) {
   if (!match.world) match.world = newWorld(now, { phase: 'running' });
