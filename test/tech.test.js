@@ -25,10 +25,10 @@ assert.equal(forceOf(S), 1.1); assert.equal(capacityOf({ speer: 100 }, S), 2530)
 const att = { speer: 100 }, def = { speer: 100 };
 assert.equal(battle(att, def, 1, 1).win, false);
 assert.equal(battle(att, def, 1, 1.5).win, true);
-assert.equal(Object.keys(T).length, 14);
+assert.equal(Object.keys(T).length, 27);
 const S2 = freshState(0); S2.lv.akademie = 9; S2.res = { food: 1e6, wood: 1e6, stone: 1e6, gold: 1e6 };
-assert.match(applyCommand(S2, { type: 'research', tech: 'forst' }), /Erst Ackerbau/);
-S2.tech.ackerbau = 2; assert.equal(applyCommand(S2, { type: 'research', tech: 'forst' }), '');
+assert.match(applyCommand(S2, { type: 'research', tech: 'forst' }), /Erst Fruchtfolge/);
+S2.tech.ackerbau2 = 2; assert.equal(applyCommand(S2, { type: 'research', tech: 'forst' }), '');
 S2.tech.forst = 2; S2.tech.drill = 5; S2.tech.festungsbau = 0;
 assert.ok(Math.abs(unitTime(S2, 'speer', 'kaserne') - U.speer.t / 1.15) < 1e-6, 'Drill beschleunigt');
 assert.ok(cap(S2) >= 1500);

@@ -49,20 +49,28 @@ export const U = {
 // per = Wirkung je Stufe, Kosten und Zeit wachsen mit der Stufe, Stufe n braucht Akademie 2n-1.
 export const T = {
   ackerbau:    { grp: 'eco', col: 0, row: 0, pre: null, name: 'Ackerbau',      icon: 'farm',    per: .04, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
-  forst:       { grp: 'eco', col: 1, row: 0, pre: 'ackerbau', name: 'Forstwirtschaft', icon: 'saege', per: .04, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
+  forst:       { grp: 'eco', col: 2, row: 0, pre: 'ackerbau2', name: 'Forstwirtschaft', icon: 'saege', per: .04, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
   steinmetz:   { grp: 'eco', col: 1, row: 1, pre: 'ackerbau', name: 'Steinmetzkunst', icon: 'stein',  per: .04, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
-  handel:      { grp: 'eco', col: 2, row: 1, pre: 'steinmetz', name: 'Handel',         icon: 'gold', per: .05, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
+  handel:      { grp: 'eco', col: 3, row: 1, pre: 'steinmetz2', name: 'Handel',         icon: 'gold', per: .05, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
   kriegskunst: { grp: 'mil', col: 0, row: 2.5, pre: null, name: 'Kriegskunst',    icon: 'kaserne', per: .02, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
-  marsch:      { grp: 'mil', col: 1, row: 2.5, pre: 'kriegskunst', name: 'Marschordnung',  icon: 'stall',  per: .03, steps: [.03, .04, .05, .06, .07], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
-  lasten:      { grp: 'eco', col: 4, row: 1, pre: 'lagerhaltung', name: 'Tragkraft',      icon: 'lager',  per: .05, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' },
-  bauwesen:    { grp: 'eco', col: 2, row: 0, pre: 'forst', name: 'Bauwesen', icon: 'bau', per: .03, unit: 'Bautempo', eff: 'build', base: [150, 200, 150], time: 80, desc: 'Gebäude werden schneller gebaut und ausgebaut' },
-  lagerhaltung: { grp: 'eco', col: 3, row: 1, pre: 'handel', name: 'Lagerhaltung', icon: 'lager', per: .04, unit: 'Lagerplatz', eff: 'cap', base: [200, 200, 220], time: 85, desc: 'Mehr Platz im Lager: es passen mehr Rohstoffe hinein' },
-  schriftkunde: { grp: 'eco', col: 3, row: 0, pre: 'bauwesen', name: 'Schriftkunde', icon: 'akademie', per: .03, unit: 'Forschungstempo', eff: 'rsp', base: [180, 160, 200], time: 90, desc: 'Die Akademie forscht schneller' },
-  taktik:      { grp: 'mil', col: 2, row: 2.5, pre: 'marsch', name: 'Taktik', icon: 'taktik', per: .02, unit: 'Kraft aller Truppen', eff: 'force', base: [300, 200, 350], time: 120, desc: 'Bessere Gefechtsführung: noch mehr Angriff und Verteidigung' },
+  marsch:      { grp: 'mil', col: 2, row: 2.5, pre: 'kriegskunst2', name: 'Marschordnung',  icon: 'stall',  per: .03, steps: [.03, .04, .05, .06, .07], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
+  lasten:      { grp: 'eco', col: 7, row: 1, pre: 'lagerhaltung2', name: 'Tragkraft',      icon: 'lager',  per: .05, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' },
+  bauwesen:    { grp: 'eco', col: 4, row: 0, pre: 'forst2', name: 'Bauwesen', icon: 'bau', per: .03, unit: 'Bautempo', eff: 'build', base: [150, 200, 150], time: 80, desc: 'Gebäude werden schneller gebaut und ausgebaut' },
+  lagerhaltung: { grp: 'eco', col: 5, row: 1, pre: 'handel2', name: 'Lagerhaltung', icon: 'lager', per: .04, unit: 'Lagerplatz', eff: 'cap', base: [200, 200, 220], time: 85, desc: 'Mehr Platz im Lager: es passen mehr Rohstoffe hinein' },
+  schriftkunde: { grp: 'eco', col: 6, row: 0, pre: 'bauwesen2', name: 'Schriftkunde', icon: 'akademie', per: .03, unit: 'Forschungstempo', eff: 'rsp', base: [180, 160, 200], time: 90, desc: 'Die Akademie forscht schneller' },
+  taktik:      { grp: 'mil', col: 3, row: 2.5, pre: 'marsch', name: 'Taktik', icon: 'taktik', per: .02, unit: 'Kraft aller Truppen', eff: 'force', base: [300, 200, 350], time: 120, desc: 'Bessere Gefechtsführung: noch mehr Angriff und Verteidigung' },
   drill:       { grp: 'mil', col: 1, row: 3.5, pre: 'kriegskunst', name: 'Drill', icon: 'drill', per: .03, unit: 'Ausbildungstempo', eff: 'train', base: [200, 150, 200], time: 80, desc: 'Truppen werden schneller ausgebildet' },
-  heilkunde:   { grp: 'mil', col: 2, row: 3.5, pre: 'drill', name: 'Heilkunde', icon: 'lazarett', per: .06, unit: 'Verwundetenrate', eff: 'wound', base: [200, 120, 160], time: 95, desc: 'Mehr Gefallene werden nur verwundet und kommen ins Lazarett' },
-  festungsbau: { grp: 'mil', col: 3, row: 3.5, pre: 'heilkunde', name: 'Festungsbau', icon: 'mauer', per: .03, unit: 'Mauerstärke', eff: 'wall', base: [150, 250, 350], time: 110, desc: 'Deine Stadtmauer schützt stärker' }
+  heilkunde:   { grp: 'mil', col: 3, row: 3.5, pre: 'drill2', name: 'Heilkunde', icon: 'lazarett', per: .06, unit: 'Verwundetenrate', eff: 'wound', base: [200, 120, 160], time: 95, desc: 'Mehr Gefallene werden nur verwundet und kommen ins Lazarett' },
+  festungsbau: { grp: 'mil', col: 5, row: 3.5, pre: 'heilkunde2', name: 'Festungsbau', icon: 'mauer', per: .03, unit: 'Mauerstärke', eff: 'wall', base: [150, 250, 350], time: 110, desc: 'Deine Stadtmauer schützt stärker' }
 };
+// Stufe II: hinter jeder Forschung (außer der Marschordnung) liegt eine Fortsetzung mit eigenem Namen und etwas schwächerer Wirkung
+const T2 = {
+  ackerbau: ['Fruchtfolge', 1, 0], forst: ['Waldpflege', 3, 0], bauwesen: ['Baukunst', 5, 0], schriftkunde: ['Gelehrte', 7, 0],
+  steinmetz: ['Gewölbe', 2, 1], handel: ['Marktrecht', 4, 1], lagerhaltung: ['Speicher', 6, 1], lasten: ['Packtiere', 8, 1],
+  kriegskunst: ['Schmiede', 1, 2.5], taktik: ['Strategie', 4, 2.5],
+  drill: ['Manöver', 2, 3.5], heilkunde: ['Feldscher', 4, 3.5], festungsbau: ['Wehrgänge', 6, 3.5]
+};
+for (const id in T2) { const t = T[id], [name, col, row] = T2[id]; T[id + '2'] = { ...t, name, col, row, pre: id, per: Math.round(t.per * .7 * 200) / 200, base: t.base.map(c => Math.round(c * 1.5)), time: Math.round(t.time * 1.3) }; }
 export const T_MAX = 5;
 export const T_PRE_LV = 2;   // Vorgänger im Techtree muss mindestens auf dieser Stufe sein
 export const techLv = (S, id) => (S.tech && S.tech[id]) || 0;
