@@ -195,7 +195,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   const post = match.world.marches.find(m => m.owner === a.id); assert.equal(post.phase, 'post', 'Heer steht');
   adv(match, players, 3 * DAY); assert.equal(match.world.marches.find(m => m.owner === a.id).phase, 'post', 'bleibt stehen');
   assert.equal(run(match, players, clock, b, { type: 'march', target: post.tid, mode: 'attack', troops: { schwert: 400 } }), '');
-  { const g1 = match.world.marches.find(m => m.owner === b.id); adv(match, players, g1.arr[g1.arr.length - 1] + 30); }
+  { const g1 = match.world.marches.find(m => m.owner === b.id); adv(match, players, g1.arr[g1.arr.length - 1] + 30); adv(match, players, 3 * 3600); }
   assert.ok(!match.world.marches.some(m => m.owner === a.id), 'aufgestelltes Heer vernichtet');
   assert.ok(a.state.reports.some(r => r.role === 'def' && !r.win), 'Bericht Opfer');
   // zurückrufen
@@ -271,13 +271,14 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   const v0 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
   adv(match, players, m.fight.dt * 2 + 1);
   const v1 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
+  assert.ok(v0.tot >= 600 && v0.tot <= 7200 + 60, 'Kampfdauer 10 Min bis 2 Std: ' + v0.tot);
   assert.ok(v1.na < v0.na && v1.nd < v0.nd, 'beide Balken sinken: ' + JSON.stringify([v0, v1]));
   give(b, { speer: 100 }); const home0 = b.state.troops.speer;
   assert.ok(home0 > 0);
   const f0 = m.fight.D0.speer;
   // Verteidiger-Verstärkung aus eigenem Heer, das heimkehrt
   const r = run(match, players, clock, a, { type: 'recall', id: m.id }); assert.equal(r, '', 'Abzug aus dem Kampf');
-  assert.equal(m.phase, 'back'); assert.ok(sumT(m.troops) < 400, 'Verluste beim Abzug'); assert.ok(sumT(m.troops) > 0);
+  assert.equal(m.phase, 'back'); assert.deepEqual(cellXY(m.path[m.path.length - 1]), a.state.pos, 'direkt nach Hause'); assert.ok(sumT(m.troops) < 400, 'Verluste beim Abzug'); assert.ok(sumT(m.troops) > 0);
   assert.ok(f0 > 0);
   adv(match, players, DAY);
   assert.equal(a.state.troops.speer + (a.state.away.speer || 0) > 0, true);

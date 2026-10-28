@@ -11,6 +11,7 @@ import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
+import { snd } from '/public/sound.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
 
@@ -32,9 +33,45 @@ function accept(v) {
   if (typeof $ === 'function' && !$('game').hidden) afterAccept();
 }
 function afterAccept() {
+  soundTick();
   try { renderChat(); checkFeed(); renderBanner(); renderNav(); renderPanel(false); if (match.result) showEnd(); } catch (e) { console.error(e); }
 }
 const serverNow = () => Date.now() + offset;
+
+/* ---------- Töne und Musik ---------- */
+let sndPrev = null, fightIds = new Set();
+document.addEventListener('pointerdown', () => snd.unlock(), true);
+document.addEventListener('click', e => {
+  const el = e.target.closest && e.target.closest('[data-snd]');
+  if (el) { const k = el.dataset.snd, on = k === 'sfx' ? !snd.cfg.sfx : !snd.cfg.music; if (k === 'sfx') snd.setSfx(on); else snd.setMusic(on); el.textContent = (k === 'sfx' ? '🔊 Töne: ' : '🎵 Musik: ') + (on ? 'an' : 'aus'); el.classList.toggle('ghost', !on); return; }
+  const t = e.target.closest && e.target.closest('button,.chip,[data-act],[data-goto],.ptab,summary,a.btn,label.tgl');
+  if (t) snd.sfx('tap');
+}, true);
+document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
+setInterval(() => { if (fightIds.size && !document.hidden) snd.sfx('clash', .55); }, 1300);
+function cmdSound(cmd) {
+  const t = cmd.type;
+  if (t === 'march') return ['attack', 'raid', 'assist'].includes(cmd.mode) ? 'war' : 'march';
+  if (/^(upgrade|build|op|site|opDismantle)$/.test(t)) return 'build';
+  if (/^(train|heal)$/.test(t)) return 'train';
+  if (/^(research)$/.test(t)) return 'research';
+  if (/^(buy|donate|useSpeed)$/.test(t)) return 'coin';
+  if (t === 'teleport') return 'teleport';
+  if (/^(recall|halt|stationRecall|opRecall|holdRecall)$/.test(t)) return 'home';
+  if (/Chat$/.test(t)) return 'pop';
+  return 'ok';
+}
+function soundTick() {
+  try {
+    const sg = (view.sieges || []).filter(x => x.mine), ids = new Set(sg.map(x => x.id));
+    for (const x of sg) if (!fightIds.has(x.id) && x.tpid !== me.id) snd.sfx('war');
+    for (const id of fightIds) if (!ids.has(id)) { const r = S.reports[0]; snd.sfx(r && r.win ? 'win' : 'lose'); }
+    fightIds = ids; snd.mood(ids.size ? 'battle' : 'calm');
+    const lv = Object.values(S.lv || {}).reduce((a, b) => a + (+b || 0), 0), tc = Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
+    if (sndPrev) { if (lv > sndPrev.lv) snd.sfx('done'); if (tc > sndPrev.tc) snd.sfx('research'); if (S.reports.length > sndPrev.rep && !ids.size) snd.sfx('report'); }
+    sndPrev = { lv, tc, rep: S.reports.length };
+  } catch (e) { console.error(e); }
+}
 
 /* ---------- Chat auf der Karte: Global oder Bündnis ---------- */
 let chatOpen = false, chatTab = 'global', chatSeen = { global: 0, ally: 0 };
@@ -301,6 +338,7 @@ async function command(cmd) {
   busy = false; if (moved) { sendFrom = 0; sendFromOp = ''; syncMoveBar(); }
   if (r.data && r.data.state) accept(r.data);
   if (!r.ok) toast(r.data.error || 'Das hat nicht geklappt.');
+  snd.sfx(r.ok ? cmdSound(cmd) : 'err');
   renderSheet(); renderTop(); renderHud(); renderNav(); renderCity(true); renderBanner(); renderPanel(true);
   return r.ok;
 }
@@ -525,6 +563,7 @@ function checkFeed() {
   if (fresh.length) {
     feedToasted = top;
     const bad = fresh.some(f => ['attack', 'battle', 'out'].includes(f.kind));
+    snd.sfx(bad ? 'alert' : 'bell');
     toast(fresh.length === 1 ? fresh[0].title + (fresh[0].body ? ' – ' + fresh[0].body : '') : fresh.length + ' neue Meldungen (Mehr)', bad ? '' : 'info');
   }
 }
@@ -667,7 +706,10 @@ function moreHTML() {
   const feed = S.feed.map(f => `<div class="mrow"><div>${FEED_ICON[f.kind] || '•'} <b>${esc(f.title)}</b>${f.id > uf ? ' <span class="tag">neu</span>' : ''}<div class="note">${esc(f.body)} · ${ago(f.t)}</div></div></div>`).join('') || '<p class="note">Keine Meldungen.</p>';
   const ps = pushOn === 'unsupported' ? '<p class="note">Dein Browser unterstützt keine Benachrichtigungen. Auf dem iPhone: Seite zum Home-Bildschirm hinzufügen und von dort öffnen.</p>'
     : `<div class="row">${pushOn === 'on' ? '<button class="btn ghost" data-act="pushOff" type="button">Benachrichtigungen ausschalten</button>' : '<button class="btn" data-act="pushOn" type="button">Benachrichtigungen einschalten</button>'}</div><p class="note">${pushMsg || 'Du bekommst eine Meldung, wenn dich jemand angreift, ein Heer zurückkehrt oder das Bündnis dich braucht. Auf dem iPhone: zuerst zum Home-Bildschirm hinzufügen.'}</p>`;
-  const settings = `<div class="block"><h3>Benachrichtigungen</h3>${ps}</div>
+  const sc = snd.cfg;
+  const settings = `<div class="block"><h3>Ton und Musik</h3><div class="row"><button class="btn ${sc.sfx ? '' : 'ghost'}" data-snd="sfx" type="button">🔊 Töne: ${sc.sfx ? 'an' : 'aus'}</button><button class="btn ${sc.music ? '' : 'ghost'}" data-snd="music" type="button">🎵 Musik: ${sc.music ? 'an' : 'aus'}</button></div>
+    <div class="field"><label for="vs">Lautstärke Töne</label><input id="vs" type="range" min="0" max="1" step=".05" value="${sc.vs}" data-sndv="vs"></div><div class="field"><label for="vm">Lautstärke Musik</label><input id="vm" type="range" min="0" max="1" step=".05" value="${sc.vm}" data-sndv="vm"></div></div>
+    <div class="block"><h3>Benachrichtigungen</h3>${ps}</div>
     <div class="block"><h3>Passwort ändern</h3><div class="field"><label for="pwOld">Altes Passwort</label><input id="pwOld" type="password" autocomplete="current-password"></div>
       <div class="field"><label for="pwNew">Neues Passwort (mindestens 6 Zeichen)</label><input id="pwNew" type="password" autocomplete="new-password"></div>
       <div class="row"><button class="btn ghost" data-act="pwChange" type="button">Passwort ändern</button><span class="note" id="pwMsg"></span></div>
@@ -1104,7 +1146,7 @@ function powBars(pw) {
   const mx = Math.max(pw.pk, 1), pa = Math.round(100 * pw.pa / mx), pd = Math.round(100 * pw.pd / mx);
   return `<div class="pbars fight"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${fmtN(pw.na)}</b></div>`
     + `<div class="pb def"><span>Verteidiger</span><div class="bar"><i style="width:${pd}%"></i></div><b>${fmtN(pw.nd)}</b></div>`
-    + `<div class="pv">${pw.pa >= pw.pd ? '⚔ Die Angreifer sind vorn' : '🛡 Die Verteidiger sind vorn'}</div></div>`;
+    + `<div class="pv">${pw.pa >= pw.pd ? '⚔ Die Angreifer sind vorn' : '🛡 Die Verteidiger sind vorn'} · ⏱ noch ca. ${fmtT(real(pw.left))}</div></div>`;
 }
 function siegeBlock(tid, defName) {
   const sg = (view.sieges || []).find(x => x.tid === tid); if (!sg || view.match.phase !== 'running') return '';

@@ -1,11 +1,11 @@
 // Zehn Kronen – Krieg zwischen den Spielern: Angriffe auf Burgen, Besatzungen, Vasallen, Ausscheiden,
 // Thron und Heiligtümer, Spähen, Punkte und Spielende. Läuft auf dem Server und in der Testversion.
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
-import { battle, roundStep, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf, power } from './combat.js';
+import { battle, roundStep, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf, power, campTroops, campMult, campLoot } from './combat.js';
 import {
   DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, FIGHT_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
-  settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY, reversed, fightAt, joinDefenders, leaveDefenders
+  CAMP_RESPAWN, settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY, reversed, fightAt, joinDefenders, leaveDefenders, homeBack
 } from './core.js';
 import { territory, touchesObj, removeOutposts, releaseAux, opGuard, checkRaid, OP_COST } from './outpost.js';
 
@@ -104,45 +104,21 @@ const subTroops = (a, lost) => { const r = {}; for (const u in a) { const n = a[
 export function arriveField(ctx, m, o, bt, realT, back) {
   const { match, players } = ctx, w = match.world, A = byId(players, m.owner);
   const info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
+  const lead = fightAt(w, o.id); if (lead) { attach(ctx, lead, m, 'att'); return; }
   const gs = fieldGatherers(ctx, A.id, o.id, bt);
   if (gs.error) { pushReport(A.state, { kind: 'pvp', role: 'att', title: 'Heer kehrt um', win: false, target: info, text: 'Hier ist niemand mehr, den du angreifen kannst.' }, realT); return back(); }
-  const startA = { ...m.troops }; let cur = { ...m.troops }, killed = 0, last = null, won = false;
-  const defStart = {}, defLeft = {}, gathered = {};
+  let def = {}, fn = 0, ff = 0;
   for (const g of gs.list) {
-    if (!sum(cur)) break;
     const D = byId(players, g.owner); advanceTo(D.state, realT, match.speed);
-    const frac = g.phase === 'gather' && g.tEnd > g.tStart ? Math.max(0, Math.min(1, (bt - g.tStart) / (g.tEnd - g.tStart))) : 0, got = g.phase === 'gather' ? Math.floor(g.amount * frac) : 0;
-    const sd = { ...g.troops }, r = battle(cur, sd, forceOf(D.state), forceOf(A.state)), sa2 = settleAway(D.state, sd, r.defLeft);
-    last = r; killed += sum(sd) - sum(r.defLeft); cur = r.attLeft;
-    for (const u in sd) { defStart[u] = (defStart[u] || 0) + sd[u]; defLeft[u] = (defLeft[u] || 0) + (r.defLeft[u] || 0); }
-    if (!sum(r.defLeft)) {
-      g.dead = true; won = true;
-      if (o.k !== 'post') { const n = w.nodes[o.id] || { left: 0, t: bt }; const rest = n.left - got; w.nodes[o.id] = { left: rest < 50 ? 0 : rest, t: bt }; }
-      if (got > 0) gathered[g.res] = (gathered[g.res] || 0) + got;
-    } else {
-      g.troops = r.defLeft;
-      if (g.phase === 'gather') { g.amount = Math.min(g.amount, Math.floor(capacityOf(g.troops, D.state))); g.tEnd = g.tStart + GATHER_SEC * g.amount; }
-    }
-    pushReport(D.state, { kind: 'pvp', role: 'def', title: (g.dead ? (o.k === 'post' ? 'Heer überfallen: ' : 'Sammler überfallen: ') : 'Überfall abgewehrt: ') + A.name, win: !g.dead, target: info,
-      att: { start: startA, left: r.attLeft }, def: { start: sd, left: r.defLeft, groups: [{ label: 'Dein Heer auf dem Feld', start: sd, left: r.defLeft, wounded: sa2.wounded, dead: sa2.dead }] }, rounds: r.rounds,
-      text: g.dead ? A.name + ' hat dein Heer auf dem Feld vernichtet.' : 'Dein Heer hat ' + A.name + ' zurückgeschlagen und sammelt weiter.' }, realT);
-    note(ctx, D.id, 'battle', g.dead ? 'Heer vernichtet' : 'Überfall abgewehrt', A.name + (g.dead ? ' hat dein Heer auf dem Feld besiegt.' : ' wurde auf dem Feld zurückgeschlagen.'));
+    const frac = g.phase === 'gather' && g.tEnd > g.tStart ? Math.max(0, Math.min(1, (bt - g.tStart) / (g.tEnd - g.tStart))) : 0;
+    g.pre = { phase: g.phase, tStart: g.tStart, tEnd: g.tEnd, amount: g.amount, res: g.res, got: g.phase === 'gather' ? Math.floor(g.amount * frac) : 0 };
+    def = merge(def, g.troops); const k = sum(g.troops); fn += k; ff += k * forceOf(D.state);
   }
-  const sa = settleAway(A.state, startA, cur);
-  m.troops = cur; A.state.stats.kills += killed; if (won) A.state.stats.wins++;
-  let loot = {};
-  if (sum(cur)) {
-    const capa = capacityOf(cur, A.state), tot = Object.values(gathered).reduce((a, b) => a + b, 0), k = tot > capa ? capa / tot : 1;
-    for (const r in gathered) { const v = Math.floor(gathered[r] * k); if (v > 0) loot[r] = v; }
-    m.load = loot;
+  startFight(ctx, m, def, fn ? ff / fn : 1, bt, 'field');
+  for (const g of gs.list) {
+    attach(ctx, m, g, 'def');
+    note(ctx, g.owner, 'attack', 'Dein Heer wird angegriffen!', A.name + tag(w, A.id) + ' kämpft gegen dein Heer auf dem Feld. Schau dir den Lebensbalken an und zieh es notfalls ab.');
   }
-  w.marches = w.marches.filter(x => x === m || !x.dead);
-  pushReport(A.state, { kind: 'pvp', role: 'att', title: sum(cur) && won ? (o.k === 'post' ? 'Heer überfallen' : 'Sammler überfallen') : 'Überfall gescheitert', win: sum(cur) > 0 && won, target: info,
-    att: { start: startA, left: cur, wounded: sa.wounded, dead: sa.dead }, def: { start: defStart, left: defLeft }, rounds: last ? last.rounds : [], loot,
-    text: won ? 'Du hast ' + (sum(cur) ? 'die Sammler auf dem Feld besiegt.' : 'die Sammler besiegt, aber dein Heer wurde aufgerieben.') : 'Die Sammler haben dich zurückgeschlagen.' }, realT);
-  note(ctx, A.id, 'battle', sum(cur) && won ? 'Überfall gelungen' : 'Überfall gescheitert', 'Dein Heer ' + (won ? 'hat die Sammler auf dem Feld besiegt.' : 'wurde auf dem Feld geschlagen.'));
-  if (!sum(cur)) { m.dead = true; return; }
-  return back();
 }
 
 
@@ -151,73 +127,101 @@ export function arriveField(ctx, m, o, bt, realT, back) {
    Ein Angriff beginnt sofort bei der Ankunft. Der Kampf läuft in Runden (je nach Heergröße 1 bis 20 Minuten Spielzeit insgesamt).
    Der erste Angreifer ("Anführer") trägt den Kampfstand m.fight; weitere Angreifer und Helfer hängen als Marsch in der Phase 'fight' daran (m.lead, m.side).
    Beide Seiten können jederzeit Verstärkung schicken oder ihr Heer abziehen; die Lebensbalken folgen dem Stand der Truppen. */
-const ROUNDS_BASE = 30, MAXR = 60;
-const multOf = (ctx, list) => { let n = 0, f = 0; for (const x of list) { const P = byId(ctx.players, x.owner), k = sum(x === list[0] ? x.troops : (x.fc || x.troops)); n += k; f += k * (P ? forceOf(P.state) : 1); } return n ? f / n : 1; };
+const SUB = 4, MAXT = 180;   // je Kampfrunde vier kleine Schritte, damit sich die Balken gleichmäßig leeren
+let CX = null;               // Kontext des laufenden Kampfbefehls (für den Heimweg)
+const multOf = (ctx, list) => { let n = 0, f = 0; for (const x of list) { const P = byId(ctx.players, x.owner), k = sum(x.fc || x.troops); n += k; f += k * (P ? forceOf(P.state) : 1); } return n ? f / n : 1; };
 const cOf = (lead, x) => x === lead ? lead.troops : (x.fc || x.troops);
 const scaleT = (t, k) => { const l = {}; for (const u in t) { const n = Math.round(t[u] * (k[u] || 0)); if (n > 0) l[u] = n; } return l; };
 const ratio = (P, P0) => { const k = {}; for (const u in P0) k[u] = P0[u] > 0 ? Math.max(0, Math.min(1, (P[u] || 0) / P0[u])) : 0; return k; };
-const goBack = (x, bt) => { x.phase = 'back'; x.t0 = bt; x.mode = x.mode === 'assist' ? 'assist' : x.mode; delete x.lead; delete x.side; delete x.fc; delete x.fight; delete x.ft; reversed(x); };
+const goBack = (x, bt) => { delete x.lead; delete x.side; delete x.fc; delete x.fight; delete x.ft; delete x.pre; homeBack(CX, x, bt); };
 export const fightMembers = (w, lead, side) => w.marches.filter(x => !x.dead && x.phase === 'fight' && x.lead === lead.id && x.side === side);
+// Wie viele Schritte braucht dieser Kampf noch? (Schätzung für Dauer und Restzeit)
+function ticksLeft(A, D, am, dm, from = 0) {
+  let a = { ...A }, d = { ...D }, n = from;
+  while (n < MAXT && sum(a) >= 0.5 && sum(d) >= 0.5) { const r = roundStep(a, d, am, dm, 1 / SUB); a = r.A; d = r.D; n++; }
+  return n - from;
+}
 
-function startFight(ctx, m, def, dm, bt) {
-  const A = { ...m.troops }, D = { ...def }, n0 = sum(A) + sum(D);
-  const dur = Math.max(60, Math.min(1200, 60 + 1140 * Math.min(1, n0 / 3000)));
-  m.phase = 'fight'; m.side = 'att'; m.tStart = bt; m.ft = bt + dur / ROUNDS_BASE;
-  m.fight = { dt: dur / ROUNDS_BASE, round: 0, A, A0: { ...A }, D, D0: { ...D }, dm, pkA: power(A), pkD: power(D, dm) };
+function startFight(ctx, m, def, dm, bt, kind) {
+  const A = { ...m.troops }, D = { ...def }, n0 = sum(A) + sum(D), P = byId(ctx.players, m.owner), am = P ? forceOf(P.state) : 1;
+  const dur = Math.max(600, Math.min(7200, 600 + 6600 * Math.min(1, n0 / 3000)));   // mindestens 10 Minuten, höchstens 2 Stunden
+  const ticks = Math.max(8, Math.min(120, ticksLeft(A, D, am, dm)));
+  m.phase = 'fight'; m.side = 'att'; m.tStart = bt; m.ft = bt + dur / ticks;
+  m.fight = { kind, dt: dur / ticks, round: 0, A, A0: { ...A }, D, D0: { ...D }, dm, pkA: power(A), pkD: power(D, dm) };
 }
 function attach(ctx, lead, m, side) {   // Heer schließt sich einem laufenden Kampf an
   const f = lead.fight, P = side === 'att' ? f.A : f.D, P0 = side === 'att' ? f.A0 : f.D0;
   m.fc = { ...m.troops }; m.phase = 'fight'; m.lead = lead.id; m.side = side; m.tStart = lead.tStart;
   for (const u in m.troops) { P[u] = (P[u] || 0) + m.troops[u]; P0[u] = (P0[u] || 0) + m.troops[u]; }
 }
+export const attachTo = (ctx, lead, m) => attach(ctx, lead, m, 'att');
 // Ein Heer verlässt den Kampf (Abzug): es nimmt seinen Anteil an den bisherigen Verlusten mit
 function leave(ctx, lead, x, bt, realT) {
+  CX = ctx;
   const f = lead.fight, P = x.side === 'att' ? f.A : f.D, P0 = x.side === 'att' ? f.A0 : f.D0, k = ratio(P, P0), c = x.fc;
   for (const u in c) { P[u] = Math.max(0, (P[u] || 0) - c[u] * (k[u] || 0)); P0[u] = Math.max(0, (P0[u] || 0) - c[u]); }
   const Pl = byId(ctx.players, x.owner), left = scaleT(c, k);
   if (Pl) { const sa = settleAway(Pl.state, c, left); pushReport(Pl.state, { kind: 'pvp', role: x.side, title: 'Rückzug aus dem Kampf', win: false, target: { kind: x.tk, id: x.tid }, att: { start: c, left, wounded: sa.wounded, dead: sa.dead }, text: 'Du hast dein Heer abgezogen und ' + (sum(c) - sum(left)) + ' Einheiten verloren.' }, realT); }
-  x.troops = left; if (!sum(left)) { x.dead = true; return; } goBack(x, bt);
+  x.troops = left; delete x.load; if (!sum(left)) { x.dead = true; return; } goBack(x, bt);
 }
 // Befehl "Abziehen" für ein Heer im Kampf. Gibt true zurück, wenn das Heer im Kampf war.
 export function withdraw(ctx, player, m, bt, realT) {
   if (m.phase !== 'fight') return false;
-  const w = ctx.match.world;
+  CX = ctx; const w = ctx.match.world;
   if (m.lead) { const lead = w.marches.find(x => x.id === m.lead && !x.dead); if (lead) leave(ctx, lead, m, bt, realT); else { m.troops = { ...m.fc }; goBack(m, bt); } return true; }
   resolveFight(ctx, m, bt, realT, false); return true;
 }
 // Verwaiste Helfer (Anführer ist weg): heimschicken
 export function freeOrphans(ctx, bt) {
-  const w = ctx.match.world;
+  CX = ctx; const w = ctx.match.world;
   for (const x of w.marches) if (!x.dead && x.phase === 'fight' && x.lead && !w.marches.some(l => l.id === x.lead && !l.dead && l.fight)) { x.troops = { ...(x.fc || x.troops) }; goBack(x, bt); }
 }
 export function stepFight(ctx, m, bt, realT) {
+  CX = ctx;
   const w = ctx.match.world, f = m.fight, att = [m, ...fightMembers(w, m, 'att')], am = multOf(ctx, att);
-  const r = roundStep(f.A, f.D, am, f.dm); f.A = r.A; f.D = r.D; f.round++;
+  const r = roundStep(f.A, f.D, am, f.dm, 1 / SUB); f.A = r.A; f.D = r.D; f.round++;
   f.pkA = Math.max(f.pkA, power(f.A, am)); f.pkD = Math.max(f.pkD, power(f.D, f.dm));
   m.ft = bt + f.dt;
   const nA = sum(f.A), nD = sum(f.D);
-  if (nA < 0.5 || nD < 0.5 || f.round >= MAXR) resolveFight(ctx, m, bt, realT, nD < 0.5 && nA >= 0.5);
+  if (nA < 0.5 || nD < 0.5 || f.round >= MAXT) resolveFight(ctx, m, bt, realT, nD < 0.5 && nA >= 0.5);
 }
-// Anzeige: Lebensbalken beider Seiten (Stärke jetzt, höchste Stärke bisher)
+// Anzeige: Lebensbalken beider Seiten (Stärke jetzt, höchste Stärke bisher) und geschätzte Restzeit (Spielsekunden)
 export function fightView(ctx, m) {
   const w = ctx.match.world, f = m.fight; if (!f) return null;
-  const am = multOf(ctx, [m, ...fightMembers(w, m, 'att')]);
-  return { pa: Math.round(power(f.A, am)), pd: Math.round(power(f.D, f.dm)), pk: Math.round(Math.max(f.pkA, f.pkD, power(f.A, am), power(f.D, f.dm))), na: Math.round(sum(f.A)), nd: Math.round(sum(f.D)), na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), round: f.round };
+  const am = multOf(ctx, [m, ...fightMembers(w, m, 'att')]), pa = power(f.A, am), pd = power(f.D, f.dm);
+  return { kind: f.kind, pa: Math.round(pa), pd: Math.round(pd), pk: Math.round(Math.max(f.pkA, f.pkD, pa, pd)), na: Math.round(sum(f.A)), nd: Math.round(sum(f.D)), na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), round: f.round,
+    left: Math.max(0, ticksLeft(f.A, f.D, am, f.dm, f.round)) * f.dt, tot: (f.round + ticksLeft(f.A, f.D, am, f.dm, f.round)) * f.dt };
 }
+// Kampf gegen ein Banditenlager
+export function startCampFight(ctx, m, o, bt) { startFight(ctx, m, campTroops(o.lv), campMult(o.lv), bt, 'camp'); }
 
 function resolveFight(ctx, lead, bt, realT, win) {
-  const { match, players } = ctx, w = match.world, f = lead.fight, map = mapOf(match);
-  const kA = ratio(f.A, f.A0), kD = win ? {} : ratio(f.D, f.D0);
+  CX = ctx;
+  const { match, players } = ctx, w = match.world, f = lead.fight, map = mapOf(match), kind = f.kind;
+  const kA = ratio(f.A, f.A0), kD = ratio(f.D, f.D0);
   if (win) for (const u in f.D0) kD[u] = 0;
   const atts = [lead, ...fightMembers(w, lead, 'att')], defs = fightMembers(w, lead, 'def');
-  const A = byId(players, lead.owner), isRaid = lead.mode === 'raid', rounds = f.round;
-  const startA = { ...f.A0 }, startD = { ...f.D0 }, leftA = {}, leftD = {};
-  for (const u in f.A) if (Math.round(f.A[u]) > 0) leftA[u] = Math.round(f.A[u]);
+  const A = byId(players, lead.owner);
+  const startA = { ...f.A0 }, startD = { ...f.D0 }, leftD = {};
   for (const u in f.D) if (!win && Math.round(f.D[u]) > 0) leftD[u] = Math.round(f.D[u]);
   const lostOf = t => { const lost = {}; for (const u in t) { const l = win ? t[u] : Math.min(t[u], Math.round(t[u] * (1 - (kD[u] === undefined ? 1 : kD[u])))); if (l > 0) lost[u] = l; } return lost; };
-  // Helfer der Verteidiger
+  const tNode = kind === 'field' && !String(lead.tid).startsWith('post') ? map.byId[lead.tid] : null, gathered = {};
+  // Helfer der Verteidiger (bei Feldkämpfen: die Heere auf dem Feld)
   const defHelp = [];
-  for (const x of defs) { const c = x.fc, left = scaleT(c, kD), P = byId(players, x.owner); if (P) { settleAway(P.state, c, left); defHelp.push({ label: 'Helfer ' + P.name, start: c, left }); pushReport(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen haben verteidigt', win: !win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); } x.troops = left; if (!sum(left)) x.dead = true; else goBack(x, bt); }
+  for (const x of defs) {
+    const c = x.fc, left = scaleT(c, kD), P = byId(players, x.owner);
+    if (P) {
+      const sa2 = settleAway(P.state, c, left); defHelp.push({ label: kind === 'field' ? 'Dein Heer auf dem Feld' : 'Helfer ' + P.name, start: c, left, wounded: sa2.wounded, dead: sa2.dead });
+      if (kind === 'field') pushReport(P.state, { kind: 'pvp', role: 'def', title: (!sum(left) ? 'Heer überfallen: ' : 'Überfall abgewehrt: ') + A.name, win: !!sum(left), target: { kind: x.tk, id: x.tid }, att: { start: startA, left: {} }, def: { start: c, left, groups: [{ label: 'Dein Heer auf dem Feld', start: c, left, wounded: sa2.wounded, dead: sa2.dead }] },
+        text: !sum(left) ? A.name + ' hat dein Heer auf dem Feld vernichtet.' : 'Dein Heer hat ' + A.name + ' zurückgeschlagen und sammelt weiter.' }, realT);
+      else pushReport(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen haben verteidigt', win: !win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT);
+    }
+    x.troops = left;
+    if (x.pre) {   // Heer stand auf dem Feld: Überlebende machen dort weiter
+      if (!sum(left)) { x.dead = true; if (x.pre.res && x.pre.got > 0) gathered[x.pre.res] = (gathered[x.pre.res] || 0) + x.pre.got; if (tNode) { const n = w.nodes[tNode.id] || { left: 0, t: bt }, rest = n.left - x.pre.got; w.nodes[tNode.id] = { left: rest < 50 ? 0 : rest, t: bt }; } }
+      else { const pre = x.pre; delete x.lead; delete x.side; delete x.fc; delete x.pre; x.phase = pre.phase; if (pre.phase === 'gather') { const d = bt - lead.tStart; x.tStart = pre.tStart + d; x.amount = Math.min(pre.amount, Math.floor(capacityOf(left, P ? P.state : null))); x.tEnd = x.tStart + GATHER_SEC * x.amount; } }
+    } else if (!sum(left)) x.dead = true; else goBack(x, bt);
+  }
   // Angreifer: Verluste verbuchen, Überlebende heim
   let ownLeft = {}, sa = null;
   for (const x of atts) {
@@ -226,13 +230,56 @@ function resolveFight(ctx, lead, bt, realT, win) {
     else { if (P) pushReport(P.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg' : 'Niederlage') + ' im Kampf', win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); x.troops = left; if (!sum(left)) x.dead = true; else goBack(x, bt); }
   }
   lead.troops = ownLeft;
-  const killedDef = sum(startD) - sum(leftD);
-  A.state.stats.kills += killedDef; if (win) A.state.stats.wins++;
+  A.state.stats.kills += sum(startD) - sum(leftD); if (win) A.state.stats.wins++;
   const fin = () => { delete lead.fight; delete lead.ft; delete lead.side; if (!sum(lead.troops)) lead.dead = true; else goBack(lead, bt); };
-  if (isRaid) {
+  const attInfo = { start: startA, left: ownLeft, wounded: sa ? sa.wounded : {}, dead: sa ? sa.dead : {} };
+  if (kind === 'camp') {
+    const o = map.byId[lead.tid], info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
+    const rep = { kind: 'camp', title: (win ? 'Sieg über Banditenlager Stufe ' : 'Niederlage vor Banditenlager Stufe ') + o.lv, win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [] };
+    if (win) { const loot = campLoot(o.lv); lead.load = loot; rep.loot = loot; w.camps[o.id] = { dead: bt + CAMP_RESPAWN }; }
+    pushReport(A.state, rep, realT); return fin();
+  }
+  if (kind === 'field') {
+    const o = map.byId[lead.tid] || { k: 'post', id: lead.tid }, info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y }, won = defs.length > 0 && defs.every(x => x.dead);
+    let loot = {};
+    if (sum(ownLeft)) { const capa = capacityOf(ownLeft, A.state), tot = Object.values(gathered).reduce((a, b) => a + b, 0), k = tot > capa ? capa / tot : 1; for (const r in gathered) { const v = Math.floor(gathered[r] * k); if (v > 0) loot[r] = v; } lead.load = loot; }
+    pushReport(A.state, { kind: 'pvp', role: 'att', title: sum(ownLeft) && win ? (o.k === 'post' ? 'Heer überfallen' : 'Sammler überfallen') : 'Überfall gescheitert', win: sum(ownLeft) > 0 && win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [], loot,
+      text: win ? 'Du hast die Sammler auf dem Feld besiegt.' : 'Die Sammler haben dich zurückgeschlagen.' }, realT);
+    note(ctx, A.id, 'battle', win ? 'Überfall gelungen' : 'Überfall gescheitert', 'Dein Heer ' + (win ? 'hat die Sammler auf dem Feld besiegt.' : 'wurde auf dem Feld geschlagen.')); void won;
+    return fin();
+  }
+  if (kind === 'hold') {
+    const o = map.byId[lead.tid], hold = w.holds[o.id], group = groupOf(w, A.id), info = { kind: o.k, id: o.id, x: o.x, y: o.y, n: o.n }, defender = hold ? groupLabel(w, players, hold.group) : 'Wächter';
+    if (win) {
+      if (hold) for (const pid of Object.keys(hold.garr)) {
+        const P = byId(players, Number(pid)); if (!P) continue;
+        const sp = settleAway(P.state, hold.garr[pid], {});
+        pushReport(P.state, { kind: 'hold', title: holdName(o) + ' verloren', win: false, target: info, text: A.name + ' hat die Besatzung geschlagen. Du hast ' + sum(hold.garr[pid]) + ' Truppen verloren (' + sum(sp.wounded) + ' verwundet).' }, realT);
+        note(ctx, P.id, 'hold', holdName(o) + ' verloren', A.name + tag(w, A.id) + ' hat deine Besatzung geschlagen.');
+      }
+      w.holds[o.id] = { group, since: bt, garr: { [A.id]: { ...ownLeft } } }; lead.dead = true;
+      chron(ctx, groupLabel(w, players, group) + ' hält jetzt ' + holdName(o) + '.');
+      for (const p of groupMembers(w, players, group)) note(ctx, p.id, 'hold', holdName(o) + ' erobert', A.name + ' hat ' + holdName(o) + ' für ' + groupLabel(w, players, group) + ' eingenommen.');
+      delete lead.fight; delete lead.ft; delete lead.side;
+    } else {
+      if (hold) {
+        for (const pid of Object.keys(hold.garr)) {
+          const P = byId(players, Number(pid)), st = hold.garr[pid], left = subTroops(st, lostOf(st));
+          if (P) { settleAway(P.state, st, left); note(ctx, P.id, 'hold', holdName(o) + ' verteidigt', A.name + ' hat angegriffen und wurde zurückgeschlagen.'); }
+          if (sum(left)) hold.garr[pid] = left; else delete hold.garr[pid];
+        }
+        if (!Object.keys(hold.garr).length) delete w.holds[o.id];
+      }
+      fin();
+    }
+    pushReport(A.state, { kind: 'hold', title: (win ? 'Sieg: ' : 'Niederlage: ') + holdName(o), win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [], defLabel: defender,
+      text: win ? 'Deine Truppen halten jetzt ' + holdName(o) + '. Sie bleiben dort, bis du sie zurückrufst.' : '' }, realT);
+    return;
+  }
+  if (kind === 'raid') {
     const o = (w.outposts || {})[lead.tid], alD = o ? w.alliances[o.al] : null, lab = alD ? alD.name : 'Bündnis', mem = alD ? alD.members : [];
     const info = { kind: 'outpost', id: lead.tid, x: o ? o.x : 0, y: o ? o.y : 0 };
-    const detail = { att: { start: startA, left: ownLeft, wounded: sa ? sa.wounded : {}, dead: sa ? sa.dead : {} }, def: { start: startD, left: leftD }, defLabel: 'Außenposten', rounds: [] };
+    const detail = { att: attInfo, def: { start: startD, left: leftD }, defLabel: 'Außenposten', rounds: [] };
     if (!o) { pushReport(A.state, { kind: 'outpost', role: 'att', title: 'Außenposten nicht mehr da', win: false, target: info, text: 'Hier steht nichts mehr.' }, realT); return fin(); }
     if (win) {
       let lost = 0;
@@ -270,14 +317,13 @@ function resolveFight(ctx, lead, bt, realT, win) {
   let fate = null, loot = {};
   if (win) { loot = lootFrom(SD, capacityOf(ownLeft, A.state)); lead.load = loot; fate = fall(ctx, A, D, bt); }
   const fateText = fate === 'out' ? ' Die Burg wurde erobert, ' + D.name + ' ist ausgeschieden.' : fate === 'vassal' ? ' Die Burg wurde erobert, ' + D.name + ' ist jetzt dein Vasall.' : '';
-  const det = { att: { start: startA, left: ownLeft }, def: { start: startD, left: leftD, groups }, rounds: [], loot };
-  pushReport(A.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg über die Burg von ' : 'Niederlage vor der Burg von ') + D.name, win, target: info, fate, ...det, att: { ...det.att, wounded: sa ? sa.wounded : {}, dead: sa ? sa.dead : {} }, text: fateText.trim() }, realT);
+  const det = { att: attInfo, def: { start: startD, left: leftD, groups }, rounds: [], loot };
+  pushReport(A.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg über die Burg von ' : 'Niederlage vor der Burg von ') + D.name, win, target: info, fate, ...det, text: fateText.trim() }, realT);
   pushReport(SD, { kind: 'pvp', role: 'def', title: (win ? 'Burg gefallen: ' : 'Angriff abgewehrt: ') + A.name, win: !win, target: info, fate, ...det,
     text: win ? (fate === 'out' ? 'Deine Burg ist gefallen. Du bist ausgeschieden.' : 'Deine Burg ist gefallen. Du bist jetzt Vasall von ' + A.name + '.') : 'Deine Verteidiger haben ' + A.name + ' zurückgeschlagen.' }, realT);
   note(ctx, D.id, 'battle', win ? (fate === 'out' ? 'Du bist ausgeschieden' : 'Deine Burg ist gefallen') : 'Angriff abgewehrt', A.name + (win ? ' hat deine Burg erobert.' : ' wurde zurückgeschlagen.'));
   note(ctx, A.id, 'battle', win ? 'Burg erobert' : 'Angriff gescheitert', 'Dein Heer ' + (win ? 'hat die Burg von ' + D.name + ' genommen.' : 'hat den Kampf vor der Burg von ' + D.name + ' verlassen oder verloren.'));
   if (win) { const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) note(ctx, id, 'battle', 'Verbündeter gefallen', D.name + ' wurde von ' + A.name + ' erobert.'); }
-  void rounds;
   fin();
 }
 
@@ -330,7 +376,7 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   const SD = D.state; let def = merge({ ...SD.troops }, guardOf(SD));
   for (const pid in SD.stationed) def = merge(def, SD.stationed[pid]);
   for (const u in def) if (!(def[u] > 0)) delete def[u];
-  startFight(ctx, m, def, wallMult(SD) * forceOf(SD), bt);
+  startFight(ctx, m, def, wallMult(SD) * forceOf(SD), bt, 'city');
   const who = [D.id]; const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) who.push(id);
   note(ctx, D.id, 'attack', 'Kampf um deine Burg!', A.name + tag(w, A.id) + ' kämpft mit ' + sum(m.troops) + ' Truppen vor deiner Burg. Schick Verstärkung und beobachte den Lebensbalken!');
   for (const id of who) if (id !== D.id) note(ctx, id, 'attack', 'Kampf um die Burg eines Verbündeten', A.name + ' kämpft vor der Burg von ' + D.name + '. Schick Verstärkung!');
@@ -346,7 +392,7 @@ export function arriveRaid(ctx, m, bt, realT, back) {
   if (why) { pushReport(A.state, { kind: 'outpost', role: 'att', title: 'Angriff abgebrochen', win: false, target: info, text: why + ' Das Heer kehrt um.' }, realT); return back(); }
   const g = opGuard(), def = { ...g.troops };
   for (const pid in o.garr) for (const u in o.garr[pid]) def[u] = (def[u] || 0) + o.garr[pid][u];
-  startFight(ctx, m, def, o.done > bt ? 1 : g.mult, bt);
+  startFight(ctx, m, def, o.done > bt ? 1 : g.mult, bt, 'raid');
   const al = w.alliances[o.al];
   if (al) for (const pid of al.members) note(ctx, pid, 'attack', 'Kampf um euren Außenposten!', A.name + tag(w, A.id) + ' kämpft mit ' + sum(m.troops) + ' Truppen um einen Außenposten eures Bündnisses. Schickt Besatzung hin!');
 }
@@ -427,39 +473,13 @@ export function arriveHold(ctx, m, o, bt, realT, back) {
     return back();
   }
   if (hold && hold.group === group) {
-    hold.garr[A.id] = merge(hold.garr[A.id] || {}, m.troops); m.dead = true;
+    hold.garr[A.id] = merge(hold.garr[A.id] || {}, m.troops); joinDefenders(w, o.id, m.troops); m.dead = true;
     pushReport(A.state, { kind: 'hold', title: holdName(o) + ': Truppen angekommen', win: true, target: info, text: 'Deine Truppen verstärken die Besatzung.' }, realT);
     return;
   }
-  const guard = holdGuard(o.k), def = hold ? sumGarr(hold) : guard.troops, mult = hold ? 1 : guard.mult, startA = { ...m.troops };
-  const r = battle(m.troops, def, mult, forceOf(A.state)), sa = settleAway(A.state, startA, r.attLeft);
-  m.troops = r.attLeft; A.state.stats.kills += sum(def) - sum(r.defLeft); if (r.win) A.state.stats.wins++;
-  const defender = hold ? groupLabel(w, players, hold.group) : 'Wächter';
-  if (r.win) {
-    if (hold) for (const pid of Object.keys(hold.garr)) {
-      const P = byId(players, Number(pid)); if (!P) continue;
-      const sp = settleAway(P.state, hold.garr[pid], {});
-      pushReport(P.state, { kind: 'hold', title: holdName(o) + ' verloren', win: false, target: info, text: A.name + ' hat die Besatzung geschlagen. Du hast ' + sum(hold.garr[pid]) + ' Truppen verloren (' + sum(sp.wounded) + ' verwundet).' }, realT);
-      note(ctx, P.id, 'hold', holdName(o) + ' verloren', A.name + tag(w, A.id) + ' hat deine Besatzung geschlagen.');
-    }
-    w.holds[o.id] = { group, since: bt, garr: { [A.id]: { ...r.attLeft } } }; m.dead = true;
-    chron(ctx, groupLabel(w, players, group) + ' hält jetzt ' + holdName(o) + '.');
-    for (const p of groupMembers(w, players, group)) note(ctx, p.id, 'hold', holdName(o) + ' erobert', A.name + ' hat ' + holdName(o) + ' für ' + groupLabel(w, players, group) + ' eingenommen.');
-  } else if (hold) {
-    const frac = {}; for (const u in def) frac[u] = def[u] ? 1 - (r.defLeft[u] || 0) / def[u] : 0;
-    for (const pid of Object.keys(hold.garr)) {
-      const P = byId(players, Number(pid)), st = hold.garr[pid], left = {};
-      for (const u in st) { const n = st[u] - Math.round(st[u] * (frac[u] || 0)); if (n > 0) left[u] = n; }
-      if (P) settleAway(P.state, st, left);
-      if (sum(left)) hold.garr[pid] = left; else delete hold.garr[pid];
-      if (P) note(ctx, P.id, 'hold', holdName(o) + ' verteidigt', A.name + ' hat angegriffen und wurde zurückgeschlagen.');
-    }
-    if (!Object.keys(hold.garr).length) delete w.holds[o.id];
-  }
-  pushReport(A.state, { kind: 'hold', title: (r.win ? 'Sieg: ' : 'Niederlage: ') + holdName(o), win: r.win, target: info,
-    att: { start: startA, left: r.attLeft, wounded: sa.wounded, dead: sa.dead }, def: { start: def, left: r.defLeft }, rounds: r.rounds, defLabel: defender,
-    text: r.win ? 'Deine Truppen halten jetzt ' + holdName(o) + '. Sie bleiben dort, bis du sie zurückrufst.' : '' }, realT);
-  if (!r.win) { if (!sum(m.troops)) m.dead = true; else back(); }
+  const lead = fightAt(w, o.id); if (lead) { attach(ctx, lead, m, 'att'); return; }
+  const guard = holdGuard(o.k), def = hold ? sumGarr(hold) : guard.troops, mult = hold ? 1 : guard.mult;
+  startFight(ctx, m, def, mult, bt, 'hold');
 }
 export function holdRecall(ctx, me, oid) {
   const w = ctx.match.world, o = mapOf(ctx.match).byId[oid], h = w.holds[oid];

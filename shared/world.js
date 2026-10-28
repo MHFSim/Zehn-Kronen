@@ -8,9 +8,9 @@ import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from
 import {
   DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
-  settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders
+  settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack
 } from './core.js';
-import { stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { startCampFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText } from './rules.js';
@@ -24,7 +24,7 @@ function onArrive(ctx, m, bt, realT) {
   if (!p) { m.dead = true; return; }
   const S = p.state;
   advanceTo(S, realT, match.speed);
-  const back = () => { m.phase = 'back'; m.t0 = bt; reversed(m); };
+  const back = () => homeBack(ctx, m, bt);
   if (m.mode === 'post') { m.phase = 'post'; return; }
   if (m.mode === 'attack' && m.tk === 'post') { const [px, py] = cellXY(m.path[m.path.length - 1]); return arriveField(ctx, m, { k: 'post', id: m.tid, x: px, y: py }, bt, realT, back); }
   if (m.mode === 'build') return arriveBuild(ctx, m, bt, realT, back);
@@ -54,17 +54,9 @@ function onArrive(ctx, m, bt, realT) {
       pushReport(S, { kind: 'camp', title: 'Lager bereits zerstört', win: false, target: info, text: 'Hier war schon jemand schneller. Das Lager baut sich in einigen Stunden wieder auf.' }, realT);
       return back();
     }
-    const def = campTroops(o.lv), start = { ...m.troops };
-    const r = battle(m.troops, def, campMult(o.lv), forceOf(S));
-    const sa = settleAway(S, start, r.attLeft);
-    S.stats.kills += sum(def) - sum(r.defLeft); if (r.win) S.stats.wins++;
-    const rep = { kind: 'camp', title: (r.win ? 'Sieg über Banditenlager Stufe ' : 'Niederlage vor Banditenlager Stufe ') + o.lv, win: r.win, target: info,
-      att: { start, left: r.attLeft, wounded: sa.wounded, dead: sa.dead }, def: { start: def, left: r.defLeft }, rounds: r.rounds };
-    m.troops = r.attLeft;
-    if (r.win) { const loot = campLoot(o.lv); m.load = loot; rep.loot = loot; w.camps[o.id] = { dead: bt + CAMP_RESPAWN }; }
-    pushReport(S, rep, realT);
-    if (!Object.keys(m.troops).length) { m.dead = true; return; }
-    return back();
+    const lead = fightAt(w, o.id); if (lead) { attachTo(ctx, lead, m); return; }
+    startCampFight(ctx, m, o, bt);
+    return;
   }
   if (o.k === 'ruin') {
     if (w.ruins[o.id]) { pushReport(S, { kind: 'ruin', title: 'Ruine bereits geplündert', win: false, target: info, text: 'Hier gibt es nichts mehr zu holen.' }, realT); return back(); }
@@ -136,7 +128,7 @@ export function syncMatch(match, players, now) {
     else if (best.phase === 'gather') onGatherEnd(ctx, best, bt, realT);
     else onHome(ctx, best, bt, realT);
     events++;
-    if (best.dead) w.marches = w.marches.filter(m => m !== best);
+    if (w.marches.some(m => m.dead)) w.marches = w.marches.filter(m => !m.dead);
     if (best.dead || best.phase !== 'fight') freeOrphans(ctx, bt);
     if (checkEnd(ctx, bt)) { w.gt = bt; w.at = realT; ctx.bt = null; return { events }; }
   }
@@ -405,8 +397,12 @@ export function viewFor(match, players, me, now) {
       const op = (w.outposts || {})[m.tid];
       if (op && myAl && op.al === myAl.id) incoming.push({ id: m.id, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', target: 'einen Außenposten', targetId: 0, mine: false, op: true, siege: lead, eta: m.t0 + m.arr[m.arr.length - 1] });
     }
-    if (lead && m.fight && (m.mode === 'attack' || m.mode === 'raid')) { const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null;
-      sieges.push({ id: m.id, tid: m.tid, kind: op ? 'op' : 'city', tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : '?', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, n: sum(m.troops), pw: fightView(mkCtx(match, players, now), m) }); }
+    if (lead && m.fight) {
+      const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null, kind = op ? 'op' : dp ? 'city' : 'other';
+      const involved = kind !== 'other' || m.owner === me.id || w.marches.some(x => x.lead === m.id && x.owner === me.id);
+      const mineF = m.owner === me.id || friends.includes(m.owner) || (dp && friends.includes(dp.id)) || (op && myAl && op.al === myAl.id) || w.marches.some(x => x.lead === m.id && x.owner === me.id);
+      if (involved) sieges.push({ mine: !!mineF, id: m.id, tid: m.tid, kind, tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : bo && bo.k === 'camp' ? 'Banditenlager Stufe ' + bo.lv : bo && bo.k === 'throne' ? 'den Thron' : bo && bo.k === 'sanct' ? 'ein Heiligtum' : 'ein Heer auf dem Feld', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, n: sum(m.troops), pw: fightView(mkCtx(match, players, now), m), px: marchPos(m, gt).x, py: marchPos(m, gt).y });
+    }
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
       tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, lead: m.lead, side: m.side, amount: m.amount, res: m.res, load: own ? m.load : undefined });

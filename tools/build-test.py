@@ -38,7 +38,7 @@ def wrap(name, src):
 import os
 mods = []
 for name, path in [('mapgen', 'shared/mapgen.js'), ('rules', 'shared/rules.js'), ('combat', 'shared/combat.js'), ('core', 'shared/core.js'), ('outpost', 'shared/outpost.js'), ('war', 'shared/war.js'), ('social', 'shared/social.js'), ('world', 'shared/world.js'), ('cheat', 'shared/cheat.js'),
-                   ('art', 'public/art.js'), ('rockdata', 'public/rockdata.js'), ('vikingdata', 'public/vikingdata.js'), ('riderdata', 'public/riderdata.js'), ('map', 'public/map.js'), ('city3d', 'public/city3d.js')]:
+                   ('art', 'public/art.js'), ('rockdata', 'public/rockdata.js'), ('vikingdata', 'public/vikingdata.js'), ('riderdata', 'public/riderdata.js'), ('map', 'public/map.js'), ('sound', 'public/sound.js'), ('city3d', 'public/city3d.js')]:
     if (root / path).exists():
         mods.append(wrap(name, rd(path)))
 sim = wrap('sim', rd('tools/sim.js'))

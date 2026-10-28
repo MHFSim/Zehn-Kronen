@@ -107,7 +107,12 @@ export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, ob
 
 export function marchPos(m, gt) {
   const L = m.path.length - 1;
-  if (m.phase === 'gather' || m.phase === 'post' || m.phase === 'fight') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
+  if (m.phase === 'fight') {   // im Kampf steht das Heer etwas vor dem Ziel, Angreifer auf der Anmarschseite, Verteidiger gegenüber
+    const [x, y] = cellXY(m.path[L]), [px, py] = cellXY(m.path[Math.max(0, L - 3)]);
+    let dx = px - x, dy = py - y; if (!dx && !dy) dy = 1; const d = Math.hypot(dx, dy), base = m.tk === 'start' ? 3.2 : m.tk === 'outpost' ? 2.8 : 2, off = m.side === 'def' ? base * .42 : base, lat = ((m.id % 5) - 2) * .5;
+    return { x: x + .5 + dx / d * off - dy / d * lat, y: y + .5 + dy / d * off + dx / d * lat, i: L, frac: 0, still: true, fight: true };
+  }
+  if (m.phase === 'gather' || m.phase === 'post') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
   const el = Math.max(0, Math.min(m.arr[L], gt - m.t0));
   let i = 0; while (i < L && m.arr[i + 1] <= el) i++;
   const [ax, ay] = cellXY(m.path[i]);
@@ -127,6 +132,13 @@ export function joinDefenders(w, tid, troops) {
 export function leaveDefenders(w, tid, troops) {
   const L = fightAt(w, tid); if (!L) return;
   const f = L.fight; for (const u in troops) { const k = f.D0[u] > 0 ? Math.min(1, (f.D[u] || 0) / f.D0[u]) : 0; f.D[u] = Math.max(0, (f.D[u] || 0) - troops[u] * k); f.D0[u] = Math.max(0, (f.D0[u] || 0) - troops[u]); }
+}
+// Heer nach Hause schicken: direkter Weg vom jetzigen Ort, ohne Umweg über den früheren Ausgangspunkt
+export function homeBack(ctx, m, bt) {
+  const P = byId(ctx.players, m.owner), end = m.path[m.path.length - 1];
+  const plan = P ? planFrom(mapOf(ctx.match), cellXY(end), P.state.pos[0], P.state.pos[1], m.troops, P.state) : null;
+  if (plan && !plan.error && plan.path.length > 1) { m.path = plan.path; m.arr = plan.arr; } else reversed(m);
+  m.phase = 'back'; m.t0 = bt; m.mode = 'home'; m.tk = 'start'; delete m.redir;
 }
 export function reversed(m) {
   const L = m.arr.length - 1;

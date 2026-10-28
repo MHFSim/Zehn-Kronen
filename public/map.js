@@ -993,6 +993,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       if (!show) { h.lab.el.style.display = 'none'; h.lab.vis = false; continue; }
       place(h.lab, o.x + .5, h.grp.position.y + h.lab.up * h.grp.scale.y, o.y + .5, sb);
     }
+    this.placeFightBars(place, sb);
     for (const id in this.marchObjs) {
       const s = this.marchObjs[id]; if (!s.lab) continue;
       if (!s.grp.visible) { s.lab.el.style.display = 'none'; s.lab.vis = false; continue; }
@@ -1007,7 +1008,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     const m = s.m, sp = this.view.match.speed || 1; let x = '';
     const f = sec => { sec = Math.max(0, Math.ceil(sec)); const h = Math.floor(sec / 3600), mi = Math.floor(sec % 3600 / 60), se = sec % 60; return h ? h + ':' + String(mi).padStart(2, '0') + ':' + String(se).padStart(2, '0') : mi + ':' + String(se).padStart(2, '0'); };
     if (m.phase === 'out' || m.phase === 'back') x = ' · ' + f((m.t0 + m.arr[m.arr.length - 1] - gt) / sp);
-    else if (m.phase === 'siege') x = ' · Kampf in ' + f((m.tSiege - gt) / sp);
+    else if (m.phase === 'fight') x = ' · Kampf';
     else if (m.phase === 'gather' && m.tEnd > m.tStart) x = ' · ' + Math.round(Math.max(0, Math.min(1, (gt - m.tStart) / (m.tEnd - m.tStart))) * 100) + ' %';
     return s.pre + x;
   }
@@ -1044,11 +1045,43 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         }));
       }
       for (const u of s.units) u.ring.material.color.setRGB(LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255));
-      s.pre = (m.own ? '' : m.name + ' · ') + (m.phase === 'siege' || m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
+      s.pre = (m.own ? '' : m.name + ' · ') + (m.phase === 'fight' || m.mode === 'attack' ? '⚔ ' : m.mode === 'station' ? '🛡 ' : m.phase === 'post' ? '⚑ ' : m.phase === 'back' ? '↩ ' : '') + n; s.lt = 0;
       this.setBadge(s.lab, this.badgeTxt(s, this.gtNow()), 0x2a2f38); s.lab.el.style.borderColor = '#' + col.toString(16).padStart(6, '0');
     }
     for (const id in this.marchObjs) if (!keep.has(Number(id))) { const s = this.marchObjs[id]; this.scene.remove(s.grp); s.lab.el.remove(); delete this.marchObjs[id]; }
+    this.syncFightBars(view);
   }
+
+  /* ---------- Kampfbalken über dem Ziel ---------- */
+  syncFightBars(view) {
+    const keep = new Set(); this.fbars = this.fbars || {};
+    for (const sg of view.sieges || []) {
+      keep.add(sg.id); let b = this.fbars[sg.id];
+      if (!b) {
+        const el = document.createElement('div'); el.className = 'fbar'; el.innerHTML = '<div class="fb a"><i></i></div><div class="fb d"><i></i></div><span class="ft"></span>'; this.labelsEl.appendChild(el);
+        b = this.fbars[sg.id] = { el, a: el.querySelector('.a i'), d: el.querySelector('.d i'), t: el.querySelector('.ft') };
+      }
+      b.sg = sg; const pw = sg.pw;
+      if (pw) { const mx = Math.max(pw.pk, 1); b.a.style.width = Math.round(100 * pw.pa / mx) + '%'; b.d.style.width = Math.round(100 * pw.pd / mx) + '%'; b.left = pw.left; b.gt0 = this.gtNow(); b.na = pw.na; b.nd = pw.nd; }
+    }
+    for (const id in this.fbars) if (!keep.has(Number(id))) { this.fbars[id].el.remove(); delete this.fbars[id]; }
+  }
+  placeFightBars(place, sb) {
+    const sp = this.view.match.speed || 1, gt = this.gtNow();
+    for (const id in this.fbars) {
+      const b = this.fbars[id], sg = b.sg, h = this.obj[sg.tid], q = this.opObjs && this.opObjs[sg.tid], ms = this.marchObjs[sg.id];
+      let x, y, z;
+      if (h) { if (h.fogHide) { b.el.style.display = 'none'; b.vis = false; continue; } x = h.o.x + .5; z = h.o.y + .5; y = h.grp.position.y + ((h.h || 3) + .5) * h.grp.scale.y; }
+      else if (q) { x = q.o.x + .5; z = q.o.y + .5; y = 5; }
+      else if (ms) { x = ms.grp.position.x; z = ms.grp.position.z; y = ms.grp.position.y + 3; }
+      else { b.el.style.display = 'none'; b.vis = false; continue; }
+      place(b, x, y, z, sb);
+      const left = Math.max(0, (b.left || 0) - (gt - (b.gt0 || gt))) / sp, mm = Math.floor(left / 60), ss = Math.floor(left % 60);
+      const tx = '⚔ ' + (b.na || 0) + ' | ' + (b.nd || 0) + ' · ⏱ ' + (mm >= 60 ? Math.floor(mm / 60) + ':' + String(mm % 60).padStart(2, '0') + ':' : mm + ':') + String(ss).padStart(2, '0');
+      if (b.tx !== tx) { b.tx = tx; b.t.textContent = tx; }
+    }
+  }
+
 
 
   /* ---------- Revier und Außenposten ---------- */
@@ -1268,6 +1301,12 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const L = m.path.length - 1, dtc = L > 0 ? m.arr[L] / L : 1;
       if (!p.still) { const dx = ax + .5 - p.x, dz = ay + .5 - p.y; if (Math.hypot(dx, dz) > .01) s.hd = Math.atan2(dx, dz); }
       if (!s.dOk) { let d = 0; s.units.forEach((u, k) => { if (k) d += (s.units[k - 1].sz + u.sz) / 2; u.dist = d; }); s.dOk = true; }
+      const fighting = !!p.fight;
+      if (fighting) {   // Kämpfer schauen sich an: Angreifer zum Ziel, Verteidiger zu den Angreifern
+        const [tx, ty] = cellXY(m.path[L]), dx = tx + .5 - p.x, dz = ty + .5 - p.y;
+        if (Math.hypot(dx, dz) > .01) s.hd = m.side === 'def' ? Math.atan2(-dx, -dz) : Math.atan2(dx, dz);
+        if (m.side !== 'def' && t - (s.sp || 0) > .28) { s.sp = t; this.spark(p.x + Math.sin(s.hd) * .9, y + .55, p.y + Math.cos(s.hd) * .9); }
+      }
       const colm = !p.still && s.units.length > 1;
       s.grp.rotation.y = colm ? 0 : (s.hd || 0);
       const y0 = Math.max(0, y);
@@ -1275,6 +1314,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
         if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.spin ? (p.still ? 0 : t * 6) : l.s * sw * 1.1;
         let bob = p.still ? 0 : Math.abs(Math.sin(ph)) * (u.cav ? .05 : .035);
+        if (fighting) { const fw = Math.sin(t * 8 + k * 1.7 + Number(id)); if (u.la) u.la.rotation.x = fw * 1.3; if (u.lb) u.lb.rotation.x = -fw * 1.3; bob = Math.max(0, fw) * .07; u.g.position.set(u.rx, bob, u.rz + Math.max(0, fw) * .22); u.g.rotation.y = 0; return; }
         if (colm) {   // Marschkolonne: jede Figur folgt dem Weg im Abstand hinter dem Vordermann
           const q = marchPos(m, gt - u.dist * dtc), qa = m.path[Math.min(L, q.i + 1)], [bx, by] = cellXY(qa), ddx = bx + .5 - q.x, ddz = by + .5 - q.y;
           u.g.position.set(q.x - p.x, Math.max(0, this.yAt(q.x, q.y)) - y0 + bob, q.y - p.y);
@@ -1289,6 +1329,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       void step;
     }
     this.updateRoutes(routes, t);
+    this.stepSparks(t);
     // Auswahlring
     let ring = null;
     if (this.sel && this.sel.type === 'obj') { const h = this.obj[this.sel.id]; if (h) ring = { x: h.o.x + .5, z: h.o.y + .5, r: (KIND_R[h.o.k] || 1.7) * 1.15 + Math.sin(t * 3) * .05 }; }
@@ -1299,6 +1340,22 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.stepSmoke(t);
     this.projectLabels();
     this.renderer.render(this.scene, this.camera);
+  }
+  // Funken bei Schlägen im Kampf
+  spark(x, y, z) {
+    this.sparks = this.sparks || []; if (!this.sparkGeo) { this.sparkGeo = new T.SphereGeometry(.07, 6, 6); }
+    for (let i = 0; i < 3; i++) {
+      const m = new T.Mesh(this.sparkGeo, new T.MeshBasicMaterial({ color: i ? 0xffc04a : 0xffffff, transparent: true })); m.position.set(x, y, z); this.scene.add(m);
+      this.sparks.push({ m, vx: (Math.random() - .5) * 2.2, vy: 1.4 + Math.random() * 1.6, vz: (Math.random() - .5) * 2.2, life: .5 + Math.random() * .3 });
+    }
+    if (this.sparks.length > 120) { const o = this.sparks.shift(); this.scene.remove(o.m); o.m.material.dispose(); }
+  }
+  stepSparks(t) {
+    const dt = Math.min(.1, t - (this.fxT || t)); this.fxT = t; if (!this.sparks) return;
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const q = this.sparks[i]; q.life -= dt; q.vy -= 5 * dt; q.m.position.x += q.vx * dt; q.m.position.y += q.vy * dt; q.m.position.z += q.vz * dt; q.m.material.opacity = Math.max(0, q.life * 2.2); q.m.scale.setScalar(Math.max(.2, q.life * 2));
+      if (q.life <= 0) { this.scene.remove(q.m); q.m.material.dispose(); this.sparks.splice(i, 1); }
+    }
   }
   stepSmoke(t) {
     const g = this.smoke.geometry, P = g.attributes.position.array, A = g.attributes.aA.array, S = g.attributes.aS.array, list = this.smokeList, cx = this.cam.x, cz = this.cam.z;

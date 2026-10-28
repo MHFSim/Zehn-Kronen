@@ -49,12 +49,12 @@ export function battle(attT, defT, defMult = 1, attMult = 1) {
   return { win: Object.keys(defLeft).length === 0 && Object.keys(attLeft).length > 0, attLeft, defLeft, rounds };
 }
 // Eine einzige Kampfrunde auf Zählständen (Kommazahlen erlaubt): für den Kampf in Echtzeit
-export function roundStep(attT, defT, attMult = 1, defMult = 1) {
+export function roundStep(attT, defT, attMult = 1, defMult = 1, k = 1) {
   const A = grp(attT, attMult), D = grp(defT, defMult), nA = alive(A), nD = alive(D);
   if (nA < 0.5 || nD < 0.5) return { A: { ...attT }, D: { ...defT } };
   const toA = A.map(() => 0), toD = D.map(() => 0);
-  for (const g of A) D.forEach((h, j) => { toD[j] += g.n * atkVs(g, h.g) * KAMPF * (h.n / nD) / defVs(h, g.g); });
-  for (const g of D) A.forEach((h, j) => { toA[j] += g.n * atkVs(g, h.g) * KAMPF * (h.n / nA) / defVs(h, g.g); });
+  for (const g of A) D.forEach((h, j) => { toD[j] += k * g.n * atkVs(g, h.g) * KAMPF * (h.n / nD) / defVs(h, g.g); });
+  for (const g of D) A.forEach((h, j) => { toA[j] += k * g.n * atkVs(g, h.g) * KAMPF * (h.n / nA) / defVs(h, g.g); });
   const oA = {}, oD = {};
   A.forEach((h, j) => { oA[h.u] = Math.max(0, h.n - toA[j]); }); D.forEach((h, j) => { oD[h.u] = Math.max(0, h.n - toD[j]); });
   return { A: oA, D: oD };
