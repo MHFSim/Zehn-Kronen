@@ -337,6 +337,7 @@ function statsHTML(id) {
   const nx = (a, bb) => a + (L < 30 ? ` <span class="up">→ ${bb}</span>` : '');
   if (b.prod) rows.push(['Produktion', nx(fmtN(prodAt(id, L)) + '/h', fmtN(prodAt(id, n)) + '/h')]);
   if (id === 'rathaus') rows.push(['Gebäude bis Stufe', nx(L, n)], ['Bauschleifen', maxQueues(S) + (S.lv.rathaus < 5 ? ' <span class="up">· 2 ab Rathaus Stufe 5</span>' : '')], ['Steuergold', fmtN(rate(S, 'gold')) + '/h']);
+  if (id === 'akademie' && L) rows.push(['Forschungsschleifen', (L >= 15 ? 2 : 1) + (L < 15 ? ' <span class="up">· 2 ab Akademie Stufe 15</span>' : '')]);
   if (id === 'lager') rows.push(['Lagerplatz', nx(fmtN(cap(S)), fmtN(capFor(n)))], ['Plünderschutz', protectedPct(S) + ' %']);
   if (id === 'mauer') rows.push(['Haltbarkeit', nx(fmtN(1000 * L), fmtN(1000 * n))], ['Verteidigung', nx('+' + 5 * L + ' %', '+' + 5 * n + ' %')]);
   if (id === 'lazarett') rows.push(['Plätze', nx(fmtN(200 * L), fmtN(200 * n))]);
