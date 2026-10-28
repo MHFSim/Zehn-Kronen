@@ -906,6 +906,8 @@ function panelSignature() {
 /* ---------- Helden ---------- */
 const FX_GLYPH = { shield: '🛡', wind: '💨', leaf: '🍃', grain: '🌾', chips: '🪵', sparks: '✨', dust: '💨', ward: '✦', glow: '✦', shadow: '✦', flame: '🔥', gust: '🌀' };
 const hpic = (id, H) => HERO_PIC[id] ? `<img class="himg" src="${HERO_PIC[id]}" alt="" draggable="false">` : H.pic;
+const alaricIco = () => HERO_PIC.aldric ? `<img class="navhero" src="${HERO_PIC.aldric}" alt="" draggable="false">` : '🦸';
+{ const ni = document.querySelector('[data-nav=heroes] i'); if (ni) ni.innerHTML = alaricIco(); }
 const heroPortrait = (id, cls = '') => { const H = HEROES[id]; return `<div class="hport ${cls} fx-${H.fx}" style="--hc:${H.col}"><span class="haura"></span><span class="hface${HERO_PIC[id] ? ' img' : ''}">${hpic(id, H)}</span><span class="hweap">${H.icon}</span><i></i><i></i><i></i><i></i></div>`; };
 const keeperNow = () => [S.defHero, S.defDeputy].find(id => id && HEROES[id] && !busyHero(id)) || '';
 function heroCardHTML(id) {
@@ -920,7 +922,7 @@ function heroDetailHTML(id) {
   const sk = skillList(S, id).map(k => `<div class="mrow"><div><b>${k.name}</b><div class="note">${k.text}</div></div><div class="hsv"><b>+${(Math.round(k.val * 1000) / 10).toString().replace('.', ',')} %</b><small>Stufe ${HERO_MAX}: +${Math.round(k.top * 100)} %</small></div></div>`).join('');
   const how = H.role === 'gather' ? 'Lernt beim <b>Sammeln</b> auf Feldern (1 Erfahrung je 4 gesammelte Rohstoffe). Kämpfe bringen ihm nichts.' : 'Lernt im <b>Kampf</b>: Banditenlager und Räuber besiegen, Spieler oder Außenposten angreifen. Gegen viel zu schwache Ziele gibt es kaum Erfahrung.';
   const st = busyHero(id) ? 'führt gerade ein Heer an' : id === keeperNow() ? 'bewacht die Burg' : 'bereit in der Burg';
-  return phead('🦸', H.name + ' ' + H.title, 'Stufe ' + lv + ' von ' + HERO_MAX, '<button class="pback" type="button" data-act="heroBack">‹ Zurück</button>')
+  return phead(alaricIco(), H.name + ' ' + H.title, 'Stufe ' + lv + ' von ' + HERO_MAX, '<button class="pback" type="button" data-act="heroBack">‹ Zurück</button>')
     + `<div class="hdetail" style="--hc:${H.col}">${heroPortrait(id, 'big')}<div class="hstory"><p class="desc">${H.story}</p><p class="note">Zustand: <b>${st}</b></p>
       <div class="hbar big"><i style="width:${lv >= HERO_MAX ? 100 : Math.min(100, Math.round(xp / need * 100))}%"></i><span>${lv >= HERO_MAX ? 'Höchststufe' : fmtN(xp) + ' / ' + fmtN(need) + ' Erfahrung'}</span></div></div></div>
     <div class="block flat"><h3>Fähigkeiten</h3>${sk}</div>
@@ -931,7 +933,7 @@ function heroDetailHTML(id) {
 function heroesHTML() {
   if (heroSel) return heroDetailHTML(heroSel);
   const k = keeperNow(), nm = id => id ? HEROES[id].name : '–';
-  return phead('🦸', 'Helden', 'Anführer deiner Heere') + `<p class="note">Jedes Heer braucht einen Helden als Anführer. Sammler-Helden werden beim Sammeln stärker, die übrigen im Kampf. Tippe einen Helden an für Details.</p>
+  return phead(alaricIco(), 'Helden', 'Anführer deiner Heere') + `<p class="note">Jedes Heer braucht einen Helden als Anführer. Sammler-Helden werden beim Sammeln stärker, die übrigen im Kampf. Tippe einen Helden an für Details.</p>
     <div class="block flat"><h3>Burgwächter</h3><p class="note">${k ? '🏰 <b>' + HEROES[k].name + '</b> bewacht gerade die Burg.' : '<span class="why">Niemand bewacht gerade die Burg.</span>'} Wächter: ${nm(S.defHero)} · Stellvertreter: ${nm(S.defDeputy)}. Tippe einen Helden an, um ihn zum Wächter zu machen.</p></div>
     <div class="hgrid">${HERO_IDS.map(heroCardHTML).join('')}</div>`;
 }
