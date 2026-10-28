@@ -389,6 +389,13 @@ function signature() {
   if (!sel) return '';
   return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy, S.research && S.research.id + S.research.target]);
 }
+// Der gewählte Anführer soll in der Heldenreihe sichtbar sein (auch bei automatischer Wahl)
+function showSelHero() {
+  const on = document.querySelector('.hpick .hchip.on'), row = on && on.parentElement; if (!row) return;
+  const l = on.offsetLeft - row.offsetLeft, r = l + on.offsetWidth;
+  if (l < row.scrollLeft || r > row.scrollLeft + row.clientWidth) row.scrollLeft = l - (row.clientWidth - on.offsetWidth) / 2;
+}
+{ const si = document.getElementById('sheetInner'); if (si) new MutationObserver(showSelHero).observe(si, { childList: true, subtree: true }); }
 function renderSheet() {
   $('sheet').classList.add('parch'); $('sheet').classList.toggle('popup', !!msel);
   if (msel) return renderMapSheet();
