@@ -318,7 +318,7 @@ function renderPts() {
   let mu = $('mutChip'); if (!mu) { mu = document.createElement('div'); mu.id = 'mutChip'; mu.className = 'ptschip'; document.body.appendChild(mu); }
   mu.hidden = false; mu.style.top = (parseFloat(el.style.top) + el.offsetHeight + 6) + 'px';
   const mb = mu.offsetTop + mu.offsetHeight + 8; let nx = mb;   // Knöpfe links untereinander direkt unter den Chips, Heere rechts oben
-  for (const id of ['placeBtn', 'tpBtn', 'chatBtn']) { const b = $(id); if (!b || b.hidden || getComputedStyle(b).display === 'none') continue; b.style.top = nx + 'px'; b.style.bottom = 'auto'; nx += b.offsetHeight + 8; }
+  for (const id of ['placeBtn', 'tpBtn']) { const b = $(id); if (!b || b.hidden || getComputedStyle(b).display === 'none') continue; b.style.top = nx + 'px'; b.style.bottom = 'auto'; nx += b.offsetHeight + 8; }
   const ab = $('armyBtns'); if (ab) ab.style.top = ((tb ? tb.offsetHeight : 60) + 8) + 'px';
   const t2 = `💪 <b>${Math.floor(S.mut == null ? MUT_MAX : S.mut)}</b>`; if (mu.innerHTML !== t2) { mu.innerHTML = t2; mu.title = 'Mut (max. ' + MUT_MAX + ')'; mu.classList.add('small'); }
 }
