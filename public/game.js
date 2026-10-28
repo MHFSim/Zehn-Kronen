@@ -597,7 +597,7 @@ function checkFeed() {
 /* ---------- gemeinsame Bausteine der Menüs ---------- */
 const phead = (ico, title, sub, right) => `<header class="phead"><span class="pico">${ico}</span><div class="ptitle"><h2>${title}</h2>${sub ? `<small>${sub}</small>` : ''}</div>${right || ''}</header>`;
 const ptabs = (items, cur, act) => `<div class="ptabs" role="tablist">${items.map(([id, label, n]) => `<button type="button" role="tab" class="ptab ${id === cur ? 'on' : ''}" data-act="${act}" data-t="${id}">${label}${n ? `<span class="pbadge">${n}</span>` : ''}</button>`).join('')}</div>`;
-let allyTab = '', moreSub = '', repTab = 'all';
+let moreFrom = '', allyTab = '', moreSub = '', repTab = 'all';
 
 /* ---------- Bündnis ---------- */
 function revierHTML() {
@@ -888,7 +888,7 @@ function fitTree() {}
 window.addEventListener('resize', () => { if (panelName === 'tech') fitTree(); });
 function openPanel(name) {
   if (!$('reports').hidden) closeReports();
-  closeSheet(); panelName = name; panelSig = ''; if (name === 'more') moreSub = ''; if (name === 'ally') allyTab = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
+  closeSheet(); panelName = name; panelSig = ''; if (name === 'more') { moreSub = ''; moreFrom = ''; } if (name === 'ally') allyTab = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
   if (name === 'tech') { fitTree(); requestAnimationFrame(fitTree); }
   if (name === 'more') {
     pushStatus().then(() => renderPanel(true));
@@ -913,8 +913,8 @@ function setupPanel() {
     if (act === 'devTools') { closePanel(); const on = !document.body.classList.contains('dev-tools'); document.body.classList.toggle('dev-tools', on); const bx = document.getElementById('zkToolsBox'); if (on && bx && bx.hidden) document.getElementById('zkToolsBtn').click(); return; }
     if (act === 'devAdmin') { closePanel(); document.getElementById('swap').click(); return; }
     if (act === 'sub' && d.t === 'reports') return openReports();
-    if (act === 'sub') { moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
-    if (act === 'back') { moreSub = ''; return go(); }
+    if (act === 'sub') { moreFrom = ''; moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
+    if (act === 'back') { moreSub = ''; if (moreFrom) { moreFrom = ''; return closePanel(); } return go(); }
     if (act === 'claimDaily') { const ok = await command({ type: 'claimDaily' }); if (ok) toast('3 Stunden Speedups erhalten!', 'info'); return renderPanel(true); }
     if (act === 'openPack') { const ok = await command({ type: 'openPack' }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
     if (act === 'donate') { const amounts = {}; for (const r of RES) { const v = Math.floor(Number(val('dn_' + r)) || 0); if (v > 0) amounts[r] = v; } if (!Object.keys(amounts).length) return void toast('Gib an, wie viel du einzahlen willst.'); return void command({ type: 'donate', amounts }).then(ok => { if (ok) { for (const r of RES) { const i = document.getElementById('dn_' + r); if (i) i.value = ''; } toast('Eingezahlt. Danke!', 'info'); } }); }
@@ -1029,7 +1029,7 @@ function setupModal() {
   document.addEventListener('click', async e => {
     const sp = e.target.closest('[data-speed]'); if (sp) { const [k, r] = sp.dataset.speed.split(':'); return openSpeed(k, r); }
     if (e.target.closest('[data-bag]')) return openSpeed('bag', '');
-    if (e.target.closest('[data-daily]')) { openPanel('more'); moreSub = 'daily'; return renderPanel(true); }
+    if (e.target.closest('[data-daily]')) { openPanel('more'); moreSub = 'daily'; moreFrom = mode; return renderPanel(true); }
     const el = e.target.closest('#modalIn [data-act]'); if (!el || !speedCtx) return;
     const act = el.dataset.act, i = el.dataset.i;
     if (act === 'mClose') { $('modal').hidden = true; speedCtx = null; }
