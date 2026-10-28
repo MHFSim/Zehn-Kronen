@@ -148,9 +148,37 @@ export function blocker(S, id) {
 export const ITEMS = {
   teleport: { name: 'Teleporter', icon: '🌀', price: 800, desc: 'Versetzt deine Burg an einen freien Ort in eurem Bündnisgebiet. Danach 12 Stunden Pause.' },
   // Beschleuniger kann man nicht kaufen: Sie werden beim Ressourcensammeln gefunden (in 2 Stunden Sammeln im Schnitt je einer)
+  sp1:   { name: 'Beschleuniger 1 Min.', icon: '⚡', sec: 60, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Minute.' },
   sp5:   { name: 'Beschleuniger 5 Min.', icon: '⚡', sec: 300, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 5 Minuten.' },
-  sp15:  { name: 'Beschleuniger 15 Min.', icon: '⚡', sec: 900, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 15 Minuten.' }
+  sp15:  { name: 'Beschleuniger 15 Min.', icon: '⚡', sec: 900, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 15 Minuten.' },
+  sp60:  { name: 'Beschleuniger 1 Std.', icon: '⚡', sec: 3600, desc: 'Verkürzt Bau, Ausbildung oder Forschung um 1 Stunde.' }
 };
+export const SPEED_IDS = ['sp1', 'sp5', 'sp15', 'sp60'];
+export const SPEED_SLACK = 300;   // beim automatischen Anpassen dürfen höchstens 5 Minuten überstehen
+// Passende Beschleuniger für eine Restzeit `left` (Sekunden) aus dem Beutel `have` ({id: Anzahl}) wählen: möglichst wenig überstehende Zeit, dann möglichst wenige Stück.
+// Ergebnis: use (Auswahl), sum (gesparte Sekunden), over (überstehende Sekunden), ok (über höchstens SPEED_SLACK), short (Sekunden, die selbst mit allem fehlen)
+export function planSpeeds(have, left) {
+  const n = id => Math.max(0, Math.floor((have || {})[id] || 0)), sec = id => ITEMS[id].sec, none = { use: {}, sum: 0, over: 0, ok: false, short: Math.max(0, left) };
+  if (!(left > 0)) return { ...none, ok: true, short: 0 };
+  const all = SPEED_IDS.reduce((a, id) => a + n(id) * sec(id), 0);
+  if (all < left) { const use = {}; SPEED_IDS.forEach(id => { if (n(id)) use[id] = n(id); }); return { use, sum: all, over: 0, ok: false, short: left - all }; }
+  let best = null;
+  const cap = (id, rest) => Math.min(n(id), Math.ceil(Math.max(0, rest) / sec(id)));
+  for (let a = 0; a <= cap('sp60', left); a++) {
+    const r1 = left - a * 3600;
+    for (let b = 0; b <= cap('sp15', r1); b++) {
+      const r2 = r1 - b * 900;
+      for (let c = 0; c <= cap('sp5', r2); c++) {
+        const r3 = r2 - c * 300, d = Math.max(0, Math.ceil(r3 / 60)); if (d > n('sp1')) continue;
+        const sum = a * 3600 + b * 900 + c * 300 + d * 60, over = sum - left, cnt = a + b + c + d;
+        if (!best || over < best.over || (over === best.over && cnt < best.cnt)) best = { use: { sp60: a, sp15: b, sp5: c, sp1: d }, sum, over, cnt };
+      }
+    }
+  }
+  if (!best) return none;
+  for (const id in best.use) if (!best.use[id]) delete best.use[id];
+  return { use: best.use, sum: best.sum, over: best.over, ok: best.over <= SPEED_SLACK, short: 0 };
+}
 export const TELEPORT_COOLDOWN = 12 * 3600;
 // Zeit eines laufenden Auftrags (Bau, Ausbildung, Forschung) um sec Spielsekunden kürzen
 export function speedUp(S, kind, ref, sec) {
@@ -249,6 +277,14 @@ export function applyCommand(S, cmd) {
     const why = speedUp(S, String(cmd.kind), String(cmd.ref), it.sec); if (why) return why;
     S.items[cmd.item]--; return '';
   }
+  if (cmd.type === 'useSpeeds') {   // mehrere Beschleuniger auf einmal (automatisch angepasst)
+    const use = cmd.items && typeof cmd.items === 'object' ? cmd.items : {}; let tot = 0;
+    for (const id in use) { const k = Math.floor(Number(use[id]) || 0); if (k < 0 || !ITEMS[id] || !ITEMS[id].sec) return 'Das ist kein Beschleuniger'; if (k > ((S.items || {})[id] || 0)) return 'Du hast nicht so viele Beschleuniger'; tot += k * ITEMS[id].sec; }
+    if (!(tot > 0)) return 'Keine Beschleuniger gewählt';
+    const why = speedUp(S, String(cmd.kind), String(cmd.ref), tot); if (why) return why;
+    for (const id in use) S.items[id] -= Math.floor(Number(use[id]) || 0);
+    return '';
+  }
   if (cmd.type === 'research') {
     const why = techBlocker(S, cmd.tech); if (why) return why;
     const lv = techLv(S, cmd.tech) + 1, tm = techTimeFor(S, cmd.tech, lv);
@@ -296,12 +332,12 @@ export function applyCommand(S, cmd) {
   return 'Unbekannter Befehl';
 }
 
-// Fund von Beschleunigern beim Sammeln: je 2 Stunden Sammelzeit im Schnitt ein 15-Min.- und ein 5-Min.-Beschleuniger (zufällig, aber reproduzierbar).
-export const FIND_EVERY = 2 * 3600;
+// Fund von Beschleunigern beim Sammeln: im Schnitt je Stunde Sammelzeit so viele Stück (zufällig, aber reproduzierbar).
+export const FINDS = { sp1: 3, sp5: 1.5, sp15: .75, sp60: .1 };
 const rnd01 = k => { const x = Math.sin(k * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 export function gatherFinds(S, seed, gameSec) {
-  const exp = Math.max(0, gameSec) / FIND_EVERY, got = {};
-  ['sp15', 'sp5'].forEach((id, i) => { const n = Math.floor(exp) + (rnd01(seed * 7 + i * 131 + Math.floor(gameSec)) < exp - Math.floor(exp) ? 1 : 0); if (n > 0) { got[id] = n; S.items = S.items || {}; S.items[id] = (S.items[id] || 0) + n; } });
+  const got = {};
+  Object.keys(FINDS).forEach((id, i) => { const exp = Math.max(0, gameSec) / 3600 * FINDS[id], n = Math.floor(exp) + (rnd01(seed * 7 + i * 131 + Math.floor(gameSec)) < exp - Math.floor(exp) ? 1 : 0); if (n > 0) { got[id] = n; S.items = S.items || {}; S.items[id] = (S.items[id] || 0) + n; } });
   return got;
 }
 export const findsText = g => Object.keys(g).map(id => g[id] + '× ' + ITEMS[id].name).join(' und ');

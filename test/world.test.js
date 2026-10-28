@@ -119,9 +119,15 @@ assert.equal(va.world.marches.filter(x => x.own).length, 2);
 const gt0 = match.world.gt; setSpeed(match, players, 10, t + 1000);
 assert.ok(match.world.gt > gt0);
 
-// Beschleuniger werden beim Sammeln gefunden: bei 2 Stunden je einer, im Schnitt über viele Märsche
-{ const { gatherFinds } = await import('../shared/rules.js'), S = { items: {} };
-  const g = gatherFinds(S, 1, 2 * 3600); assert.equal(g.sp15, 1); assert.equal(g.sp5, 1, 'bei genau 2 Stunden je einer');
-  let n15 = 0, n5 = 0; for (let i = 1; i <= 400; i++) { const r = gatherFinds({ items: {} }, i, 3600); n15 += r.sp15 || 0; n5 += r.sp5 || 0; }
-  assert.ok(n15 > 140 && n15 < 260 && n5 > 140 && n5 < 260, 'bei 1 Stunde ungefähr die Hälfte: ' + n15 + '/' + n5); }
+// Beschleuniger werden beim Sammeln gefunden: im Schnitt je Stunde mehrere kleine und große
+{ const { gatherFinds, FINDS } = await import('../shared/rules.js'), tot = {};
+  for (let i = 1; i <= 400; i++) { const r = gatherFinds({ items: {} }, i, 3600); for (const id in r) tot[id] = (tot[id] || 0) + r[id]; }
+  for (const id in FINDS) { const want = FINDS[id] * 400; assert.ok(Math.abs((tot[id] || 0) - want) < want * .25 + 10, id + ' im Schnitt ' + (tot[id] || 0) + ' statt ' + want); }
+  assert.equal(gatherFinds({ items: {} }, 1, 2 * 3600).sp1, 6); }
+// Automatische Auswahl: höchstens 5 Minuten überstehen, sonst eine Warnung mit dem Überstand
+{ const { planSpeeds } = await import('../shared/rules.js');
+  let p = planSpeeds({ sp1: 10, sp5: 3, sp15: 2, sp60: 1 }, 3600 + 900 + 120); assert.ok(p.ok && p.over <= 300 && p.sum >= 4620, JSON.stringify(p));
+  p = planSpeeds({ sp60: 2 }, 600); assert.equal(p.ok, false); assert.equal(p.over, 3000); assert.equal(p.use.sp60, 1);
+  p = planSpeeds({ sp5: 2 }, 3600); assert.equal(p.ok, false); assert.equal(p.short, 3000);
+  p = planSpeeds({ sp15: 1, sp5: 1 }, 1200); assert.ok(p.ok && p.over === 0, JSON.stringify(p)); }
 console.log('Alle Weltentests bestanden.');

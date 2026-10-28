@@ -88,7 +88,7 @@ Ohne Bündnis gibt es kein Revier. Die Burg hat kein eigenes Revier; den **erste
 - **Heiligtümer und Thron** gehören der Gruppe, deren Viereck das weiße Andockfeld berührt (keine Besatzung nötig).
 - **Wege:** Mit den Außenposten entstehen Wege (Burg des Gründers → erster Außenposten, dann jeweils zum nächsten bestehenden Punkt). Auf Wegen sind Heere 30 % schneller (`ROAD_SPEED` in `shared/mapgen.js`).
 - **Platzieren:** Der Button „Außenposten“ auf der Karte zeigt oben, wie viele Felder, Wälder und Steinbrüche im Viereck liegen. Jedes Feld im fertigen Revier bringt dem Bündnislager automatisch 50 pro Stunde.
-- **Shop** (Mehr → Shop, bezahlt mit Gold): *Teleporter* (800 Gold, versetzt die Burg an einen freien Ort im Bündnisgebiet, danach 12 Stunden Pause, mit Lichteffekt) und *Beschleuniger* (5 Min. 15 Gold, 1 Std. 150, 8 Std. 1000), die Bau, Ausbildung oder Forschung verkürzen (⚡ beim jeweiligen Auftrag).
+- **Shop** (Mehr → Shop, bezahlt mit Gold): *Teleporter* (800 Gold, versetzt die Burg an einen freien Ort im Bündnisgebiet, danach 12 Stunden Pause, mit Lichteffekt) und *Beschleuniger* (1 Min., 5 Min., 15 Min., 1 Std.), die Bau, Ausbildung oder Forschung verkürzen (⚡ beim jeweiligen Auftrag). Man kann sie nicht kaufen: Das Heer findet sie beim Sammeln (je Stunde im Schnitt 3× 1 Min., 1,5× 5 Min., 0,75× 15 Min., 0,1× 1 Std.). ⚡ Speedups in Stadt und Akademie zeigt den Beutel, „Automatisch anpassen“ wählt passende Beschleuniger (höchstens 5 Min. Überstand, sonst Warnung mit der verschwendeten Zeit).
 
 Die Regeln stehen in `shared/outpost.js` und `shared/rules.js` (ITEMS), die Zahlen oben in diesen Dateien.
 

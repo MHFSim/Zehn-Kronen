@@ -3,7 +3,7 @@
 import {
   RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, buildTime, techTimeFor, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, T_PRE_LV, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
+  T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe } from '/shared/war.js';
@@ -271,7 +271,7 @@ function upgradeHTML(id) {
   return `<div class="block"><h3>${L ? 'Ausbau auf Stufe ' + t : 'Bauen'}</h3>
     <div class="costs">${costHTML(c)}</div>
     <div class="time">Bauzeit ${fmtT(real(tm))}${speed > 1 ? ' · ohne Testtempo ' + fmtT(tm) : ''}</div>
-    <div class="row"><button class="btn" data-act="upgrade" type="button" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button>${why ? `<span class="why">${why}</span>` : ''}</div></div>`;
+    <div class="row"><button class="btn" data-act="upgrade" type="button" ${why ? 'disabled' : ''}>${L ? 'Ausbauen' : 'Bauen'}</button><button class="btn ghost" data-act="upgradeSp" type="button" ${why ? 'disabled' : ''}>⚡ + Speedups</button>${why ? `<span class="why">${why}</span>` : ''}</div></div>`;
 }
 function unitsHTML(id) {
   const b = B[id], L = S.lv[id];
@@ -352,6 +352,7 @@ function setupSheet() {
     if (act === 'cancelResearch') return void command({ type: 'cancelResearch' });
     if (mapAct(act, el)) return;
     if (act === 'upgrade') return command({ type: 'upgrade', id });
+    if (act === 'upgradeSp') { const ok = await command({ type: 'upgrade', id }); if (ok) openSpeed('build', id); return; }
     if (act === 'cancel') return command({ type: 'cancel', id });
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
     if (act === 'plus' || act === 'minus') {
@@ -426,7 +427,7 @@ function techPlateHTML(id) {
 function citySig() {
   return JSON.stringify([S.lv, S.queue.map(q => q.id + q.target), Object.keys(S.train).map(k => k + S.train[k].map(o => o.count + o.unit).join()), S.troops, S.away, S.wounded,
     Object.keys(B).map(id => locked_(id) ? 'L' : blocker(S, id)), ownMarches().map(m => m.id + m.phase), unread(), me.name, match.name, cityCat, S.stationed, match.phase,
-    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id))]);
+    S.tech, S.research && S.research.id + S.research.target, Object.keys(T).map(id => techBlocker(S, id)), S.items]);
 }
 let citySigV = '';
 function renderCity(force) {
@@ -446,6 +447,7 @@ function renderCity(force) {
   const body = BORDER.map(plateHTML).join('');
   $('cityList').innerHTML = `<div class="city-in">
     <div class="burg" data-b="rathaus"><b>Burg von ${esc(me.name)}</b><span>Rathaus Stufe ${L} · „${esc(match.name)}“</span></div>
+    <button class="bagbtn" type="button" data-bag="1" aria-label="Speedups">⚡ Speedups<b>${SPEED_IDS.reduce((a, i) => a + itemN(i), 0)}</b></button>
     <div class="strip parch"><div><b>${fmtN(home)}</b><span>Truppen daheim</span></div><div><b>${fmtN(away)}</b><span>unterwegs</span></div><div><b>${fmtN(wd)}</b><span>verwundet</span></div><div><b>${fmtN(rate(S, 'gold'))}</b><span>Gold/h</span></div></div>
     <section class="orders parch"><h3 class="sec">Aufträge</h3>${orders.join('')}${freeSlots}${stRow}</section>
     <div class="tabbody parch">${body}</div>
@@ -798,7 +800,7 @@ function techCardHTML(id) {
   let act;
   if (run) act = `<div class="bprog"><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span><button class="spd" type="button" data-speed="research:1" aria-label="Beschleunigen">⚡</button></div>`;
   else if (L >= T_MAX) act = '<span class="note">Höchststufe erreicht</span>';
-  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><div class="row"><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button><span class="${why ? 'why' : 'note'}">${why || 'Dauer ' + fmtT(real(techTime(id, next))) + ' · Akademie ' + techReq(next)}</span></div>`;
+  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><div class="row"><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button><button class="btn ghost" type="button" data-act="techGoSp" data-id="${id}" ${why ? 'disabled' : ''}>⚡ + Speedups</button><span class="${why ? 'why' : 'note'}">${why || 'Dauer ' + fmtT(real(techTime(id, next))) + ' · Akademie ' + techReq(next)}</span></div>`;
   const rows = [1, 2, 3, 4, 5].map(l => `<div class="tlv ${l === L ? 'cur' : ''}"><b>Stufe ${l}${l <= L ? ' ✓' : ''}</b><div class="note">${techEffect(id, l)}</div><div class="tmeta"><span class="costs sm">${costHTML(techCost(id, l))}</span><span class="note">Dauer ${fmtT(real(techTime(id, l)))} · Akademie ${techReq(l)}</span></div></div>`).join('');
   return `<div class="ucard tcard"><div class="uhead"><div><b>${t.name}</b> ${pips}</div><span class="utime">Stufe ${L} von ${T_MAX}</span></div>
     <p class="note" style="margin:4px 0">${L ? 'Jetzt: ' + techEffect(id, L) : 'Noch nicht erforscht.'}</p>
@@ -827,7 +829,7 @@ function techPopHTML(id) {
   let act;
   if (run) act = `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><div class="row"><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span><button class="btn small" type="button" data-speed="research:1">⚡ Beschleunigen</button></div>`;
   else if (L >= T_MAX) act = '<p class="note">Höchststufe erreicht ✓</p>';
-  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTimeFor(S, id, next)))} · braucht Akademie ${techReq(next)}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button>${why ? `<p class="why">${why}</p>` : ''}`;
+  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTimeFor(S, id, next)))} · braucht Akademie ${techReq(next)}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button><button class="btn ghost" type="button" data-act="techGoSp" data-id="${id}" ${why ? 'disabled' : ''}>⚡ + Speedups</button>${why ? `<p class="why">${why}</p>` : ''}`;
   return `<div class="tpop" data-act="techClose"><div class="tpin"><div class="uhead"><div><b>${t.name}</b> <span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span></div><button class="pback" type="button" data-act="techClose">✕</button></div>
     <p class="note">${t.desc}</p><p class="tbo"><b>+${now} %</b>${L < T_MAX ? ` → <b>+${nx} %</b> ${t.unit}` : ' ' + t.unit}</p>${act}</div></div>`;
 }
@@ -835,13 +837,13 @@ function techHTML() {
   const A = S.lv.akademie, r = S.research;
   const run = r ? `<div class="trun"><span class="tni">${bico(T[r.id].icon)}</span><div class="trb"><div class="trt"><b>${T[r.id].name} → Stufe ${r.target}</b><span class="time" data-rtime="1">${fmtT(real(r.left))}</span></div><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div></div><button class="btn small" type="button" data-speed="research:1">⚡</button></div>` : '';
   const note = A ? '' : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'}</div>`;
-  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut') + note + run + techTreeHTML() + (techSel && T[techSel] ? techPopHTML(techSel) : '');
+  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut', `<button class="bagbtn small" type="button" data-bag="1" aria-label="Speedups">⚡<b>${SPEED_IDS.reduce((a, i) => a + itemN(i), 0)}</b></button>`) + note + run + techTreeHTML() + (techSel && T[techSel] ? techPopHTML(techSel) : '');
 }
 
 /* ---------- Panels (Bündnis, Mehr) ---------- */
 let panelName = '', panelSig = '';
 function panelSignature() {
-  if (panelName === 'tech') return JSON.stringify([techSel, S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
+  if (panelName === 'tech') return JSON.stringify([S.items, techSel, S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
@@ -878,6 +880,7 @@ function setupPanel() {
     if (act === 'ttab') { trainTab = d.t; return go(); }
     if (act === 'techSel') { techSel = d.id; return renderPanel(true); }
     if (act === 'techClose') { if (el.classList.contains('tpop') && e.target !== el) return; techSel = ''; return renderPanel(true); }
+    if (act === 'techGoSp') { techSel = ''; renderPanel(true); const ok = await command({ type: 'research', tech: d.id }); if (ok) openSpeed('research', '1'); return; }
     if (act === 'techGo') { techSel = ''; renderPanel(true); return void command({ type: 'research', tech: d.id }); }
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
     if (act === 'train') return void command({ type: 'train', id: d.b, unit: d.u, count: pick[d.u] || 10 });
@@ -935,7 +938,7 @@ function placeInfo(t) {
     + (cnt.sanct ? `<span title="Heiligtum">✨ ${cnt.sanct}</span>` : '') + (cnt.throne ? '<span title="Thron">👑</span>' : '');
 }
 function placeStep() {
-  const show = mode === 'map' && view && (view.ally || S.startTp > 0) && !msel && view.match.phase === 'running';
+  const show = mode === 'map' && view && (view.ally || S.startTp > 0) && !msel && view.match.phase === 'running' && !panelName && $('reports').hidden;
   $('placeBtn').hidden = !show || !!placing || !view.ally; $('tpBtn').hidden = !show || !!placing;
   $('placeBar').hidden = !(show && placing); $('placeInfo').hidden = !(show && placing === 'build');
   if (!placing || !show) { if (placing && !show) placing = false; return; }
@@ -968,7 +971,6 @@ function setupPlace() {
 }
 
 /* ---------- Shop, Beutel, Beschleuniger ---------- */
-const SPEED_IDS = ['sp5', 'sp15'];
 let speedCtx = null;
 const itemN = id => (S.items || {})[id] || 0;
 function speedTarget(kind, ref) {
@@ -976,32 +978,52 @@ function speedTarget(kind, ref) {
   if (kind === 'research') return S.research ? { name: T[S.research.id].name + ' → Stufe ' + S.research.target, left: S.research.left } : null;
   const l = S.train[ref]; return l && l.length ? { name: B[ref].name + ': ' + l.reduce((a, o) => a + o.count, 0) + ' Einheiten', left: l.reduce((a, o, i) => a + o.left + (o.count - 1) * o.per, 0) } : null;
 }
+const findsLine = () => 'Speedups findet dein Heer beim Ressourcensammeln: je Stunde Sammeln im Schnitt ' + SPEED_IDS.map(id => FINDS[id] + '× ' + ITEMS[id].name.replace('Beschleuniger ', '')).join(', ') + ' – man kann sie nicht kaufen.';
+const bagList = () => SPEED_IDS.map(id => { const it = ITEMS[id]; return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b></div><b class="spn">${itemN(id)}×</b></div>`; }).join('');
+const bagTotal = () => SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0);
 function speedHTML() {
+  if (speedCtx.kind === 'bag') return `<h2>⚡ Deine Speedups</h2>${bagList()}<p class="note">Zusammen: <b>${bagTotal() ? fmtT(real(bagTotal())) : '0'}</b> Zeitersparnis. Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p><p class="note">${findsLine()}</p><div class="row"><button class="btn ghost" type="button" data-act="mClose">Schließen</button></div>`;
   const t = speedTarget(speedCtx.kind, speedCtx.ref);
   if (!t) return `<h2>⚡ Beschleunigen</h2><p class="note">Dieser Auftrag ist fertig.</p><div class="row"><button class="btn" type="button" data-act="mClose">Schließen</button></div>`;
+  const w = speedCtx.warn, nm = u => Object.keys(u).map(id => u[id] + '× ' + ITEMS[id].name.replace('Beschleuniger ', '')).join(', ');
+  let warn = '';
+  if (w) warn = w.short > 0
+    ? `<div class="note-box">Alle deine Speedups (${fmtT(real(w.sum))}) reichen nicht ganz: Es bleiben noch ${fmtT(real(w.short))}.<div class="row" style="margin-top:6px"><button class="btn small" type="button" data-act="mAutoGo">Alle einsetzen</button><button class="btn ghost small" type="button" data-act="mAutoNo">Abbrechen</button></div></div>`
+    : `<div class="note-box why">Kein passender Speedup: Der beste (${nm(w.use)}) spart ${fmtT(real(w.sum))}, davon sind <b>${fmtT(real(w.over))}</b> zu viel. Diese Zeit würde verschwendet.<div class="row" style="margin-top:6px"><button class="btn small" type="button" data-act="mAutoGo">Trotzdem nehmen</button><button class="btn ghost small" type="button" data-act="mAutoNo">Abbrechen</button></div></div>`;
   return `<h2>⚡ Beschleunigen</h2><p class="desc"><b>${esc(t.name)}</b><br>Noch ${fmtT(real(t.left))}</p>
+    <button class="btn" type="button" data-act="mAuto" ${bagTotal() ? '' : 'disabled'}>✨ Automatisch anpassen</button>
+    <p class="note">Wählt Speedups, die zur Restzeit passen (höchstens ${Math.round(SPEED_SLACK / 60)} Min. überstehend).</p>${warn}
     ${SPEED_IDS.map(id => { const it = ITEMS[id], n = itemN(id); return `<div class="mrow"><div><b>${it.icon} ${it.name}</b><div class="note">Im Beutel: ${n}</div></div>
       <div class="row">${n ? `<button class="btn small" type="button" data-act="mUse" data-i="${id}">Benutzen</button>` : '<span class="note">keiner</span>'}</div></div>`; }).join('')}
-    <p class="note">Beschleuniger kann man nicht kaufen: Dein Heer findet sie beim Ressourcensammeln (alle 2 Stunden Sammeln im Schnitt einen 15-Minuten- und einen 5-Minuten-Beschleuniger).</p>
+    <p class="note">${findsLine()}</p>
     <div class="row"><button class="btn ghost" type="button" data-act="mClose">Schließen</button></div>`;
 }
-function openSpeed(kind, ref) { speedCtx = { kind, ref }; $('modalIn').innerHTML = speedHTML(); $('modal').hidden = false; }
+function openSpeed(kind, ref) { speedCtx = { kind, ref, warn: null }; $('modalIn').innerHTML = speedHTML(); $('modal').hidden = false; }
 function refreshSpeed() { if (!speedCtx || $('modal').hidden) return; $('modalIn').innerHTML = speedHTML(); }
 function setupModal() {
   document.addEventListener('click', async e => {
     const sp = e.target.closest('[data-speed]'); if (sp) { const [k, r] = sp.dataset.speed.split(':'); return openSpeed(k, r); }
+    if (e.target.closest('[data-bag]')) return openSpeed('bag', '');
     const el = e.target.closest('#modalIn [data-act]'); if (!el || !speedCtx) return;
     const act = el.dataset.act, i = el.dataset.i;
     if (act === 'mClose') { $('modal').hidden = true; speedCtx = null; }
+    else if (act === 'mAuto' || act === 'mAutoGo') {
+      const t = speedTarget(speedCtx.kind, speedCtx.ref); if (!t) return refreshSpeed();
+      const plan = act === 'mAutoGo' && speedCtx.warn ? speedCtx.warn : planSpeeds(S.items, t.left);
+      if (act === 'mAuto' && !plan.ok) { speedCtx.warn = plan; return refreshSpeed(); }
+      if (!Object.keys(plan.use).length) return refreshSpeed();
+      const ok = await command({ type: 'useSpeeds', kind: speedCtx.kind, ref: speedCtx.ref, items: plan.use }); speedCtx.warn = null;
+      if (ok) { toast('Beschleunigt um ' + fmtT(real(plan.sum)) + '.', 'info'); if (!speedTarget(speedCtx.kind, speedCtx.ref)) { $('modal').hidden = true; speedCtx = null; return; } }
+      refreshSpeed();
+    }
+    else if (act === 'mAutoNo') { speedCtx.warn = null; refreshSpeed(); }
     else if (act === 'mBuy') { await command({ type: 'buy', item: i, n: 1 }); refreshSpeed(); }
     else if (act === 'mUse') { const ok = await command({ type: 'useSpeed', item: i, kind: speedCtx.kind, ref: speedCtx.ref }); if (ok) toast('Beschleunigt um ' + ITEMS[i].name.replace('Beschleuniger ', '') + '.', 'info'); refreshSpeed(); }
   });
 }
 function speedupsHTML() {
-  const tot = SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0);
-  return `<p class="note">Speedups findet dein Heer beim Ressourcensammeln: bei 2 Stunden Sammeln im Schnitt je einen 15- und einen 5-Minuten-Speedup. Man kann sie nicht kaufen.</p>
-    <div class="block"><h3>Deine Speedups</h3>${SPEED_IDS.map(id => { const it = ITEMS[id], n = itemN(id); return `<div class="mrow shopi"><span class="tico">${it.icon}</span><div><b>${it.name}</b><div class="note">${it.desc}</div></div><b class="spn">${n}×</b></div>`; }).join('')}
-    <p class="note">Zusammen: <b>${tot ? fmtT(real(tot)) : '0'}</b> Zeitersparnis. Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
+  return `<p class="note">${findsLine()}</p><div class="block"><h3>Deine Speedups</h3>${bagList()}
+    <p class="note">Zusammen: <b>${bagTotal() ? fmtT(real(bagTotal())) : '0'}</b> Zeitersparnis. Benutzen kannst du sie mit dem ⚡ bei einem Bau, einer Ausbildung oder einer Forschung.</p></div>`;
 }
 function shopHTML() {
   const tp = ITEMS.teleport, cd = Math.max(0, TELEPORT_COOLDOWN - (gtNow() - S.tpAt));
