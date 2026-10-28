@@ -1430,7 +1430,7 @@ function sendOpAll() { const q = (view.world.outposts || []).find(x => x.id === 
 function sendList() {
   const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u];
   // Handkarren ziehen nicht allein los: eine Infanterie wird automatisch dazugenommen
-  if (t.handkarren && sum(t) === t.handkarren && !sendFromOp && (S.troops.schwert || 0) > 0) t.schwert = 1;
+  if (t.handkarren && sum(t) === t.handkarren && !sendFromOp && !sendFrom && (S.troops.schwert || 0) > 0) { t.schwert = 1; send.schwert = 1; }   // auch im Regler sichtbar
   return t;
 }
 function planFor(o) {
