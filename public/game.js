@@ -807,7 +807,7 @@ function techCardHTML(id) {
     <details class="tdet"><summary>Alle Stufen</summary>${rows}</details></div>`;
 }
 let techSel = '';
-const TN = { w: 148, h: 58, gx: 34, gy: 18, pad: 10 };
+const TN = { w: 96, h: 90, gx: 26, gy: 10, pad: 8 };
 function techTreeHTML() {
   const ids = Object.keys(T), px = id => TN.pad + T[id].col * (TN.w + TN.gx), py = id => TN.pad + T[id].row * (TN.h + TN.gy);
   const W = TN.pad * 2 + (Math.max(...ids.map(i => T[i].col)) + 1) * (TN.w + TN.gx) - TN.gx, H = TN.pad * 2 + (Math.max(...ids.map(i => T[i].row)) + 1) * (TN.h + TN.gy) - TN.gy;
@@ -827,7 +827,7 @@ function techPopHTML(id) {
   let act;
   if (run) act = `<div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - S.research.left / S.research.total) * 100}%"></i></div><div class="row"><span class="time" data-rtime="1">${fmtT(real(S.research.left))}</span><button class="btn small" type="button" data-speed="research:1">⚡ Beschleunigen</button></div>`;
   else if (L >= T_MAX) act = '<p class="note">Höchststufe erreicht ✓</p>';
-  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTimeFor(S, id, next)))} · braucht Akademie ${techReq(next)}${S.techCatch > .02 ? ' · Aufholbonus −' + Math.round(S.techCatch / (1 + S.techCatch) * 100) + ' %' : ''}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button>${why ? `<p class="why">${why}</p>` : ''}`;
+  else act = `<div class="costs">${costHTML(techCost(id, next))}</div><p class="note">Dauer ${fmtT(real(techTimeFor(S, id, next)))} · braucht Akademie ${techReq(next)}</p><button class="btn" type="button" data-act="techGo" data-id="${id}" ${why ? 'disabled' : ''}>Stufe ${next} erforschen</button>${why ? `<p class="why">${why}</p>` : ''}`;
   return `<div class="tpop" data-act="techClose"><div class="tpin"><div class="uhead"><div><b>${t.name}</b> <span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= L ? 'on' : ''}"></i>`).join('')}</span></div><button class="pback" type="button" data-act="techClose">✕</button></div>
     <p class="note">${t.desc}</p><p class="tbo"><b>+${now} %</b>${L < T_MAX ? ` → <b>+${nx} %</b> ${t.unit}` : ' ' + t.unit}</p>${act}</div></div>`;
 }
@@ -857,10 +857,19 @@ function renderPanel(force) {
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
+  fitTree();
 }
+// Techtree immer komplett im Bild: auf die Größe des Bildschirms skalieren
+function fitTree() {
+  const box = document.querySelector('.tree'), inner = box && box.firstElementChild; if (!inner) return;
+  const W = inner.offsetWidth, H = inner.offsetHeight, cw = box.clientWidth - 8, ch = box.clientHeight - 8; if (!W || !H || cw <= 0 || ch <= 0) return;
+  inner.style.transform = 'translate(-50%,-50%) scale(' + Math.min(cw / W, ch / H, 1.7) + ')';
+}
+window.addEventListener('resize', () => { if (panelName === 'tech') fitTree(); });
 function openPanel(name) {
   if (!$('reports').hidden) closeReports();
   closeSheet(); panelName = name; panelSig = ''; if (name === 'more') moreSub = ''; if (name === 'ally') allyTab = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
+  if (name === 'tech') { fitTree(); requestAnimationFrame(fitTree); }
   if (name === 'more') {
     pushStatus().then(() => renderPanel(true));
   }

@@ -72,10 +72,7 @@ export const techMult = (S, eff) => { let m = 1; for (const k in T) if (T[k].eff
 export const techReq = lv => Math.max(1, 2 * lv - 1);                       // nötige Akademiestufe für Forschungsstufe lv
 export const techCost = (id, lv) => T[id].base.map(c => Math.max(0, Math.round(c * 4 * Math.pow(1.8, lv - 1) / 5) * 5));
 export const techTime = (id, lv) => T[id].time * 60 * 2 * Math.pow(1.8, lv - 1);
-// Aufholhilfe: wer bei der Forschung hinter dem Durchschnitt liegt, forscht schneller (bis zu 40 % kürzere Dauer). Die Welt setzt S.techCatch.
-export const techTotal = S => Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
-export const catchUpOf = (mine, avg) => avg < 4 ? 0 : Math.min(.4, Math.max(0, (avg - mine) / avg) * .6);
-export const techTimeFor = (S, id, lv) => techTime(id, lv) / techMult(S, 'rsp') / (1 + (S.techCatch || 0));
+export const techTimeFor = (S, id, lv) => techTime(id, lv) / techMult(S, 'rsp');
 export function techBlocker(S, id) {
   const t = T[id]; if (!t) return 'Unbekannte Forschung';
   const lv = techLv(S, id) + 1;

@@ -3,7 +3,7 @@
 // "Spielsekunden" (gt); echte Zeit * Tempo = Spielzeit. Alle Ereignisse werden in zeitlicher Reihenfolge
 // abgearbeitet, egal wann ein Spieler das nächste Mal nachfragt.
 import { N, startSpot, SLOTS, NODE_RES, NODE_KINDS } from './mapgen.js';
-import { U, freshState, advanceTo, applyCommand, armySlots, techTotal, catchUpOf } from './rules.js';
+import { U, freshState, advanceTo, applyCommand, armySlots } from './rules.js';
 import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from './combat.js';
 import {
   DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
@@ -139,7 +139,6 @@ export function syncMatch(match, players, now) {
   clanIncome(ctx, dt);
   applyBonuses(ctx);
   for (const p of players) { advanceTo(p.state, now, speed); }
-  { const act = players.filter(p => p.state.slot >= 0 && !p.state.out), avg = act.length ? act.reduce((a, p) => a + techTotal(p.state), 0) / act.length : 0; for (const p of players) p.state.techCatch = catchUpOf(techTotal(p.state), avg); }
   vassalStep(ctx, dt, w.gt);
   for (const p of players) {   // Schutz läuft bald aus: einmal Bescheid geben
     const S = p.state;

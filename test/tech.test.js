@@ -1,6 +1,6 @@
 // Prüfung der Forschung: `npm test`
 import assert from 'node:assert/strict';
-import { unitTime, U, cap, catchUpOf, freshState, applyCommand, advanceTo, rate, techCost, techTime, techMult, T_MAX, T } from '../shared/rules.js';
+import { unitTime, U, cap, freshState, applyCommand, advanceTo, rate, techCost, techTime, techMult, T_MAX, T } from '../shared/rules.js';
 import { battle, capacityOf, forceOf } from '../shared/combat.js';
 const S = freshState(0); S.res = { food: 1e5, wood: 1e5, stone: 1e5, gold: 0 };
 assert.match(applyCommand(S, { type: 'research', tech: 'ackerbau' }), /Akademie/);
@@ -32,5 +32,4 @@ S2.tech.ackerbau = 2; assert.equal(applyCommand(S2, { type: 'research', tech: 'f
 S2.tech.forst = 2; S2.tech.drill = 5; S2.tech.festungsbau = 0;
 assert.ok(Math.abs(unitTime(S2, 'speer', 'kaserne') - U.speer.t / 1.15) < 1e-6, 'Drill beschleunigt');
 assert.ok(cap(S2) >= 1500);
-assert.equal(catchUpOf(2, 10) > 0, true); assert.equal(catchUpOf(10, 10), 0); assert.ok(catchUpOf(0, 10) <= .4);
 console.log('Alle Forschungstests bestanden.');
