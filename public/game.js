@@ -317,6 +317,9 @@ function renderPts() {
   const t = `🏅 <b>${fmtN(scoreOf(S))}</b> Punkte`; if (el.innerHTML !== t) el.innerHTML = t;
   let mu = $('mutChip'); if (!mu) { mu = document.createElement('div'); mu.id = 'mutChip'; mu.className = 'ptschip'; document.body.appendChild(mu); }
   mu.hidden = false; mu.style.top = ((tb ? tb.offsetHeight : 60) + 6 + el.offsetHeight + 6) + 'px';
+  const mb = mu.offsetTop + mu.offsetHeight + 8; let nx = mb;   // Knöpfe links untereinander direkt unter den Chips, Heere rechts oben
+  for (const id of ['placeBtn', 'tpBtn', 'chatBtn']) { const b = $(id); if (!b || b.hidden || getComputedStyle(b).display === 'none') continue; b.style.top = nx + 'px'; b.style.bottom = 'auto'; nx += b.offsetHeight + 8; }
+  const ab = $('armyBtns'); if (ab) ab.style.top = ((tb ? tb.offsetHeight : 60) + 8) + 'px';
   const t2 = `💪 <b>${Math.floor(S.mut == null ? MUT_MAX : S.mut)}</b>`; if (mu.innerHTML !== t2) { mu.innerHTML = t2; mu.title = 'Mut (max. ' + MUT_MAX + ')'; mu.classList.add('small'); }
 }
 // Bündnishilfe: kleine Popups mit Hilfe-Symbol
@@ -637,7 +640,7 @@ function renderBanner() {
     for (const i of view.incoming || []) L.push(['bad', `⚔ ${i.fromTag ? '[' + esc(i.fromTag) + '] ' : ''}${esc(i.from)} ${i.siege ? 'kämpft gegen' : 'greift'} ${i.mine ? 'dich' : esc(i.target)}${i.siege ? '' : ' an'}${i.siege ? ' – Kampf läuft, jetzt Verstärkung schicken!' : ' · Ankunft in ' + fmtT(real(i.eta - gt))}`]);
     const seen = new Set((view.incoming || []).map(i => i.id));
     for (const sg of view.sieges || []) if (!seen.has(sg.id)) L.push(['warn', `<span data-goto="${esc(sg.kind)}:${esc(String(sg.tid))}" style="cursor:pointer">⚔ ${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} kämpft gegen ${esc(sg.tname)} – tippen und eingreifen</span>`]);
-    if (S.protUntil > gt) L.push(['good', `🛡 ${S.protKind === 'fall' ? 'Schutz nach dem Fall deiner Burg' : 'Neulingsschutz'}: noch ${fmtT(real(S.protUntil - gt))}`]);
+    if (S.protUntil > gt) L.push(['good mini', `🛡 ${S.protKind === 'fall' ? 'Schutz' : 'Neulingsschutz'} ${fmtT(real(S.protUntil - gt))}`]);
     if (S.vassalOf) L.push(['warn', `Du bist Vasall von ${esc(pname(S.vassalOf))} (20 % Tribut) · frei in ${fmtT(real(S.vassalUntil - gt))}. Fällt deine Burg noch einmal, scheidest du aus.`]);
     const vs = m.players.filter(p => p.vassalOf === me.id); if (vs.length) L.push(['good', `Deine Vasallen: ${vs.map(p => esc(p.name)).join(', ')}`]);
     const th = (m.holds || []).find(h => h.id === 'throne1');
