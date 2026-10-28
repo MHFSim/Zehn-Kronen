@@ -216,14 +216,17 @@ async function armyDragSend(id, sx, sy) {
   const hit = wm.pickAt(sx, sy); if (hit && hit.type === 'march' && hit.id === id) return;
   const cmd = orderCmd(hit, sx, sy, true);
   if (!cmd) { if (hit && hit.type !== 'march') { miniClose(); sendFromOp = ''; sendFrom = id; syncMoveBar(); selectMap(hit, false); } return; }   // Gebäude: Menü mit dem gewählten Heer öffnen
-  sendFrom = id; const ok = await command(cmd); sendFrom = 0; syncMoveBar(); renderArmyBtns();
+  sendFrom = id; const ok = await command(cmdFor(cmd, id)); sendFrom = 0; syncMoveBar(); renderArmyBtns();
   if (ok) { dismissAll(); toast('Das Heer zieht dorthin.', 'info'); }
 }
+const cmdFor = (cmd, id) => cmd.type === 'recall' ? { type: 'recall', id } : { ...cmd };
 // Befehl für ein Ziel auf der Karte: Gelände, Rohstofffeld oder Räuber
 function orderCmd(hit, sx, sy, quiet) {
   const o = hit && hit.type === 'obj' ? wm.map.byId[hit.id] : null;
   if (!hit) { const t = wm.tileAtScreen(sx, sy); return t ? { type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} } : null; }
   if (hit.type === 'raider' || (o && ['farm', 'wood', 'stone'].includes(o.k))) return { type: 'march', target: hit.id, troops: {} };
+  if (o && o.k === 'start') { const pl = view.match.players.find(x => x.slot === o.slot); if (!pl) return null; return pl.id === me.id ? { type: 'recall' } : { type: 'march', target: hit.id, mode: isAlly(pl.id) ? 'station' : 'attack', troops: {} }; }   // eigene Burg: heimkehren, Verbündete: verstärken, Feind: angreifen
+  if (o && (o.k === 'sanct' || o.k === 'throne')) return { type: 'march', target: hit.id, mode: 'occupy', troops: {} };
   if (!quiet) toast('Für mehrere Heere zugleich: Gelände, Rohstofffelder oder Räuber antippen.'); return null;
 }
 
@@ -1291,7 +1294,7 @@ const nearIds = m0 => { const o0 = wm.marchObjs[m0.id]; return ownMarches().filt
 async function groupSend(hit, sx, sy, idList) {
   const cmd = orderCmd(hit, sx, sy); if (!cmd) return;
   const ids = (idList || sendGroup).slice(); sendGroup = []; syncMoveBar(); let okN = 0;
-  for (const id of ids) { sendFrom = id; if (await command({ ...cmd })) okN++; }
+  for (const id of ids) { sendFrom = id; if (await command(cmdFor(cmd, id))) okN++; }
   sendFrom = 0; syncMoveBar(); renderArmyBtns(); if (okN) dismissAll(); if (okN) toast(okN + ' Heere ziehen gemeinsam los.', 'info');
 }
 function mapTap(sx, sy) {
