@@ -1064,10 +1064,10 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
         }));
         // ein großer Kreis um das ganze Heer statt vieler kleiner Ringe
         let ex = 1, zmin = 0, zmax = 0; for (const u of s.units) { ex = Math.max(ex, Math.abs(u.rx) + .55); zmin = Math.min(zmin, u.rz); zmax = Math.max(zmax, u.rz); u.ring.visible = false; if (u.ring.userData.disc) u.ring.userData.disc.visible = false; if (u.ring.userData.edge) u.ring.userData.edge.visible = false; }
-        const R = Math.max(ex, (zmax - zmin) / 2 + .7) * 1.08, bg = new T.Group(), mkM = (o, f) => new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: o, depthWrite: false, polygonOffset: true, polygonOffsetFactor: f, polygonOffsetUnits: f });
-        const bring = new T.Mesh(new T.RingGeometry(R * .9, R, 48), mkM(1, -3)), bdisc = new T.Mesh(new T.CircleGeometry(R * .9, 40), mkM(.22, -1)), bedge = new T.Mesh(new T.RingGeometry(R, R * 1.07, 48), mkM(.75, -2));
-        for (const q of [bring, bdisc, bedge]) { q.rotation.x = -Math.PI / 2; bg.add(q); } bring.renderOrder = 3; bdisc.renderOrder = 1; bedge.renderOrder = 2;
-        bg.position.set(0, .05, (zmin + zmax) / 2); s.grp.add(bg); s.big = { g: bg, ring: bring, disc: bdisc, edge: bedge };
+        const R = Math.max(ex, (zmax - zmin) / 2 + .7) * 1.08, bg = new T.Group(), cz = (zmin + zmax) / 2, mkM = (o, f) => new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: o, depthWrite: false, polygonOffset: true, polygonOffsetFactor: f, polygonOffsetUnits: f });
+        const bring = new T.Mesh(new T.RingGeometry(R * .9, R, 64), mkM(1, -3)), bdisc = new T.Mesh(new T.CircleGeometry(R * .9, 48), mkM(.22, -1)), bedge = new T.Mesh(new T.RingGeometry(R, R * 1.07, 64), mkM(.75, -2));
+        for (const q of [bring, bdisc, bedge]) { q.geometry.rotateX(-Math.PI / 2); q.geometry.translate(0, 0, cz); q.userData.base = Float32Array.from(q.geometry.attributes.position.array); q.frustumCulled = false; bg.add(q); } bring.renderOrder = 3; bdisc.renderOrder = 1; bedge.renderOrder = 2;
+        s.grp.add(bg); s.big = { g: bg, ring: bring, disc: bdisc, edge: bedge };
       }
       if (s.big) { const c3 = [LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255)]; s.big.ring.material.color.setRGB(...c3); s.big.disc.material.color.setRGB(...c3); s.big.edge.material.color.setRGB(.07, .05, .03); }
       for (const u of s.units) { const c3 = u.hero ? [LIN(255), LIN(205), LIN(70)] : [LIN(col >> 16 & 255), LIN(col >> 8 & 255), LIN(col & 255)]; u.ring.material.color.setRGB(...c3); const d = u.ring.userData; if (d.disc) d.disc.material.color.setRGB(...c3); if (d.edge) d.edge.material.color.setRGB(m.own ? .07 : .55, m.own ? .05 : .03, m.own ? .03 : .03); u.ring.scale.setScalar(m.own ? 1.15 : 1); }
@@ -1373,6 +1373,14 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       const hdg = fighting ? (s.hd || 0) : s.hs;
       s.grp.rotation.y = hdg;
       const y0 = Math.max(0, y);
+      if (s.big) {   // der Kreis folgt dem Gelände: jeder Punkt liegt auf der Bodenhöhe
+        const cs = Math.cos(hdg), sn = Math.sin(hdg);
+        for (const q of [s.big.ring, s.big.disc, s.big.edge]) {
+          const a = q.geometry.attributes.position.array, b = q.userData.base;
+          for (let i = 0; i < a.length; i += 3) { const lx = b[i], lz = b[i + 2], wx = p.x + lx * cs + lz * sn, wz = p.y - lx * sn + lz * cs; a[i + 1] = Math.max(0, this.yAt(wx, wz)) - y0 + .16; }
+          q.geometry.attributes.position.needsUpdate = true;
+        }
+      }
       s.units.forEach((u, k) => {
         const ph = t * (u.cav ? 10 : 8) + k * 1.3 + Number(id), sw = p.still ? 0 : Math.sin(ph) * (u.cav ? .5 : .65);
         if (u.la) u.la.rotation.x = sw; if (u.lb) u.lb.rotation.x = -sw; for (const l of u.legs) l.m.rotation.x = l.spin ? (p.still ? 0 : t * 6) : l.s * sw * 1.1;

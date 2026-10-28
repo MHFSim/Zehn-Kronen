@@ -177,7 +177,7 @@ function setupInput() {
   view.addEventListener('pointermove', e => {
     const prev = ptrs.get(e.pointerId); if (!prev) return;
     const cur = { x: e.clientX, y: e.clientY }; ptrs.set(e.pointerId, cur);
-    if (ptrs.size === 1) { if (dist(cur, downAt) > (dragArmy ? 14 : 8)) { moved = true; clearTimeout(lpT); } if (moved) { if (dragArmy) armyDragLine(downAt, cur); else wm.dragMove(cur.x, cur.y); } }
+    if (ptrs.size === 1) { if (dist(cur, downAt) > (dragArmy ? 14 : 8)) { moved = true; clearTimeout(lpT); } if (moved) { if (dragArmy) { armyDragLine(downAt, cur); armyDragHover(cur.x, cur.y, dragArmy); } else wm.dragMove(cur.x, cur.y); } }
     else if (ptrs.size === 2 && pinch) {
       const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = dist(a, b), an = ang(a, b);
       let da = an - pinch.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
@@ -187,7 +187,7 @@ function setupInput() {
   const end = e => {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId); clearTimeout(lpT);
-    if (dragArmy && ptrs.size === 0) { const id = dragArmy; dragArmy = 0; armyDragLine(null); if (moved && e.type === 'pointerup') { armyDragSend(id, e.clientX, e.clientY); return; } }
+    if (dragArmy && ptrs.size === 0) { const id = dragArmy; dragArmy = 0; armyDragLine(null); if (!msel) wm.select(null); hoverKey = ''; if (moved && e.type === 'pointerup') { armyDragSend(id, e.clientX, e.clientY); return; } }
     if (ptrs.size === 0 && !moved && !lpDone && e.type === 'pointerup') tap(e.clientX, e.clientY);
     if (ptrs.size === 1) { const [r] = [...ptrs.values()]; wm.dragStart(r.x, r.y); downAt = { x: r.x, y: r.y }; }
     if (ptrs.size < 2) pinch = null;
@@ -204,18 +204,25 @@ function armyDragLine(a, b) {
   const dx = b.x - a.x, dy = b.y - a.y; el.hidden = false;
   el.style.left = a.x + 'px'; el.style.top = a.y + 'px'; el.style.width = Math.hypot(dx, dy) + 'px'; el.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
 }
+// Beim Wischen: Kreis um das Ziel unter dem Finger (Gebäude, Feld, Räuber)
+let hoverKey = '';
+function armyDragHover(sx, sy, id) {
+  const h = wm.pickAt(sx, sy), ok = h && (h.type === 'obj' || h.type === 'op' || h.type === 'raider'), key = ok ? h.type + h.id : '';
+  if (key === hoverKey) return; hoverKey = key; wm.select(ok ? h : null);
+}
 async function armyDragSend(id, sx, sy) {
   const hit = wm.pickAt(sx, sy); if (hit && hit.type === 'march' && hit.id === id) return;
-  const cmd = orderCmd(hit, sx, sy); if (!cmd) return;
+  const cmd = orderCmd(hit, sx, sy, true);
+  if (!cmd) { if (hit && hit.type !== 'march') { miniClose(); sendFromOp = ''; sendFrom = id; syncMoveBar(); selectMap(hit, false); } return; }   // Gebäude: Menü mit dem gewählten Heer öffnen
   sendFrom = id; const ok = await command(cmd); sendFrom = 0; syncMoveBar(); renderArmyBtns();
   if (ok) toast('Das Heer zieht dorthin.', 'info');
 }
 // Befehl für ein Ziel auf der Karte: Gelände, Rohstofffeld oder Räuber
-function orderCmd(hit, sx, sy) {
+function orderCmd(hit, sx, sy, quiet) {
   const o = hit && hit.type === 'obj' ? wm.map.byId[hit.id] : null;
   if (!hit) { const t = wm.tileAtScreen(sx, sy); return t ? { type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} } : null; }
   if (hit.type === 'raider' || (o && ['farm', 'wood', 'stone'].includes(o.k))) return { type: 'march', target: hit.id, troops: {} };
-  toast('Hierhin geht es nur über das Menü: Ziel antippen.'); return null;
+  if (!quiet) toast('Für mehrere Heere zugleich: Gelände, Rohstofffelder oder Räuber antippen.'); return null;
 }
 
 /* ---------- Oberfläche ---------- */
