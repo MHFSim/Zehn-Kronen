@@ -1456,7 +1456,7 @@ async function buildMap() {
     focusMap(own.x + .5, own.y + .5, Math.min(60, Math.max(34, 26000 / Math.max(360, window.innerWidth) * 1.2)));
     setupInput();
     let last = performance.now();
-    const loop = now => { mapLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode !== 'map') return; placeStep(); wm.frame(dt); };
+    const loop = now => { mapLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode !== 'map' || document.hidden || document.body.classList.contains('reports-open')) return; placeStep(); wm.frame(dt); };   // hinter einem Menü wird die Karte nicht gezeichnet
     mapLoop = requestAnimationFrame(loop);
     document.body.classList.remove('mode-map');
   } catch (e) { document.body.classList.remove('mode-map'); toast(String(e.message || e)); el.hidden = true; return false; }
