@@ -244,12 +244,12 @@ body:not(.mode-map) .hud{display:none}
 .panel:has(.hstage){padding:0!important;background:#0e131a!important}
 .panel>.sheet-inner:has(.hstage){margin:0;border:0;border-radius:0;box-shadow:none;background:#0e131a;color:#e9e2cf;padding:0;gap:0;min-height:100%;max-width:none;--muted:#a99f86}
 .hstage{display:flex;flex-direction:column;min-height:100%;max-width:560px;margin:0 auto;width:100%}
-.hscene{position:relative;height:clamp(260px,40vh,390px);overflow:hidden;flex:none;background:#000}
-.hart{position:absolute;left:-4%;top:-4%;width:108%;height:108%;object-fit:cover;animation:hken 18s ease-in-out infinite alternate;animation-name:hken,hfade}
+.hscene{position:relative;height:clamp(320px,52vh,520px);overflow:hidden;flex:none;background:#000}
+.hart{position:absolute;left:-4%;top:-4%;width:108%;height:108%;object-fit:cover;object-position:50% 14%;animation:hken 18s ease-in-out infinite alternate;animation-name:hken,hfade}
 .hscene .hart{animation:hken 18s ease-in-out infinite alternate,hfade .6s ease-out}
 @keyframes hken{from{transform:scale(1) translate(0,0)}to{transform:scale(1.12) translate(-2%,-2%)}}
 @keyframes hfade{from{opacity:0}to{opacity:1}}
-.hscene::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,19,26,.6) 0,transparent 22%,transparent 42%,#0e131a 100%);z-index:2}
+.hscene::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,19,26,.55) 0,transparent 18%,transparent 52%,rgba(14,19,26,.85) 82%,#0e131a 100%),radial-gradient(ellipse at 50% 40%,transparent 55%,rgba(8,11,16,.55) 100%);z-index:2}.hart{filter:saturate(.9) contrast(1.06) brightness(.95)}
 .hglow{position:absolute;inset:0;z-index:1;background:radial-gradient(circle at 50% 55%,color-mix(in srgb,var(--hc) 45%,transparent),transparent 62%);mix-blend-mode:screen;animation:hpulse 4s ease-in-out infinite}
 @keyframes hpulse{50%{opacity:.45}}
 .hscene i{position:absolute;z-index:3;bottom:18%;font-style:normal;font-size:15px;opacity:0;animation:hrise2 5.5s ease-in infinite;pointer-events:none;filter:drop-shadow(0 0 4px #000)}
@@ -291,7 +291,7 @@ body:not(.mode-map) .hud{display:none}
 .hdk small{font-size:10px;max-width:62px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:6px}
 @keyframes hfloat{50%{transform:translateY(-6px)}}
 @media (prefers-reduced-motion:reduce){.hdk,.hart,.hglow,.hscene i{animation:none}}
-.fx-shield i::before{content:'🛡'}.fx-wind i::before,.fx-dust i::before{content:'💨'}.fx-leaf i::before{content:'🍃'}.fx-grain i::before{content:'🌾'}.fx-chips i::before{content:'🪵'}.fx-sparks i::before{content:'✨'}.fx-flame i::before{content:'🔥'}.fx-gust i::before{content:'🌀'}.fx-shadow i::before{content:'✦';color:#b9a0ff}
+.fx-snow i::before{content:'❄';color:#dff2ff}.fx-shield i::before{content:'🛡'}.fx-wind i::before,.fx-dust i::before{content:'💨'}.fx-leaf i::before{content:'🍃'}.fx-grain i::before{content:'🌾'}.fx-chips i::before{content:'🪵'}.fx-sparks i::before{content:'✨'}.fx-flame i::before{content:'🔥'}.fx-gust i::before{content:'🌀'}.fx-shadow i::before{content:'✦';color:#b9a0ff}
 @keyframes hspin{to{transform:rotate(360deg)}}@keyframes hbob{50%{transform:translateY(-3px) scale(1.04)}}@keyframes hswing{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(18deg)}}
 @keyframes hrise{0%{opacity:0;transform:translateY(8px) scale(.6)}25%{opacity:.95}100%{opacity:0;transform:translateY(-44px) scale(1.1)}}
 .hgrid{display:grid;grid-template-columns:1fr;gap:10px}
