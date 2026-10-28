@@ -313,10 +313,10 @@ function renderPts() {
   let el = $('ptsChip'); if (!el) { el = document.createElement('div'); el.id = 'ptsChip'; el.className = 'ptschip'; document.body.appendChild(el); }
   const tb = document.querySelector('.topbar');
   el.hidden = mode !== 'map' || !S; { const m0 = $('mutChip'); if (m0) m0.hidden = el.hidden; } if (el.hidden) return;
-  el.style.top = ((tb ? tb.offsetHeight : 60) + 6) + 'px';
+  { const bn = $('banner'); el.style.top = ((bn && bn.classList.contains('onlymini') && bn.offsetHeight ? bn.getBoundingClientRect().top : (tb ? tb.offsetHeight : 60) + 6)) + 'px'; }   // Punkte links, Neulingsschutz rechts auf einer Zeile
   const t = `🏅 <b>${fmtN(scoreOf(S))}</b> Punkte`; if (el.innerHTML !== t) el.innerHTML = t;
   let mu = $('mutChip'); if (!mu) { mu = document.createElement('div'); mu.id = 'mutChip'; mu.className = 'ptschip'; document.body.appendChild(mu); }
-  mu.hidden = false; mu.style.top = ((tb ? tb.offsetHeight : 60) + 6 + el.offsetHeight + 6) + 'px';
+  mu.hidden = false; mu.style.top = (parseFloat(el.style.top) + el.offsetHeight + 6) + 'px';
   const mb = mu.offsetTop + mu.offsetHeight + 8; let nx = mb;   // Knöpfe links untereinander direkt unter den Chips, Heere rechts oben
   for (const id of ['placeBtn', 'tpBtn', 'chatBtn']) { const b = $(id); if (!b || b.hidden || getComputedStyle(b).display === 'none') continue; b.style.top = nx + 'px'; b.style.bottom = 'auto'; nx += b.offsetHeight + 8; }
   const ab = $('armyBtns'); if (ab) ab.style.top = ((tb ? tb.offsetHeight : 60) + 8) + 'px';
@@ -647,6 +647,7 @@ function renderBanner() {
     if (th) L.push([th.mine ? 'good' : 'bad', th.mine ? `👑 Ihr haltet den Thron – noch ${fmtT(real(th.since + THRONE_HOLD - gt))} bis zum Sieg` : `⚠ ALARM: ${esc(th.label)} hat den Thron erreicht! Sieg in ${fmtT(real(th.since + THRONE_HOLD - gt))}. Zerstört ihre Außenposten am Thron, bevor die Zeit abläuft.`]);
   }
   const html = L.map(([k, t]) => `<div class="bn ${k}">${t}</div>`).join('');
+  el.classList.toggle('onlymini', L.length > 0 && L.every(l => /mini/.test(l[0])));
   if (html !== bannerSig) { bannerSig = html; el.innerHTML = html; }
 }
 // Neue Meldungen als kurze Hinweise einblenden (Push erreicht dich, wenn die Seite zu ist)
@@ -1130,7 +1131,7 @@ function homeStep() {
 }
 function placeStep() {
   const show = mode === 'map' && view && (view.ally || S.startTp > 0) && !msel && view.match.phase === 'running' && !panelName && $('reports').hidden;
-  $('placeBtn').hidden = !show || !!placing || !view.ally; $('tpBtn').hidden = !show || !!placing;
+  $('placeBtn').hidden = !show || !!placing || !view.ally; $('tpBtn').hidden = !show || !!placing || (!(S.startTp > 0) && itemN('teleport') <= 0);
   $('placeBar').hidden = !(show && placing); $('placeInfo').hidden = !(show && placing === 'build');
   if (!placing || !show) { if (placing && !show) placing = false; return; }
   const t = placeTile(), key = placing + t.x + ',' + t.y + ',' + Math.floor(gtNow() / 60) + itemN('teleport') + 's' + (S.startTp || 0);
