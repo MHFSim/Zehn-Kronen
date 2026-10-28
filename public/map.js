@@ -490,8 +490,13 @@ function buildUnit(type, col, full) {
 /* ---------- Bäume (Instanzen) ---------- */
 function treeGeo(kind) {
   const b = new MB(), W = [255, 255, 255];
-  if (kind === 'pine' || kind === 'snow') {
-    const c = kind === 'pine' ? [[255, 255, 255], [238, 238, 238], [220, 220, 220], [206, 206, 206]] : [[226, 238, 238], [214, 230, 232], [234, 244, 246], [244, 248, 250]];
+  if (kind === 'snow') {   // abgebrannter Baum: verkohlter Stamm mit wenigen Aststümpfen
+    const ch = [60, 50, 44], ash = [96, 88, 80];
+    b.cyl(.04, .085, 1.0, 7, 0, 0, 0, ch); b.cyl(.02, .04, .3, 6, 0, .95, 0, ch);
+    b.cone(.2, .26, 7, 0, .3, 0, ash); b.cone(.14, .22, 7, 0, .56, 0, ch); b.cone(.07, .2, 6, 0, .82, 0, ash);
+    b.cyl(.015, .03, .34, 5, .12, .5, 0, ch); b.cyl(.012, .025, .28, 5, -.1, .68, 0, ch);
+  } else if (kind === 'pine') {
+    const c = [[255, 255, 255], [238, 238, 238], [220, 220, 220], [206, 206, 206]];
     b.cyl(.05, .075, .32, 8, 0, 0, 0, [90, 62, 38]);
     b.cone(.42, .5, 14, 0, .2, 0, c[0]); b.cone(.35, .46, 14, 0, .44, 0, c[1]); b.cone(.27, .42, 14, 0, .68, 0, c[2]); b.cone(.17, .38, 12, 0, .9, 0, c[3]);
   } else if (kind === 'oak') {
@@ -786,7 +791,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     }
     const geos = { pine: treeGeo('pine'), snow: treeGeo('snow'), oak: treeGeo('oak'), bush: treeGeo('bush'), rock: treeGeo('rock') };
     const mat = new T.MeshLambertMaterial({ vertexColors: true }); this.fogPatch(mat); const tmp = new T.Matrix4(), col = new T.Color(), q = new T.Quaternion(), e = new T.Euler();
-    const GREENS = { pine: [[36, 84, 48], [44, 98, 56], [30, 74, 50]], oak: [[84, 140, 52], [100, 152, 58], [70, 124, 50]], bush: [[76, 120, 56], [92, 134, 60], [66, 108, 52]], snow: [[255, 255, 255], [236, 244, 246], [248, 250, 252]], rock: [[146, 140, 128], [120, 114, 106], [162, 156, 142]] };
+    const GREENS = { pine: [[36, 84, 48], [44, 98, 56], [30, 74, 50]], oak: [[84, 140, 52], [100, 152, 58], [70, 124, 50]], bush: [[76, 120, 56], [92, 134, 60], [66, 108, 52]], snow: [[255, 255, 255], [220, 214, 208], [190, 184, 178]], rock: [[146, 140, 128], [120, 114, 106], [162, 156, 142]] };
     this.treeChunks = []; this.nTrees = 0;
     for (const key in lists) {
       const [kind, cc] = key.split('|'), arr = lists[key], im = new T.InstancedMesh(geos[kind], mat, arr.length); im.customDepthMaterial = this.fogDepthMat();
