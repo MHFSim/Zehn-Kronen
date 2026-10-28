@@ -1427,7 +1427,12 @@ function mapSignature() {
   return JSON.stringify([msel, send, S.troops, S.lv.rathaus, S.silver, (S.spies || []).length, ownMarches().map(m => m.id + m.phase + (m.hero || '')), sendHero, w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
 }
 function sendOpAll() { const q = (view.world.outposts || []).find(x => x.id === sendFromOp), g = q && q.garr ? q.garr[me.id] : null; return g ? { ...g } : {}; }
-function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
+function sendList() {
+  const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u];
+  // Handkarren ziehen nicht allein los: eine Infanterie wird automatisch dazugenommen
+  if (t.handkarren && sum(t) === t.handkarren && !sendFromOp && (S.troops.schwert || 0) > 0) t.schwert = 1;
+  return t;
+}
 function planFor(o) {
   if (sendFromOp) { const t0 = sendOpAll(), q = (view.world.outposts || []).find(x => x.id === sendFromOp); if (!q || !sum(t0)) return null; const k0 = sendHero + o.id + 'op' + sendFromOp + JSON.stringify(t0) + wm.roadSig.length; if (planCache.key !== k0) planCache = { key: k0, plan: planFrom(wm.map, [q.x, q.y], o.x, o.y, t0, S, sendHero) }; return planCache.plan; }
   const t = sendList(), key = sendHero + o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
