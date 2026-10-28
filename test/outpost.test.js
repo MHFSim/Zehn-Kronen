@@ -66,6 +66,24 @@ assert.equal(viewFor(match, players, b, clock).world.outposts[0].garr[a.id].spee
     assert.match(run(a, { type: 'march', mode: 'post', fromOp: op.id, x: tx, y: ty, troops: { speer: 999 } }), /stehen dort nicht/); }
   else assert.fail('fromOp: ' + r); void 0; if (0) assert.match(r, /kein Heer|Außenposten|Heere/, r);
 }
+// Besatzung aus dem Außenposten gegen ein Banditenlager schicken
+{
+  const camp = map.objects.filter(o => o.k === 'camp').sort((p, q) => Math.hypot(p.x - op.x, p.y - op.y) - Math.hypot(q.x - op.x, q.y - op.y))[0];
+  give(a, { schwert: 200, bogen: 100 }); op.garr[a.id].schwert = 200; op.garr[a.id].bogen = 100; a.state.away.schwert = (a.state.away.schwert || 0) + 200; a.state.away.bogen = (a.state.away.bogen || 0) + 100;
+  const awayBefore = JSON.stringify(a.state.away), garr0 = { ...op.garr[a.id] };
+  const r = run(a, { type: 'march', mode: 'normal', fromOp: op.id, target: camp.id, troops: { schwert: 150, bogen: 80 } });
+  assert.equal(r, '', 'fromOp -> Lager: ' + r);
+  assert.equal(op.garr[a.id].schwert, 50); assert.equal(op.garr[a.id].bogen, 20);
+  const mm = w.marches[w.marches.length - 1]; assert.equal(mm.tid, camp.id); assert.ok(mm.redir, 'Rückweg wird vom Außenposten aus geplant');
+  const nr = a.state.reports.length;
+  for (let i = 0; i < 300 && w.marches.some(x => x === mm && !x.dead); i++) adv(300);
+  assert.ok(!w.marches.includes(mm), 'Heer zurück');
+  assert.ok(a.state.reports.length > nr, 'Bericht zum Lager');
+  const after = { schwert: (a.state.troops.schwert || 0), bogen: (a.state.troops.bogen || 0) };
+  assert.ok(after.schwert >= 0 && after.bogen >= 0);
+  assert.equal(a.state.away.schwert || 0, op.garr[a.id].schwert, 'Buchführung: nur die Besatzung ist noch draußen'); assert.equal(a.state.away.bogen || 0, op.garr[a.id].bogen);
+  void awayBefore; void garr0;
+}
 // Auf Wegen läuft man 30 % schneller
 { const { planFrom } = await import('../shared/core.js'), { ROAD_SPEED } = await import('../shared/mapgen.js');
   const from = [tw.x, tw.y], saved = map.roads;
