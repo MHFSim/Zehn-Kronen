@@ -151,7 +151,7 @@ function readBody(req) {
 const validName = n => typeof n === 'string' && /^[\p{L}\p{N} _-]{3,20}$/u.test(n.trim());
 const validPass = p => typeof p === 'string' && p.length >= 6 && p.length <= 100;
 
-const TYPES = { '.mp3': 'audio/mpeg', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json' };
+const TYPES = { '.mp3': 'audio/mpeg', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json' };
 async function serveFile(res, rel, req) {
   const file = normalize(join(ROOT, rel));
   if (!file.startsWith(join(ROOT, 'public')) && !file.startsWith(join(ROOT, 'shared'))) return fail(res, 404, 'Nicht gefunden');

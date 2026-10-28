@@ -52,6 +52,8 @@ sim = wrap('sim', rd('tools/sim.js'))
 
 # --- Spiel: Anpassungen für die Testversion ---
 game = rd('public/game.js')
+import base64 as _b64
+game = must_rep("const BURG_URL = '/public/models/burg.glb';", "const BURG_URL = 'data:model/gltf-binary;base64," + _b64.b64encode((root / 'public/models/burg.glb').read_bytes()).decode() + "';", game)
 game = must_rep("const invite = params.get('einladung') || '';", "let invite = window.zkSimInvite();", game)
 game = must_rep("  if (joinMode) history.replaceState(null, '', '/');\n", '', game)
 game = game.replace("location.href = '/'", 'location.reload()')
