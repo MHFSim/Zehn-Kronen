@@ -1419,7 +1419,7 @@ function bestHero(hit) {
 const heroBonusText = id => skillList(S, id).map(k => '+' + (Math.round(k.val * 1000) / 10).toString().replace('.', ',') + ' % ' + k.name).join(' · ');
 function heroPickHTML(closeBtn) {
   if (!sendHero || busyHero(sendHero)) sendHero = bestHero(msel);
-  return `<div class="block hpick"><h3>Anführer${closeBtn ? '<button class="close" type="button" data-act="close" style="float:right;margin:-2px 0 0 8px">Schließen</button>' : ''}</h3><div class="hrow">${HERO_IDS.map(id => { const H = HEROES[id], b = busyHero(id);
+  return `<div class="block hpick"><h3>Anführer${closeBtn ? '<button class="xclose" type="button" data-act="close" aria-label="Schließen">✕</button>' : ''}</h3><div class="hrow">${HERO_IDS.map(id => { const H = HEROES[id], b = busyHero(id);
     return `<button type="button" class="hchip${id === sendHero ? ' on' : ''}" data-hero="${id}" ${b ? 'disabled' : ''}><span class="hpic fx-${H.fx}" style="--hc:${H.col}">${hpic(id, H)}</span><b>${H.name}</b><small>${b ? 'unterwegs' : 'Stufe ' + heroLvl(id)}</small></button>`; }).join('')}</div>
     ${sendHero ? `<p class="note">${HEROES[sendHero].name}: ${heroBonusText(sendHero)}</p>` : '<p class="why">Alle Helden sind unterwegs.</p>'}</div>`;
 }
