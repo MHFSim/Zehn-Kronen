@@ -161,13 +161,15 @@ function revealMap(tx, ty) {
 }
 function focusMap(tx, ty, dist) { wm.focus(tx, ty, dist, document.body.classList.contains('sheet-open') ? .26 : .46); }
 function setupInput() {
-  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lpT = 0, lpDone = false;
+  const view = wm.dom, ptrs = new Map(); let moved = false, downAt = null, pinch = null, lpT = 0, lpDone = false, dragArmy = 0;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y), ang = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
   view.style.touchAction = 'none';
   view.addEventListener('pointerdown', e => {
     view.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 1) {
-      moved = false; lpDone = false; downAt = { x: e.clientX, y: e.clientY }; wm.dragStart(e.clientX, e.clientY);
+      moved = false; lpDone = false; downAt = { x: e.clientX, y: e.clientY }; dragArmy = 0;
+      const h0 = mapReady && !placing && !sendGroup.length ? wm.pickAt(e.clientX, e.clientY) : null, m0 = h0 && h0.type === 'march' ? ownMarches().find(x => x.id === h0.id) : null;
+      if (m0 && (['post', 'gather', 'back', 'fight'].includes(m0.phase) || (m0.phase === 'out' && m0.mode !== 'build'))) dragArmy = m0.id; else wm.dragStart(e.clientX, e.clientY);
       clearTimeout(lpT); miniClose();
     }
     if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: dist(a, b), a: ang(a, b) }; moved = true; }
@@ -175,7 +177,7 @@ function setupInput() {
   view.addEventListener('pointermove', e => {
     const prev = ptrs.get(e.pointerId); if (!prev) return;
     const cur = { x: e.clientX, y: e.clientY }; ptrs.set(e.pointerId, cur);
-    if (ptrs.size === 1) { if (dist(cur, downAt) > 8) { moved = true; clearTimeout(lpT); } if (moved) wm.dragMove(cur.x, cur.y); }
+    if (ptrs.size === 1) { if (dist(cur, downAt) > (dragArmy ? 14 : 8)) { moved = true; clearTimeout(lpT); } if (moved) { if (dragArmy) armyDragLine(downAt, cur); else wm.dragMove(cur.x, cur.y); } }
     else if (ptrs.size === 2 && pinch) {
       const [a, b] = [...ptrs.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = dist(a, b), an = ang(a, b);
       let da = an - pinch.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
@@ -185,6 +187,7 @@ function setupInput() {
   const end = e => {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId); clearTimeout(lpT);
+    if (dragArmy && ptrs.size === 0) { const id = dragArmy; dragArmy = 0; armyDragLine(null); if (moved && e.type === 'pointerup') { armyDragSend(id, e.clientX, e.clientY); return; } }
     if (ptrs.size === 0 && !moved && !lpDone && e.type === 'pointerup') tap(e.clientX, e.clientY);
     if (ptrs.size === 1) { const [r] = [...ptrs.values()]; wm.dragStart(r.x, r.y); downAt = { x: r.x, y: r.y }; }
     if (ptrs.size < 2) pinch = null;
@@ -193,6 +196,27 @@ function setupInput() {
   view.addEventListener('wheel', e => { e.preventDefault(); wm.zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : .89); }, { passive: false });
 }
 function tap(sx, sy) { mapTap(sx, sy); }
+// Heer mit dem Finger ziehen: auf der Karte antippen, halten und zum Ziel wischen – beim Loslassen zieht es dorthin
+function armyDragLine(a, b) {
+  let el = $('dragLine');
+  if (!a) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'dragLine'; document.body.appendChild(el); }
+  const dx = b.x - a.x, dy = b.y - a.y; el.hidden = false;
+  el.style.left = a.x + 'px'; el.style.top = a.y + 'px'; el.style.width = Math.hypot(dx, dy) + 'px'; el.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+}
+async function armyDragSend(id, sx, sy) {
+  const hit = wm.pickAt(sx, sy); if (hit && hit.type === 'march' && hit.id === id) return;
+  const cmd = orderCmd(hit, sx, sy); if (!cmd) return;
+  sendFrom = id; const ok = await command(cmd); sendFrom = 0; syncMoveBar(); renderArmyBtns();
+  if (ok) toast('Das Heer zieht dorthin.', 'info');
+}
+// Befehl für ein Ziel auf der Karte: Gelände, Rohstofffeld oder Räuber
+function orderCmd(hit, sx, sy) {
+  const o = hit && hit.type === 'obj' ? wm.map.byId[hit.id] : null;
+  if (!hit) { const t = wm.tileAtScreen(sx, sy); return t ? { type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} } : null; }
+  if (hit.type === 'raider' || (o && ['farm', 'wood', 'stone'].includes(o.k))) return { type: 'march', target: hit.id, troops: {} };
+  toast('Hierhin geht es nur über das Menü: Ziel antippen.'); return null;
+}
 
 /* ---------- Oberfläche ---------- */
 const $ = id => document.getElementById(id);
@@ -1245,11 +1269,7 @@ function healHTML() {
 
 // Alle gewählten Heere auf einmal losschicken (Gelände, Sammelfelder, Räuber)
 async function groupSend(hit, sx, sy) {
-  const o = hit && hit.type === 'obj' ? wm.map.byId[hit.id] : null;
-  let cmd;
-  if (!hit) { const t = wm.tileAtScreen(sx, sy); if (!t) return; cmd = { type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }; }
-  else if (hit.type === 'raider' || (o && ['farm', 'wood', 'stone'].includes(o.k))) cmd = { type: 'march', target: hit.id, troops: {} };
-  else return toast('Für alle Heere zugleich: Gelände, Rohstofffelder oder Räuber antippen.');
+  const cmd = orderCmd(hit, sx, sy); if (!cmd) return;
   const ids = sendGroup.slice(); sendGroup = []; syncMoveBar(); let okN = 0;
   for (const id of ids) { sendFrom = id; if (await command({ ...cmd })) okN++; }
   sendFrom = 0; syncMoveBar(); renderArmyBtns(); if (okN) toast(okN + ' Heere ziehen gemeinsam los.', 'info');
