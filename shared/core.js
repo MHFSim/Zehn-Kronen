@@ -105,22 +105,36 @@ export function planFrom(map, from, tx, ty, troops, S) {
 }
 export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, obj.y, troops, S);
 
+// Angreifer und Helfer laufen nie ins feindliche Gebäude: Sie bleiben ein Stück davor stehen (dort kämpfen sie auch).
+const hostileM = m => m.mode === 'attack' || m.mode === 'raid' || m.mode === 'assist' || m.tk === 'camp';
+const standR = m => (m.tk === 'start' ? 3.2 : m.tk === 'outpost' ? 2.8 : 2) * (m.side === 'def' ? .42 : 1);
+export function standIdx(m) {
+  const L = m.path.length - 1; if (!hostileM(m) || L < 1) return L;
+  const [ex, ey] = cellXY(m.path[L]), R = standR(m); let j = L;
+  while (j > 0) { const [x, y] = cellXY(m.path[j]); if (Math.hypot(x - ex, y - ey) >= R) break; j--; }
+  return j;
+}
 export function marchPos(m, gt) {
   const L = m.path.length - 1;
-  if (m.phase === 'fight') {   // im Kampf steht das Heer etwas vor dem Ziel, Angreifer auf der Anmarschseite, Verteidiger gegenüber
-    const [x, y] = cellXY(m.path[L]), [px, py] = cellXY(m.path[Math.max(0, L - 3)]);
-    let dx = px - x, dy = py - y; if (!dx && !dy) dy = 1; const d = Math.hypot(dx, dy), base = m.tk === 'start' ? 3.2 : m.tk === 'outpost' ? 2.8 : 2, off = m.side === 'def' ? base * .42 : base, lat = ((m.id % 5) - 2) * .5;
-    return { x: x + .5 + dx / d * off - dy / d * lat, y: y + .5 + dy / d * off + dx / d * lat, i: L, frac: 0, still: true, fight: true };
+  if (m.phase === 'fight') {   // im Kampf steht das Heer an seinem Standplatz vor dem Ziel
+    const j = standIdx(m), [sx, sy] = cellXY(m.path[j]), [ex, ey] = cellXY(m.path[L]);
+    let dx = ex - sx, dy = ey - sy, lat = ((m.id % 5) - 2) * .5;
+    if (j === L) {   // z.B. Sammler auf dem Feld: Standplatz etwas neben dem Feld, auf der Anmarschseite
+      const [px, py] = cellXY(m.path[Math.max(0, L - 3)]); dx = sx - px; dy = sy - py; if (!dx && !dy) dy = -1;
+      const d = Math.hypot(dx, dy), off = (m.side === 'def' ? .8 : 2); return { x: sx + .5 - dx / d * off - dy / d * lat, y: sy + .5 - dy / d * off + dx / d * lat, i: L, frac: 0, still: true, fight: true };
+    }
+    const d = Math.hypot(dx, dy) || 1; return { x: sx + .5 - dy / d * lat, y: sy + .5 + dx / d * lat, i: L, frac: 0, still: true, fight: true };
   }
   if (m.phase === 'gather' || m.phase === 'post') { const [x, y] = cellXY(m.path[L]); return { x: x + .5, y: y + .5, i: L, frac: 0, still: true }; }
-  const el = Math.max(0, Math.min(m.arr[L], gt - m.t0));
+  const stop = m.phase === 'out' ? m.arr[standIdx(m)] : m.arr[L];
+  const el = Math.max(0, Math.min(stop, gt - m.t0));
   let i = 0; while (i < L && m.arr[i + 1] <= el) i++;
   const [ax, ay] = cellXY(m.path[i]);
   if (i === L) return { x: ax + .5, y: ay + .5, i, frac: 0, still: false };
   const [bx, by] = cellXY(m.path[i + 1]), f = (el - m.arr[i]) / (m.arr[i + 1] - m.arr[i] || 1);
   return { x: ax + .5 + (bx - ax) * f, y: ay + .5 + (by - ay) * f, i, frac: f, still: false };
 }
-export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.phase === 'fight' ? (m.lead ? Infinity : m.ft) : m.t0 + m.arr[m.arr.length - 1];
+export const nextT = m => m.phase === 'post' ? Infinity : m.phase === 'gather' ? m.tEnd : m.phase === 'fight' ? (m.lead ? Infinity : m.ft) : m.phase === 'out' ? m.t0 + m.arr[standIdx(m)] : m.t0 + m.arr[m.arr.length - 1];
 // Läuft am Ziel gerade ein Kampf? (Der Anführer-Marsch trägt den Kampfstand in m.fight.)
 export const fightAt = (w, tid) => w.marches.find(x => !x.dead && x.phase === 'fight' && x.fight && x.tid === String(tid)) || null;
 // Verstärkung für die Verteidiger eines laufenden Kampfes (Burg oder Außenposten)
@@ -135,7 +149,7 @@ export function leaveDefenders(w, tid, troops) {
 }
 // Heer nach Hause schicken: direkter Weg vom jetzigen Ort, ohne Umweg über den früheren Ausgangspunkt
 export function homeBack(ctx, m, bt) {
-  const P = byId(ctx.players, m.owner), end = m.path[m.path.length - 1];
+  const P = byId(ctx.players, m.owner), end = (m.phase === 'fight' || m.phase === 'out') ? m.path[standIdx(m)] : m.path[m.path.length - 1];
   const plan = P ? planFrom(mapOf(ctx.match), cellXY(end), P.state.pos[0], P.state.pos[1], m.troops, P.state) : null;
   if (plan && !plan.error && plan.path.length > 1) { m.path = plan.path; m.arr = plan.arr; } else reversed(m);
   m.phase = 'back'; m.t0 = bt; m.mode = 'home'; m.tk = 'start'; delete m.redir;

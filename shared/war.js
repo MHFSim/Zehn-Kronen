@@ -133,7 +133,7 @@ const multOf = (ctx, list) => { let n = 0, f = 0; for (const x of list) { const 
 const cOf = (lead, x) => x === lead ? lead.troops : (x.fc || x.troops);
 const scaleT = (t, k) => { const l = {}; for (const u in t) { const n = Math.round(t[u] * (k[u] || 0)); if (n > 0) l[u] = n; } return l; };
 const ratio = (P, P0) => { const k = {}; for (const u in P0) k[u] = P0[u] > 0 ? Math.max(0, Math.min(1, (P[u] || 0) / P0[u])) : 0; return k; };
-const goBack = (x, bt) => { delete x.lead; delete x.side; delete x.fc; delete x.fight; delete x.ft; delete x.pre; homeBack(CX, x, bt); };
+const goBack = (x, bt) => { homeBack(CX, x, bt); delete x.lead; delete x.side; delete x.fc; delete x.fight; delete x.ft; delete x.pre; };
 export const fightMembers = (w, lead, side) => w.marches.filter(x => !x.dead && x.phase === 'fight' && x.lead === lead.id && x.side === side);
 // Wie viele Schritte braucht dieser Kampf noch? (Schätzung für Dauer und Restzeit)
 function ticksLeft(A, D, am, dm, k, from = 0, cap = MAXT) {

@@ -39,7 +39,7 @@ function afterAccept() {
 const serverNow = () => Date.now() + offset;
 
 /* ---------- Töne und Musik ---------- */
-let sndPrev = null, fightIds = new Set();
+let sndPrev = null, fightIds = new Set(), battleLv = 0;
 document.addEventListener('pointerdown', () => snd.unlock(), true);
 document.addEventListener('click', e => {
   const el = e.target.closest && e.target.closest('[data-snd]');
@@ -48,7 +48,7 @@ document.addEventListener('click', e => {
   if (t) snd.sfx('tap');
 }, true);
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
-setInterval(() => { if (fightIds.size && !document.hidden) snd.sfx('clash', .55); }, 1300);
+setInterval(() => { snd.battle(fightIds.size && !document.hidden ? battleLv : 0); }, 300);
 function cmdSound(cmd) {
   const t = cmd.type;
   if (t === 'march') return ['attack', 'raid', 'assist'].includes(cmd.mode) ? 'war' : 'march';
@@ -66,6 +66,7 @@ function soundTick() {
     const sg = (view.sieges || []).filter(x => x.mine), ids = new Set(sg.map(x => x.id));
     for (const x of sg) if (!fightIds.has(x.id) && x.tpid !== me.id) snd.sfx('war');
     for (const id of fightIds) if (!ids.has(id)) { const r = S.reports[0]; snd.sfx(r && r.win ? 'win' : 'lose'); }
+    const tot = sg.reduce((a, x) => a + ((x.pw && (x.pw.na + x.pw.nd)) || 0), 0); battleLv = ids.size ? Math.min(1, .25 + Math.log10(1 + tot) / 4.5) : 0;
     fightIds = ids; snd.mood(ids.size ? 'battle' : 'calm');
     const lv = Object.values(S.lv || {}).reduce((a, b) => a + (+b || 0), 0), tc = Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
     if (sndPrev) { if (lv > sndPrev.lv) snd.sfx('done'); if (tc > sndPrev.tc) snd.sfx('research'); if (S.reports.length > sndPrev.rep && !ids.size) snd.sfx('report'); }
