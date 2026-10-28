@@ -13,6 +13,7 @@ import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, for
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
 import { WorldMap } from '/public/map.js';
 import { HERO_PIC } from '/public/heropics.js';
+import { HERO_ART } from '/public/heroart.js';
 import { snd } from '/public/sound.js';
 import { CityView } from '/public/city3d.js';
 import { buildingImage } from '/public/art.js';
@@ -47,6 +48,7 @@ document.addEventListener('click', e => {
   if (el) { const k = el.dataset.snd, on = k === 'sfx' ? !snd.cfg.sfx : !snd.cfg.music; if (k === 'sfx') snd.setSfx(on); else snd.setMusic(on); el.textContent = (k === 'sfx' ? '🔊 Töne: ' : '🎵 Musik: ') + (on ? 'an' : 'aus'); el.classList.toggle('ghost', !on); return; }
 }, true);
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('button,.chip,[data-act],[data-goto],.ptab,summary,a.btn,label.tgl,[data-nav],[data-sub]')) snd.click(); }, true);
+document.addEventListener('scroll', e => { if (e.target && e.target.id === 'hdock') dockX = e.target.scrollLeft; }, true);
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
 setInterval(() => { snd.heroMenu(panelName === 'heroes'); }, 300);
 let dailyWas = null;   // null = noch nicht gesehen: beim Laden kein Ton
@@ -890,32 +892,45 @@ const alaricIco = () => HERO_PIC.aldric ? `<img class="navhero" src="${HERO_PIC.
 { const ni = document.querySelector('[data-nav=heroes] i'); if (ni) ni.innerHTML = alaricIco(); }
 const heroPortrait = (id, cls = '') => { const H = HEROES[id]; return `<div class="hport ${cls} fx-${H.fx}" style="--hc:${H.col}"><span class="haura"></span><span class="hface${HERO_PIC[id] ? ' img' : ''}">${hpic(id, H)}</span><span class="hweap">${H.icon}</span><i></i><i></i><i></i><i></i></div>`; };
 const keeperNow = () => [S.defHero, S.defDeputy].find(id => id && HEROES[id] && !busyHero(id)) || '';
-function heroCardHTML(id) {
-  const H = HEROES[id], lv = heroLvl(id), xp = (S.heroes[id] || {}).xp || 0, need = xpNeed(lv), k = keeperNow();
-  const st = busyHero(id) ? '🚩 führt ein Heer' : id === k ? '🏰 bewacht die Burg' : id === S.defHero ? '🏰 Wächter (unterwegs)' : id === S.defDeputy ? '🛡 Stellvertreter' : '';
-  return `<button type="button" class="hcard" data-act="heroOpen" data-id="${id}" style="--hc:${H.col}">${heroPortrait(id)}
-    <div class="hinfo"><b>${H.name}</b><small>${H.title}</small><span class="hlv">Stufe ${lv}${lv >= HERO_MAX ? ' · Maximum' : ''}</span>
-    <div class="hbar"><i style="width:${lv >= HERO_MAX ? 100 : Math.min(100, Math.round(xp / need * 100))}%"></i></div><small class="hsk">${heroBonusText(id)}</small>${st ? `<small class="hst">${st}</small>` : ''}</div></button>`;
-}
-function heroDetailHTML(id) {
-  const H = HEROES[id], lv = heroLvl(id), xp = (S.heroes[id] || {}).xp || 0, need = xpNeed(lv);
-  const sk = skillList(S, id).map(k => `<div class="mrow"><div><b>${k.name}</b><div class="note">${k.text}</div></div><div class="hsv"><b>+${(Math.round(k.val * 1000) / 10).toString().replace('.', ',')} %</b><small>Stufe ${HERO_MAX}: +${Math.round(k.top * 100)} %</small></div></div>`).join('');
-  const how = H.role === 'gather' ? 'Lernt beim <b>Sammeln</b> auf Feldern (1 Erfahrung je 4 gesammelte Rohstoffe). Kämpfe bringen ihm nichts.' : 'Lernt im <b>Kampf</b>: Banditenlager und Räuber besiegen, Spieler oder Außenposten angreifen. Gegen viel zu schwache Ziele gibt es kaum Erfahrung.';
-  const st = busyHero(id) ? 'führt gerade ein Heer an' : id === keeperNow() ? 'bewacht die Burg' : 'bereit in der Burg';
-  return phead(alaricIco(), H.name + ' ' + H.title, 'Stufe ' + lv + ' von ' + HERO_MAX, '<button class="pback" type="button" data-act="heroBack">‹ Zurück</button>')
-    + `<div class="hdetail" style="--hc:${H.col}">${heroPortrait(id, 'big')}<div class="hstory"><p class="desc">${H.story}</p><p class="note">Zustand: <b>${st}</b></p>
-      <div class="hbar big"><i style="width:${lv >= HERO_MAX ? 100 : Math.min(100, Math.round(xp / need * 100))}%"></i><span>${lv >= HERO_MAX ? 'Höchststufe' : fmtN(xp) + ' / ' + fmtN(need) + ' Erfahrung'}</span></div></div></div>
-    <div class="block flat"><h3>Fähigkeiten</h3>${sk}</div>
-    <div class="block flat"><h3>Erfahrung</h3><p class="note">${how}</p></div>
-    <div class="block flat"><h3>Burgverteidigung</h3><p class="note">Der Wächter verstärkt die Verteidigung deiner Burg, solange er nicht unterwegs ist. Dann springt der Stellvertreter ein.${H.keeper ? ' <b>' + H.name + ' ist dafür besonders geeignet.</b>' : ''}</p>
-      <div class="row"><button class="btn small" type="button" data-act="keeperSet" data-id="${id}" data-r="main" ${S.defHero === id ? 'disabled' : ''}>Zum Wächter</button><button class="btn ghost small" type="button" data-act="keeperSet" data-id="${id}" data-r="dep" ${S.defDeputy === id ? 'disabled' : ''}>Zum Stellvertreter</button></div></div>`;
+const SK_ICO = { gather: '🧺', carry: '🛒', atkInf: '🛡️', atkCav: '🐎', atkRng: '🏹', force: '⚔️', garrison: '🏰', camp: '🗡️', assault: '🔥', speed: '💨' };
+const pct = v => (Math.round(v * 1000) / 10).toString().replace('.', ',') + ' %';
+const PREF_NAME = { inf: 'Infanterie', kav: 'Kavallerie', art: 'Fernkampf', trans: 'Handkarren' };
+let dockX = -1;
+// Heldenkraft: Stufe und Fähigkeiten in einer Zahl (nur zur Anzeige)
+const heroPowerOf = id => Math.round(1000 + heroLvl(id) * 90 + skillList(S, id).reduce((a, k) => a + k.val, 0) * 6000);
+function heroStageHTML(id) {
+  const H = HEROES[id], lv = heroLvl(id), xp = (S.heroes[id] || {}).xp || 0, need = xpNeed(lv), sk = skillList(S, id), k = keeperNow();
+  const st = busyHero(id) ? ['🚩', 'führt ein Heer an'] : id === k ? ['🏰', 'bewacht die Burg'] : id === S.defHero ? ['🏰', 'Wächter, gerade unterwegs'] : id === S.defDeputy ? ['🛡', 'Stellvertreter'] : ['✔', 'bereit in der Burg'];
+  const pr = heroPrefers(id).map(x => PREF_NAME[x]).filter(Boolean);
+  const how = H.role === 'gather' ? 'Lernt beim <b>Sammeln</b> auf Feldern (1 Erfahrung je 4 Rohstoffe).' : 'Lernt im <b>Kampf</b>: Lager, Räuber, Spieler, Außenposten. Zu schwache Ziele geben kaum Erfahrung.';
+  const nxt = lv >= HERO_MAX ? '' : sk.map(x => `<span>+${pct(x.max * .75 / (HERO_MAX - 1))} ${x.name}</span>`).join('');
+  return `<div class="hscene fx-${H.fx}" style="--hc:${H.col}" key="${id}">
+      <img class="hart" src="${HERO_ART[id] || HERO_PIC[id] || ''}" alt="" draggable="false"><span class="hglow"></span>
+      <i></i><i></i><i></i><i></i><i></i><i></i>
+      <div class="hover"><div class="htags"><span>${H.role === 'gather' ? 'Sammler' : 'Kämpfer'}</span>${sk.map(x => `<span>${SK_ICO[x.k] || ''} ${x.name}</span>`).join('')}</div>
+        <h2>${H.name}</h2><div class="hsub">${H.title}</div></div>
+    </div>
+    <div class="hbody" style="--hc:${H.col}">
+      <div class="hlvrow"><span class="hlvb"><small>Stufe</small><b>${lv}</b></span><div class="hxp"><div class="hxbar"><i style="width:${lv >= HERO_MAX ? 100 : Math.min(100, Math.round(xp / need * 100))}%"></i></div>
+        <small>${lv >= HERO_MAX ? 'Höchststufe erreicht' : fmtN(xp) + ' / ' + fmtN(need) + ' Erfahrung bis Stufe ' + (lv + 1)}</small></div>
+        <span class="hpow"><small>Heldenkraft</small><b>${fmtN(heroPowerOf(id))}</b></span></div>
+      <p class="hstoryq">„${H.story}“</p>
+      <div class="hsecs">Fähigkeiten</div>
+      ${sk.map(x => `<div class="hskill"><span class="hsi">${SK_ICO[x.k] || '✦'}</span><div class="hsm"><b>${x.name}</b><small>${x.text}</small><div class="hsbar"><i style="width:${Math.round(x.val / x.top * 100)}%"></i></div></div><div class="hsv2"><b>+${pct(x.val)}</b><small>Stufe ${HERO_MAX}: +${pct(x.top)}</small></div></div>`).join('')}
+      ${nxt ? `<div class="hnext"><small>Mit jeder Stufe</small>${nxt}</div>` : ''}
+      <div class="hsecs">Einsatz</div>
+      <div class="hinfo2"><div><small>Zustand</small><b>${st[0]} ${st[1]}</b></div><div><small>Bevorzugte Truppen</small><b>${pr.length ? pr.join(', ') : 'keine'}</b></div></div>
+      <p class="hhow">${how}</p>
+      <div class="hsecs">Burgverteidigung</div>
+      <p class="hhow">Der Wächter verstärkt die Verteidigung der Burg, solange er nicht unterwegs ist; dann springt der Stellvertreter ein.${H.keeper ? ' <b>' + H.name + ' ist dafür besonders geeignet.</b>' : ''}</p>
+      <div class="hbtns"><button type="button" data-act="keeperSet" data-id="${id}" data-r="main" ${S.defHero === id ? 'disabled' : ''}>🏰 Zum Wächter</button><button type="button" data-act="keeperSet" data-id="${id}" data-r="dep" ${S.defDeputy === id ? 'disabled' : ''}>🛡 Zum Stellvertreter</button></div>
+    </div>`;
 }
 function heroesHTML() {
-  if (heroSel) return heroDetailHTML(heroSel);
-  const k = keeperNow(), nm = id => id ? HEROES[id].name : '–';
-  return phead(alaricIco(), 'Helden', 'Anführer deiner Heere') + `<p class="note">Jedes Heer braucht einen Helden als Anführer. Sammler-Helden werden beim Sammeln stärker, die übrigen im Kampf. Tippe einen Helden an für Details.</p>
-    <div class="block flat"><h3>Burgwächter</h3><p class="note">${k ? '🏰 <b>' + HEROES[k].name + '</b> bewacht gerade die Burg.' : '<span class="why">Niemand bewacht gerade die Burg.</span>'} Wächter: ${nm(S.defHero)} · Stellvertreter: ${nm(S.defDeputy)}. Tippe einen Helden an, um ihn zum Wächter zu machen.</p></div>
-    <div class="hgrid">${HERO_IDS.map(heroCardHTML).join('')}</div>`;
+  const sel = HERO_IDS.includes(heroSel) ? heroSel : (keeperNow() || HERO_IDS[0]), k = keeperNow();
+  const dock = HERO_IDS.map(id => { const H = HEROES[id], mk = busyHero(id) ? '🚩' : id === k ? '🏰' : id === S.defDeputy ? '🛡' : '';
+    return `<button type="button" class="hdk${id === sel ? ' on' : ''} fx-${H.fx}" data-act="heroOpen" data-id="${id}" style="--hc:${H.col}" aria-label="${H.name}"><span class="hdp">${hpic(id, H)}</span><b class="hdl">${heroLvl(id)}</b>${mk ? `<em>${mk}</em>` : ''}<small>${H.name}</small></button>`; }).join('');
+  return `<div class="hstage" data-sel="${sel}">${heroStageHTML(sel)}<div class="hdock" id="hdock"><div class="hdrow">${dock}</div></div></div>`;
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
@@ -924,6 +939,7 @@ function renderPanel(force) {
   el.querySelectorAll('input,select').forEach(i => { if (i.id) keep[i.id] = [i.value, document.activeElement === i]; });
   const top = $('sidePanel').scrollTop, box = $('chatBox'), atEnd = !box || box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
   el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : panelName === 'tech' ? techHTML() : panelName === 'units' ? phead('🪖', 'Einheiten', 'Deine Truppen im Überblick') + unitOverviewHTML() : panelName === 'heroes' ? heroesHTML() : moreHTML();
+  { const dk = $('hdock'); if (dk) { const centre = () => { const on = dk.querySelector('.on'); if (on) { dk.scrollLeft = on.offsetLeft - dk.clientWidth / 2 + on.offsetWidth / 2; dockX = dk.scrollLeft; } }; if (dockX < 0) { centre(); requestAnimationFrame(centre); } else dk.scrollLeft = dockX; } }
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
@@ -932,7 +948,7 @@ function renderPanel(force) {
 function fitTree() {}
 window.addEventListener('resize', () => { if (panelName === 'tech') fitTree(); });
 function openPanel(name) {
-  if (name === 'heroes') heroSel = '';
+  if (name === 'heroes') { heroSel = ''; dockX = -1; }
   if (!$('reports').hidden) closeReports();
   closeSheet(); panelName = name; panelSig = ''; if (name === 'more') { moreSub = ''; moreFrom = ''; } if (name === 'ally') allyTab = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
   if (name === 'tech') { fitTree(); requestAnimationFrame(fitTree); }
@@ -961,7 +977,6 @@ function setupPanel() {
     if (act === 'sub' && d.t === 'reports') return openReports();
     if (act === 'sub') { moreFrom = ''; moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
     if (act === 'heroOpen') { heroSel = d.id; return go(); }
-    if (act === 'heroBack') { heroSel = ''; return go(); }
     if (act === 'keeperSet') {
       let a = S.defHero, b = S.defDeputy; if (d.r === 'main') { a = d.id; if (b === d.id) b = ''; } else { b = d.id; if (a === d.id) a = ''; }
       const ok = await command({ type: 'setKeeper', hero: a, deputy: b }); if (ok) toast(HEROES[d.id].name + (d.r === 'main' ? ' bewacht jetzt die Burg.' : ' ist jetzt Stellvertreter.'), 'info'); return renderPanel(true);
