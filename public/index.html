@@ -685,6 +685,12 @@ details.acc{background:rgba(255,255,255,.03);border-radius:14px}
 .rbtn>.ico{width:42%;height:42%}
 .spd>.ico{width:58%;height:58%;display:flex}.spd>.ico>.ic{width:100%;height:100%}
 .spd{display:inline-grid;place-items:center}
+/* Karte im Heldenstil: Abendlicht, Vignette, Schilder aus dunklem Glas */
+#stage canvas{filter:saturate(.8) contrast(1.07) brightness(.92) sepia(.08)}
+#stage::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(8,11,16,.55) 100%),linear-gradient(rgba(14,19,26,.55),transparent 22%,transparent 78%,rgba(8,11,16,.6)),radial-gradient(ellipse at 80% 0,rgba(232,199,102,.12),transparent 50%)}
+.maplabels{z-index:1}
+.mapbadge{background:linear-gradient(90deg,var(--bc,#555) 0 7px,rgba(14,19,26,.9) 7px)!important;padding:2px 10px 2px 15px;border:1px solid rgba(232,199,102,.7);color:#f4ecd4;border-radius:12px;text-shadow:0 1px 2px #000;font-size:13.5px;letter-spacing:.02em}
+.mapbadge.march{background:rgba(14,19,26,.92)!important;padding-left:10px}
 /* Aufbau (Position, Sichtbarkeit) */
 body:not(.mode-map) .city{position:fixed;z-index:3;inset:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-user-select:none;user-select:none;padding:calc(env(safe-area-inset-top,0px) + 150px) max(12px,env(safe-area-inset-left,0px)) calc(var(--nav) + 28px)}
 body.city3d:not(.mode-map) .city{overflow:hidden;padding:0}

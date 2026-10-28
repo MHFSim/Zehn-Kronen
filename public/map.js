@@ -543,10 +543,10 @@ export class WorldMap {
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); r.outputEncoding = T.sRGBEncoding;
     r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
     this.dom = r.domElement; host.appendChild(this.dom);
-    this.scene = new T.Scene(); const sky = 0x9cc3de; this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(sky, 70, 260);
+    this.scene = new T.Scene(); const sky = 0x2a3a52; this.scene.background = new T.Color(sky); this.scene.fog = new T.Fog(sky, 60, 230);
     this.camera = new T.PerspectiveCamera(34, 1, 2, 1800);
-    this.hemi = new T.HemisphereLight(0xcfe3ff, 0x7d7448, .95); this.scene.add(this.hemi);
-    this.sun = new T.DirectionalLight(0xfff1d6, 1.15); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
+    this.hemi = new T.HemisphereLight(0xb4c6ea, 0x6e5f3a, .82); this.scene.add(this.hemi);
+    this.sun = new T.DirectionalLight(0xffd9a0, 1.2); this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera; sc.left = -42; sc.right = 42; sc.top = 42; sc.bottom = -42; sc.near = 1; sc.far = 220; this.sun.shadow.bias = -.0006; this.sun.shadow.normalBias = .05;
     this.scene.add(this.sun, this.sun.target);
     this.labelsEl = document.createElement('div'); this.labelsEl.className = 'maplabels'; host.appendChild(this.labelsEl);
@@ -946,12 +946,12 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   /* ---------- Beschriftungen (HTML über der Karte) ---------- */
   labelEl(key, make) { let l = this.labels && this.labels[key]; if (!l) { (this.labels = this.labels || {})[key] = l = make(); } return l; }
   mkBadge(text, color) {
-    const el = document.createElement('div'); el.className = 'mapbadge'; el.textContent = text; el.style.background = '#' + color.toString(16).padStart(6, '0'); this.labelsEl.appendChild(el);
+    const el = document.createElement('div'); el.className = 'mapbadge'; el.textContent = text; el.style.setProperty('--bc', '#' + color.toString(16).padStart(6, '0')); this.labelsEl.appendChild(el);
     return { el, text, color, x: 0, y: 0, z: 0, sx: 1 };
   }
   setBadge(l, text, color, bar) {
     if (l.text !== text) { l.text = text; l.el.textContent = text; }
-    if (l.color !== color) { l.color = color; l.el.style.background = '#' + color.toString(16).padStart(6, '0'); }
+    if (l.color !== color) { l.color = color; l.el.style.setProperty('--bc', '#' + color.toString(16).padStart(6, '0')); }
     void bar;
   }
   rebuildLabels(view) {
