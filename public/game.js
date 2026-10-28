@@ -859,11 +859,11 @@ function renderPanel(force) {
   $('sidePanel').scrollTop = top;
   fitTree();
 }
-// Techtree immer komplett im Bild: auf die Größe des Bildschirms skalieren
+// Techtree: in voller Größe (mindestens), zum Wischen; auf hohen Bildschirmen so groß, dass die Höhe gerade passt
 function fitTree() {
   const box = document.querySelector('.tree'), inner = box && box.firstElementChild; if (!inner) return;
-  const W = inner.offsetWidth, H = inner.offsetHeight, cw = box.clientWidth - 8, ch = box.clientHeight - 8; if (!W || !H || cw <= 0 || ch <= 0) return;
-  inner.style.transform = 'translate(-50%,-50%) scale(' + Math.min(cw / W, ch / H, 1.7) + ')';
+  inner.style.zoom = 1; const H = inner.offsetHeight, ch = box.clientHeight - 12; if (!H || ch <= 0) return;
+  inner.style.zoom = Math.max(1, Math.min(1.5, ch / H));
 }
 window.addEventListener('resize', () => { if (panelName === 'tech') fitTree(); });
 function openPanel(name) {
