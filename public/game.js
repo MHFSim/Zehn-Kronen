@@ -1098,10 +1098,18 @@ function siteSheet(w) {
   }
   return `<div class="sh-head"><h2>Freies Feld</h2><span class="lvl">${msel.x} | ${msel.y}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
 }
+// Kräfte beider Seiten als zwei Balken: wer länger ist, gewinnt eher
+function powBars(pw) {
+  if (!pw) return '';
+  const mx = Math.max(pw.pa, pw.pd, 1), pa = Math.max(3, Math.round(100 * pw.pa / mx)), pd = Math.max(3, Math.round(100 * pw.pd / mx));
+  return `<div class="pbars"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${fmtN(pw.na)}</b></div>`
+    + `<div class="pb def"><span>Verteidiger</span><div class="bar"><i style="width:${pd}%"></i></div><b>${fmtN(pw.nd)}</b></div>`
+    + `<div class="pv">${pw.win ? '⚔ Die Angreifer sind im Vorteil' : '🛡 Die Verteidiger sind im Vorteil'}</div></div>`;
+}
 function siegeBlock(tid, defName) {
   const sg = (view.sieges || []).find(x => x.tid === tid); if (!sg || view.match.phase !== 'running') return '';
   const free = sendFrom || sendFromOp || ownMarches().length < armySlots(S), none = !sum(sendList()) ? 'Wähle Truppen aus.' : !free ? 'Alle Heere sind unterwegs.' : '';
-  return `<div class="block"><h3>⚔ Belagerung · Kampf in ${fmtT(real(Math.max(0, sg.tSiege - gtNow())))}</h3><p class="note">${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(defName)}. Wer rechtzeitig eintrifft, kämpft mit – auch aus anderen Bündnissen.</p>`
+  return `<div class="block"><h3>⚔ Belagerung · Kampf in ${fmtT(real(Math.max(0, sg.tSiege - gtNow())))}</h3><p class="note">${sg.fromTag ? '[' + esc(sg.fromTag) + '] ' : ''}${esc(sg.from)} belagert ${esc(defName)}. Wer rechtzeitig eintrifft, kämpft mit – auch aus anderen Bündnissen.</p>${powBars(sg.pw)}`
     + `<div class="row"><button class="btn ghost" type="button" data-act="assistD" ${none ? 'disabled' : ''}>Verteidigern helfen</button><button class="btn ghost" type="button" data-act="assistA" ${none ? 'disabled' : ''}>Angreifern helfen</button></div>${none ? `<span class="why">${none}</span>` : ''}</div>`;
 }
 function opSheet(w) {
@@ -1149,9 +1157,9 @@ function renderMapSheet() {
     const eta = st.moving ? Date.now() + offset + real(Math.max(0, marchRemain(m))) * 1000 : 0;
     const btn = (act, label, cls = '') => `<button class="btn ${cls}" type="button" data-act="${act}">${label}</button>`;
     const acts = mine ? [
-      (m.phase !== 'siege' && !(m.phase === 'out' && m.mode === 'build')) ? btn('sfStart', '➜ Marschieren') : '',
+      !(m.phase === 'out' && m.mode === 'build') ? btn('sfStart', '➜ Marschieren') : '',
       m.phase === 'out' && m.mode !== 'build' ? btn('halt', '✋ Anhalten', 'ghost') : '',
-      m.phase !== 'back' ? btn('recall', m.phase === 'gather' ? '⌂ Heimrufen (mit Beute)' : '⌂ Heimrufen', 'ghost') : ''
+      m.phase !== 'back' ? btn('recall', m.phase === 'gather' ? '⌂ Heimrufen (mit Beute)' : m.phase === 'siege' ? '⌂ Abziehen' : '⌂ Heimrufen', 'ghost') : ''
     ].filter(Boolean).join('') : '';
     h = `<div class="sh-head"><h2>${mine ? 'Dein Heer' : 'Heer von ' + esc(m.name)}</h2><span class="lvl">${modeName}</span><button class="close" type="button" data-act="close">Schließen</button></div>
       ${st.moving || m.phase === 'gather' ? `<div class="mprog"><div class="prog"><i id="mProg" style="width:${Math.round(st.pct * 100)}%"></i></div><span class="mtime" id="mTime">${fmtT(real(Math.max(0, marchRemain(m))))}</span></div>` : ''}
@@ -1160,6 +1168,7 @@ function renderMapSheet() {
       ${mine && m.troops.n == null ? `<dt>Tragkraft</dt><dd>${fmtN(capacityOf(m.troops, S))}</dd>` : ''}
       ${mine && m.load && Object.keys(m.load).length ? `<dt>Beute</dt><dd class="costs">${lootHTML(m.load)}</dd>` : ''}
       ${m.phase === 'gather' && mine ? `<dt>Sammelt</dt><dd class="costs" id="mGather">${lootHTML({ [m.res]: Math.floor(m.amount * st.pct) })} <span class="note">von ${fmtN(m.amount)}</span></dd>` : ''}</dl>
+      ${m.phase === 'siege' ? powBars(((view.sieges || []).find(x => x.id === m.id) || {}).pw) : ''}
       ${acts ? `<div class="row acts">${acts}</div>` : ''}
       ${!mine && m.phase === 'post' ? `${pickerHTML()}<div class="row"><button class="btn ${armedKey === 'patk' + m.id ? 'danger' : ''}" type="button" data-act="patk" ${!sum(sendList()) || ownMarches().length >= armySlots(S) ? 'disabled' : ''}>${armedKey === 'patk' + m.id ? 'Jetzt wirklich angreifen' : '⚔ Heer angreifen'}</button></div>` : ''}`;
   } else if (msel.type === 'site' || msel.type === 'op') {

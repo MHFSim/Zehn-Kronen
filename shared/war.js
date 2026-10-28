@@ -1,13 +1,13 @@
 // Zehn Kronen – Krieg zwischen den Spielern: Angriffe auf Burgen, Besatzungen, Vasallen, Ausscheiden,
 // Thron und Heiligtümer, Spähen, Punkte und Spielende. Läuft auf dem Server und in der Testversion.
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
-import { battle, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf } from './combat.js';
+import { battle, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf, power } from './combat.js';
 import {
   DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY
 } from './core.js';
-import { territory, touchesObj, removeOutposts, auxOf, sumAux, attMultOf, settleAux, releaseAux } from './outpost.js';
+import { territory, touchesObj, removeOutposts, auxOf, sumAux, attMultOf, settleAux, releaseAux, opGuard } from './outpost.js';
 
 const FIELD_K = ['farm', 'wood', 'stone'];
 export const SANCT_NAMES = ['Heiligtum der Felder', 'Heiligtum des Holzes', 'Heiligtum der Steine', 'Heiligtum des Goldes'];
@@ -162,6 +162,24 @@ export function checkAssist(ctx, me, tid, side, siegeId, defGroupHas) {
   }
   if (!att) return 'Der Angreifer ist nicht mehr da.';
   return sm;
+}
+// Kräfte beider Seiten einer laufenden Belagerung (Anzeige): Stärke von Angreifern und Verteidigern samt Helfern und Prognose
+export function siegeStrength(ctx, m) {
+  const { match, players } = ctx, w = match.world, o = mapOf(match).byId[m.tid];
+  const auxA = auxOf(m, 'att'), auxD = auxOf(m, 'def'), attAll = merge({ ...m.troops }, sumAux(auxA)), am = attMultOf(ctx, m, auxA);
+  let def = {}, dm = 1;
+  if (m.mode === 'raid') {
+    const op = (w.outposts || {})[m.tid]; if (!op) return null;
+    const g = opGuard(); def = { ...g.troops }; dm = g.mult;
+    for (const pid in op.garr) def = merge(def, op.garr[pid]);
+  } else {
+    const D = o && o.k === 'start' ? players.find(p => p.state.slot === o.slot) : null; if (!D) return null;
+    const SD = D.state; def = merge({ ...SD.troops }, guardOf(SD)); dm = wallMult(SD) * forceOf(SD);
+    for (const pid in SD.stationed) def = merge(def, SD.stationed[pid]);
+  }
+  def = merge(def, sumAux(auxD));
+  const r = battle(attAll, def, dm, am);
+  return { pa: Math.round(power(attAll, am)), pd: Math.round(power(def, dm)), win: r.win, na: sum(attAll), nd: sum(def) };
 }
 export function arriveAssist(ctx, m, bt, realT, back) {
   const { match, players } = ctx, w = match.world, P = byId(players, m.owner);

@@ -451,6 +451,13 @@ body.mode-map.sheet-open #chatBtn,body.mode-map.reports-open #chatBtn{display:no
 .urow .qr{width:100%;min-width:0;height:28px;margin:0}
 .urow .qn{width:58px;height:30px;font-size:14px}
 .picker .usum{margin:4px 0 0;font-size:12px}
+
+.pbars{margin:8px 0 4px;display:grid;gap:5px}
+.pb{display:grid;grid-template-columns:74px 1fr 34px;align-items:center;gap:6px;font-size:12px}
+.pb .bar{height:10px;border-radius:6px;background:rgba(60,40,20,.15);overflow:hidden}
+.pb .bar i{display:block;height:100%;border-radius:6px;transition:width .4s}
+.pb.att .bar i{background:#b5402f}.pb.def .bar i{background:#3b6fa8}
+.pb b{text-align:right}.pv{font-size:12px;text-align:center;opacity:.8}
 </style>
 </head>
 <body>

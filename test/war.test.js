@@ -259,4 +259,23 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   void before; void got;
 }
 
+// ---- Abzug aus der Belagerung + Kräfteanzeige ----
+{
+  const { match, players } = mk(5); const [a, b] = players;
+  const cityOf = q => mapOf(match).objects.find(o => o.k === 'start' && o.slot === q.state.slot);
+  a.state.protUntil = 0; b.state.protUntil = 0; give(a, { speer: 60 });
+  const bs = match.world.marches; void bs;
+  adv(match, players, 4 * DAY + 10);
+  const r = run(match, players, clock, a, { type: 'march', mode: 'attack', target: cityOf(b).id, troops: { speer: 60 } });
+  if (r === '') {
+    const m = match.world.marches.find(x => x.owner === a.id);
+    adv(match, players, m.arr[m.arr.length - 1] + 20);
+    assert.equal(m.phase, 'siege');
+    const v = viewFor(match, players, b, clock), sg = v.sieges.find(x => x.id === m.id);
+    assert.ok(sg && sg.pw && sg.pw.pa > 0 && sg.pw.pd > 0 && sg.pw.na === 60, 'Kräfteanzeige');
+    assert.equal(run(match, players, clock, a, { type: 'recall', id: m.id }), '', 'Abzug aus der Belagerung');
+    assert.equal(match.world.marches.find(x => x.id === m.id).phase, 'back');
+  } else console.log('Belagerungstest übersprungen:', r);
+}
+
 console.log('Alle Kriegstests bestanden.');

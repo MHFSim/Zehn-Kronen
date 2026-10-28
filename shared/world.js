@@ -10,7 +10,7 @@ import {
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur, cellXY, planFrom, allied, isProtected
 } from './core.js';
-import { beginSiege, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { siegeStrength, beginSiege, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, arriveRaid, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText } from './rules.js';
@@ -274,7 +274,7 @@ export function command(match, players, player, cmd, now) {
       if (mode === 'build') return 'Aus dem Außenposten kann man keinen neuen bauen';
       if (mode === 'garrison' && opx && opx.id === fromOp.id) return 'Die Truppen sind schon dort';
     }
-    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && (['post', 'gather', 'back'].includes(x.phase) || (x.phase === 'out' && x.mode !== 'build'))) : null;
+    const src = cmd.from != null ? w.marches.find(x => x.id === Number(cmd.from) && x.owner === player.id && !x.dead && (['post', 'gather', 'back', 'siege'].includes(x.phase) || (x.phase === 'out' && x.mode !== 'build'))) : null;
     if (cmd.from != null && !src) return 'Dieses Heer kann gerade nicht umgeleitet werden';
     if (!src && w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
     if (src && (src.phase === 'post' || src.phase === 'gather') && o.id === src.tid) return 'Das Heer ist schon dort';
@@ -403,7 +403,7 @@ export function viewFor(match, players, me, now) {
       if (op && myAl && op.al === myAl.id) incoming.push({ id: m.id, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', target: 'einen Außenposten', targetId: 0, mine: false, op: true, siege: m.phase === 'siege', eta: m.phase === 'siege' ? m.tSiege : m.t0 + m.arr[m.arr.length - 1] });
     }
     if (m.phase === 'siege' && (m.mode === 'attack' || m.mode === 'raid')) { const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null;
-      sieges.push({ id: m.id, tid: m.tid, kind: op ? 'op' : 'city', tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : '?', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops) }); }
+      sieges.push({ id: m.id, tid: m.tid, kind: op ? 'op' : 'city', tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : '?', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, tSiege: m.tSiege, n: sum(m.troops), pw: siegeStrength(mkCtx(match, players, now), m) }); }
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
       tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, tSiege: m.tSiege, amount: m.amount, res: m.res, load: own ? m.load : undefined });
