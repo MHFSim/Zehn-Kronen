@@ -2,6 +2,7 @@
 // Klänge sind aus Rauschen und Obertönen aufgebaut (Metall, Holz, Stimmen, Hörner, Trommeln) und laufen durch einen Hall.
 // Im Kampf entsteht ein Schlachtlärm: Schwertschläge, Schilde, Kriegsschreie, Pfeilsalven, Hufe, Kriegstrommeln und Hörner –
 // je größer die Heere, desto dichter und wilder.
+import { CLIPS } from '/public/audiodata.js';
 const KEY = 'zk.sound';
 export const cfg = { sfx: true, music: true, vs: .8, vm: .5 };
 try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* ohne Speicher geht es auch */ }
@@ -185,7 +186,17 @@ function schedule() {
 function musicOn() { if (!ac()) return; if (!timer) { nextT = ctx.currentTime + .2; timer = setInterval(schedule, 250); } schedule(); }
 function musicOff() { clearInterval(timer); timer = 0; }
 
+const clipBuf = {};
+async function clipPlay(name, vol) {
+  if (!cfg.sfx || !CLIPS[name] || !ac()) return;
+  try {
+    if (!clipBuf[name]) { const b64 = CLIPS[name].split(',')[1], bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); clipBuf[name] = ctx.decodeAudioData(u.buffer); }
+    const buf = await clipBuf[name], src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = buf; g.gain.value = vol * Math.max(.3, cfg.vs); src.connect(g); g.connect(master); src.start();
+  } catch { /* ein Ton darf nie das Spiel stören */ }
+}
 export const snd = {
+  // Eigene Klangdatei (public/audio) abspielen
+  clip(name, vol = 1) { clipPlay(name, vol); },
   // Beim ersten Tippen darf der Browser Ton abspielen
   unlock() { if (!ac()) return; if (cfg.music && !timer) musicOn(); },
   sfx(name, vol = 1) {

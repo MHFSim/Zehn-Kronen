@@ -63,6 +63,7 @@ function cmdSound(cmd) {
   if (/Chat$/.test(t)) return 'pop';
   return 'ok';
 }
+let dailyWas = null;   // null = noch nicht gesehen: beim Laden kein Ton
 function soundTick() {
   try {
     const sg = (view.sieges || []).filter(x => x.mine), ids = new Set(sg.map(x => x.id));
@@ -70,6 +71,7 @@ function soundTick() {
     for (const id of fightIds) if (!ids.has(id)) { const r = S.reports[0]; snd.sfx(r && r.win ? 'win' : 'lose'); }
     const tot = sg.reduce((a, x) => a + ((x.pw && ((x.pw.na || 0) + (x.pw.nd || 0)) * (x.pw.na != null && x.pw.nd != null ? 1 : 2)) || 0), 0); battleLv = ids.size ? Math.min(1, .25 + Math.log10(1 + tot) / 4.5) : 0;
     fightIds = ids; snd.mood(ids.size ? 'battle' : 'calm');
+    { const dd = !!(S.daily && dailyDone(S)); if (dd && dailyWas === false) snd.clip('quests'); dailyWas = dd; }
     const lv = Object.values(S.lv || {}).reduce((a, b) => a + (+b || 0), 0), tc = Object.values(S.tech || {}).reduce((a, b) => a + (+b || 0), 0);
     if (sndPrev) { if (lv > sndPrev.lv) snd.sfx('done'); if (tc > sndPrev.tc) snd.sfx('research'); if (S.reports.length > sndPrev.rep && !ids.size) snd.sfx('report'); }
     sndPrev = { lv, tc, rep: S.reports.length };
