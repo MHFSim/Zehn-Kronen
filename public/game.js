@@ -438,7 +438,7 @@ function openSheet(id) { msel = null; sel = id; document.body.classList.add('she
 function syncMoveBar() {
   let el = $('moveBar');
   if (!sendFrom && !sendFromOp && !sendGroup.length) { if (el) el.hidden = true; return; }
-  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span></span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; sendGroup = []; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span hidden></span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; sendGroup = []; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
   el.querySelector('span').textContent = sendGroup.length ? '➜ Alle ' + sendGroup.length + ' Heere: Ziel antippen – sie ziehen gemeinsam los' : '➜ Ziel antippen – das Heer zieht sofort los'; el.hidden = false;
 }
 function closeSheet() { if (scoutEl) scoutEl.hidden = true; if (miniEl) miniEl.hidden = true; miniTile = null; sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
@@ -691,7 +691,7 @@ function showLvUp() {
   let el = $('lvUp'); if (!el) { el = document.createElement('div'); el.id = 'lvUp'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   el.innerHTML = `<span class="lvpic">${H ? hpic(id, H) : '⭐'}</span><div><b>STUFE ${esc(lv)}</b><small>${esc(H ? H.name : 'Held')} ist aufgestiegen</small></div>`;
   el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
-  clearTimeout(lvTimer); lvTimer = setTimeout(() => { el.hidden = true; lvQueue.shift(); if (lvQueue.length) setTimeout(showLvUp, 300); }, 3800);
+  clearTimeout(lvTimer); lvTimer = setTimeout(() => { el.hidden = true; lvQueue.shift(); if (lvQueue.length) setTimeout(showLvUp, 300); }, 8000);
 }
 function checkFeed() {
   const top = S.feed.length ? S.feed[0].id : 0;
