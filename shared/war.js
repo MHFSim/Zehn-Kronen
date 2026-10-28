@@ -179,7 +179,9 @@ export function freeOrphans(ctx, bt) {
 export function stepFight(ctx, m, bt, realT) {
   CX = ctx;
   const w = ctx.match.world, f = m.fight, att = [m, ...fightMembers(w, m, 'att')], am = multOf(ctx, att);
-  const r = roundStep(f.A, f.D, am, f.dm, f.k); f.A = r.A; f.D = r.D; f.round++;
+  if (f.wall != null) f.dm = f.fm * (1 + f.wb * f.wall);   // die Mauer hilft den Verteidigern nur, solange sie steht
+  const before = power(f.D, 1), r = roundStep(f.A, f.D, am, f.dm, f.k); f.A = r.A; f.D = r.D; f.round++;
+  if (f.wall != null) f.wall = Math.max(0, f.wall - 1.5 * Math.max(0, before - power(f.D, 1)) / Math.max(1, power(f.D0, 1)));   // Angreifer schlagen die Mauer nieder
   f.pkA = Math.max(f.pkA, power(f.A, am)); f.pkD = Math.max(f.pkD, power(f.D, f.dm));
   m.ft = bt + f.dt;
   const nA = sum(f.A), nD = sum(f.D);
@@ -189,7 +191,7 @@ export function stepFight(ctx, m, bt, realT) {
 export function fightView(ctx, m) {
   const w = ctx.match.world, f = m.fight; if (!f) return null;
   const am = multOf(ctx, [m, ...fightMembers(w, m, 'att')]), pa = power(f.A, am), pd = power(f.D, f.dm);
-  return { kind: f.kind, pa: Math.round(pa), pd: Math.round(pd), pk: Math.round(Math.max(f.pkA, f.pkD, pa, pd)), na: Math.round(sum(f.A)), nd: Math.round(sum(f.D)), na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), round: f.round,
+  return { kind: f.kind, pa: Math.round(pa), pd: Math.round(pd), pk: Math.round(Math.max(f.pkA, f.pkD, pa, pd)), fa: Math.min(1, pa / Math.max(1, power(f.A0, am))), fd: Math.min(1, pd / Math.max(1, power(f.D0, f.dm))), wall: f.wall == null ? null : f.wall, na: Math.round(sum(f.A)), nd: Math.round(sum(f.D)), na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), round: f.round,
     left: ticksLeft(f.A, f.D, am, f.dm, f.k, f.round) * f.dt, tot: Math.max(f.round, ticksLeft(f.A, f.D, am, f.dm, f.k, f.round) + f.round) * f.dt };
 }
 // Kampf gegen ein Banditenlager
@@ -301,6 +303,7 @@ function resolveFight(ctx, lead, bt, realT, win) {
     return fin();
   }
   const o = map.byId[lead.tid], D = players.find(p => p.state.slot === o.slot), SD = D.state, info = { kind: 'start', id: o.id, x: o.x, y: o.y, name: D.name };
+  SD.wall = { v: win ? 0 : (f.wall == null ? 1 : f.wall), t: bt };
   const homeStart = {}; for (const u in SD.troops) if (SD.troops[u] > 0) homeStart[u] = SD.troops[u];
   const homeLost = lostOf(homeStart), hs = settleHome(SD, homeLost);
   const groups = [{ label: 'Deine Truppen', start: homeStart, left: subTroops(homeStart, homeLost), wounded: hs.wounded, dead: hs.dead }];
@@ -381,7 +384,9 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   const SD = D.state; let def = merge({ ...SD.troops }, guardOf(SD));
   for (const pid in SD.stationed) def = merge(def, SD.stationed[pid]);
   for (const u in def) if (!(def[u] > 0)) delete def[u];
+  const wv = Math.min(1, ((SD.wall || {}).v == null ? 1 : SD.wall.v) + (bt - ((SD.wall || {}).t || bt)) / 21600);   // Mauer wächst in 6 Stunden Spielzeit wieder zu
   startFight(ctx, m, def, wallMult(SD) * forceOf(SD), bt, 'city');
+  Object.assign(m.fight, { wall: wv, wb: wallMult(SD) - 1, fm: forceOf(SD) });
   const who = [D.id]; const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) who.push(id);
   note(ctx, D.id, 'attack', 'Kampf um deine Burg!', A.name + tag(w, A.id) + ' kämpft mit ' + sum(m.troops) + ' Truppen vor deiner Burg. Schick Verstärkung und beobachte den Lebensbalken!');
   for (const id of who) if (id !== D.id) note(ctx, id, 'attack', 'Kampf um die Burg eines Verbündeten', A.name + ' kämpft vor der Burg von ' + D.name + '. Schick Verstärkung!');

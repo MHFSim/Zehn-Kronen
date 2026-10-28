@@ -1058,11 +1058,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     for (const sg of view.sieges || []) {
       keep.add(sg.id); let b = this.fbars[sg.id];
       if (!b) {
-        const el = document.createElement('div'); el.className = 'fbar'; el.innerHTML = '<div class="fb a"><i></i></div><div class="fb d"><i></i></div><span class="ft"></span>'; this.labelsEl.appendChild(el);
-        b = this.fbars[sg.id] = { el, a: el.querySelector('.a i'), d: el.querySelector('.d i'), t: el.querySelector('.ft') };
+        const el = document.createElement('div'); el.className = 'fbar'; el.innerHTML = '<div class="fb a"><i></i></div><div class="fb d"><i></i></div><div class="fb w"><i></i></div><span class="ft"></span>'; this.labelsEl.appendChild(el);
+        b = this.fbars[sg.id] = { el, a: el.querySelector('.a i'), d: el.querySelector('.d i'), w: el.querySelector('.w i'), wr: el.querySelector('.w'), t: el.querySelector('.ft') };
       }
       b.sg = sg; const pw = sg.pw;
-      if (pw) { const mx = Math.max(pw.pk, 1); b.a.style.width = Math.round(100 * pw.pa / mx) + '%'; b.d.style.width = Math.round(100 * pw.pd / mx) + '%'; b.left = pw.left; b.gt0 = this.gtNow(); b.na = pw.na; b.nd = pw.nd; }
+      if (pw) { b.a.style.width = Math.round(100 * pw.fa) + '%'; b.d.style.width = Math.round(100 * pw.fd) + '%'; b.wr.style.display = pw.wall == null ? 'none' : ''; if (pw.wall != null) b.w.style.width = Math.round(100 * pw.wall) + '%'; b.left = pw.left; b.gt0 = this.gtNow(); b.na = pw.na; b.nd = pw.nd; }
     }
     for (const id in this.fbars) if (!keep.has(Number(id))) { this.fbars[id].el.remove(); delete this.fbars[id]; }
   }

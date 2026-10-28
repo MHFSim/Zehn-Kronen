@@ -1143,10 +1143,11 @@ function siteSheet(w) {
 // Kräfte beider Seiten als zwei Balken: wer länger ist, gewinnt eher
 function powBars(pw) {
   if (!pw) return '';
-  const mx = Math.max(pw.pk, 1), pa = Math.round(100 * pw.pa / mx), pd = Math.round(100 * pw.pd / mx);
+  const pa = Math.round(100 * pw.fa), pd = Math.round(100 * pw.fd);
   return `<div class="pbars fight"><div class="pb att"><span>Angreifer</span><div class="bar"><i style="width:${pa}%"></i></div><b>${fmtN(pw.na)}</b></div>`
     + `<div class="pb def"><span>Verteidiger</span><div class="bar"><i style="width:${pd}%"></i></div><b>${fmtN(pw.nd)}</b></div>`
-    + `<div class="pv">${pw.pa >= pw.pd ? '⚔ Die Angreifer sind vorn' : '🛡 Die Verteidiger sind vorn'} · ⏱ noch ca. ${fmtT(real(pw.left))}</div></div>`;
+    + (pw.wall != null ? `<div class="pb wall"><span>Mauer</span><div class="bar"><i style="width:${Math.round(100 * pw.wall)}%"></i></div><b>${Math.round(100 * pw.wall)}%</b></div>` : '')
+    + `<div class="pv">${pw.fa >= pw.fd ? '⚔ Die Angreifer sind vorn' : '🛡 Die Verteidiger sind vorn'} · ⏱ noch ca. ${fmtT(real(pw.left))}</div></div>`;
 }
 function siegeBlock(tid, defName) {
   const sg = (view.sieges || []).find(x => x.tid === tid); if (!sg || view.match.phase !== 'running') return '';

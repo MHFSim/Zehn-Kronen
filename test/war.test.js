@@ -272,6 +272,7 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
   adv(match, players, m.fight.dt * 150 + 1);
   const v1 = viewFor(match, players, b, clock).sieges.find(x => x.id === m.id).pw;
   assert.ok(v0.tot >= 600 && v0.tot <= 7200 + 60, 'Kampfdauer 10 Min bis 2 Std: ' + v0.tot);
+  assert.ok(v0.fa > .95 && v0.fd > .95 && v1.fa < v0.fa && v1.fd < v0.fd && v1.wall < v0.wall + 1e-9 && v1.wall <= 1, 'beide Balken starten voll und sinken, die Mauer auch');
   assert.ok(v1.na < v0.na && v1.nd < v0.nd, 'beide Balken sinken: ' + JSON.stringify([v0, v1]));
   give(b, { speer: 100 }); const home0 = b.state.troops.speer;
   assert.ok(home0 > 0);
