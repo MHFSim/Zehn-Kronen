@@ -3,7 +3,7 @@
 import { RES, cap, protectedPct, rate, troopCount, advanceTo } from './rules.js';
 import { battle, roundStep, guardOf, wallMult, holdGuard, sum, capacityOf, forceOf, power, campTroops, campMult, campLoot } from './combat.js';
 import {
-  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, FIGHT_TIME, SANCT_BONUS, THRONE_GOLD, SPY_COST, stationCap,
+  DAY, PROTECT, FALL_PROTECT, VASSAL_TIME, TRIBUTE, THRONE_HOLD, SIEGE_TIME, SIEGE_OP_TIME, FIGHT_TIME, SANCT_BONUS, THRONE_GOLD, SPY_SEC, stationCap,
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   CAMP_RESPAWN, settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY, reversed, fightAt, joinDefenders, leaveDefenders, homeBack
 } from './core.js';
@@ -594,19 +594,45 @@ export function vassalStep(ctx, dt, gt) {
 }
 
 /* ---------- Späher ---------- */
-export function spy(ctx, me, targetId) {
-  const T = byId(ctx.players, targetId), S = me.state;
+// Ein Späher braucht 30 Minuten. Beim Losschicken setzt man Silber ein: Hat der Gegner in seiner Burg weniger Silber als der Einsatz, gelingt es
+// (der Einsatz kommt zurück), sonst scheitert es, das Silber ist weg und der Gegner erfährt davon.
+export function spy(ctx, me, targetId, stake) {
+  const T = byId(ctx.players, targetId), S = me.state, w = ctx.match.world;
   if (!T || T.id === me.id) return 'Dieser Spieler ist nicht da.';
   if (T.state.out) return 'Dieser Spieler ist ausgeschieden.';
-  if (S.res.gold < SPY_COST) return 'Für Späher brauchst du ' + SPY_COST + ' Gold.';
-  S.res.gold -= SPY_COST;
-  const ts = T.state, w = ctx.match.world, round = n => Math.round(n / 50) * 50;
-  pushReport(S, { kind: 'spy', title: 'Späherbericht: ' + T.name, win: true, target: { kind: 'start', name: T.name },
-    spy: { rathaus: ts.lv.rathaus, mauer: ts.lv.mauer, home: Object.fromEntries(Object.entries(ts.troops).filter(([, n]) => n > 0)),
-      stationed: stationedTotal(ts), away: troopCount(ts) - Object.values(ts.troops).reduce((a, b) => a + b, 0), guard: guardOf(ts),
-      res: Object.fromEntries([...RES, 'gold'].map(r => [r, round(ts.res[r])])), protectedFor: ts.protUntil > w.gt ? ts.protUntil - w.gt : 0,
-      vassalOf: ts.vassalOf ? (byId(ctx.players, ts.vassalOf) || {}).name || '' : '' } }, ctx.realT || ctx.now || Date.now());
+  stake = Math.floor(Number(stake));
+  if (!(stake >= 1)) return 'Setze mindestens 1 Silber ein.';
+  if ((S.silver || 0) < stake) return 'Du hast nur ' + (S.silver || 0) + ' Silber.';
+  S.spies = S.spies || [];
+  if (S.spies.some(x => x.target === T.id)) return 'Ein Späher ist schon bei ' + T.name + ' unterwegs.';
+  if (S.spies.length >= 5) return 'Es sind schon 5 Späher unterwegs.';
+  S.silver -= stake;
+  S.spies.push({ id: (S.nextSpy = (S.nextSpy || 0) + 1), target: T.id, stake, t0: w.gt, done: w.gt + SPY_SEC });
   return '';
+}
+export function spyStep(ctx, players, gt) {
+  for (const p of players) {
+    const S = p.state; if (!S.spies || !S.spies.length) continue;
+    const rest = [];
+    for (const sp of S.spies) {
+      if (gt < sp.done) { rest.push(sp); continue; }
+      const T = byId(players, sp.target); if (!T) { S.silver = (S.silver || 0) + sp.stake; continue; }
+      const ts = T.state, w = ctx.match.world, t = ctx.realT || ctx.now || Date.now();
+      if (sp.stake > (ts.silver || 0)) {   // Einsatz höher als das Silber des Gegners: Erfolg, das Silber kommt zurück
+        S.silver = (S.silver || 0) + sp.stake;
+        pushReport(S, { kind: 'spy', title: 'Späherbericht: ' + T.name, win: true, target: { kind: 'start', name: T.name },
+          spy: { rathaus: ts.lv.rathaus, mauer: ts.lv.mauer, lv: { ...ts.lv }, tech: { ...(ts.tech || {}) }, home: Object.fromEntries(Object.entries(ts.troops).filter(([, n]) => n > 0)),
+            wounded: Object.fromEntries(Object.entries(ts.wounded || {}).filter(([, n]) => n > 0)), stationed: stationedTotal(ts), away: troopCount(ts) - Object.values(ts.troops).reduce((a, b) => a + b, 0), guard: guardOf(ts),
+            res: Object.fromEntries([...RES, 'gold'].map(r => [r, Math.floor(ts.res[r])])), protectedFor: ts.protUntil > w.gt ? ts.protUntil - w.gt : 0,
+            vassalOf: ts.vassalOf ? (byId(players, ts.vassalOf) || {}).name || '' : '' } }, t);
+      } else {   // Erwischt: das Silber ist verloren, der Gegner bekommt eine Nachricht
+        pushReport(S, { kind: 'spy', title: 'Späher erwischt: ' + T.name, win: false, target: { kind: 'start', name: T.name },
+          text: 'Dein Späher wurde erwischt. Dein Einsatz von ' + sp.stake + ' Silber war nicht höher als das Silber in der Burg von ' + T.name + ' und ist verloren.' }, t);
+        note(ctx, T.id, 'spy', 'Späher erwischt', 'Ein Späher von ' + p.name + ' wurde in deiner Burg erwischt.');
+      }
+    }
+    S.spies = rest;
+  }
 }
 
 /* ---------- Punkte, Rangliste, Spielende ---------- */

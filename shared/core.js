@@ -24,7 +24,8 @@ export const SIEGE_OP_TIME = 7200;        // Kampf um einen Außenposten: immer 
 export const THRONE_HOLD = 2 * DAY;      // so lange muss der Thron gehalten werden
 export const SANCT_BONUS = 0.15;         // Produktionsbonus je gehaltenem Heiligtum
 export const THRONE_GOLD = 0.25;         // Goldbonus für den Halter des Throns
-export const SPY_COST = 50;              // Gold je Spähbericht
+export const SPY_SEC = 1800;             // Spähen dauert immer 30 Minuten (Spielzeit), egal wo der Feind ist
+export const SILVER_RATE = 1000;         // 1000 Rohstoffe (egal welche) = 1 Silber
 export const MAX_REPORTS = 25, MAX_FEED = 40, MAX_CHAT = 80, MAX_CHRON = 80;
 export const allianceCap = players => Math.floor(players / 2) + 1;   // Hälfte der Spieler plus eins
 export const stationCap = S => 60 * S.lv.rathaus;                   // so viele fremde Truppen nimmt eine Burg auf
@@ -62,7 +63,7 @@ export function ensureWorld(w) {
 export function ensureState(S) {
   if (S.uv !== 3) { migrateUnits(S); S.uv = 3; }
   S.away = S.away || {}; S.wounded = S.wounded || {}; S.reports = S.reports || []; S.nextRep = S.nextRep || 1;
-  S.explored = S.explored || ''; if (S.slot == null) S.slot = -1; S.pos = S.pos || [0, 0];
+  S.silver = S.silver || 0; S.spies = S.spies || []; S.explored = S.explored || ''; if (S.slot == null) S.slot = -1; S.pos = S.pos || [0, 0];
   S.tech = S.tech || {}; S.research = S.research || null; S.items = S.items || {}; if (S.tpAt == null) S.tpAt = -1e9; if (S.startTp == null) S.startTp = 1; S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;
   heroEnsure(S);
   S.out = !!S.out; S.exAllies = S.exAllies || {}; S.feed = S.feed || []; S.nextFeed = S.nextFeed || 1; S.bonus = S.bonus || {};

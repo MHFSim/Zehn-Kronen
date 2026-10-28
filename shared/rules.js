@@ -247,6 +247,14 @@ export function advanceTo(S, now, speed) {
 export function applyCommand(S, cmd) {
   if (!cmd || typeof cmd !== 'object') return 'Ungültiger Befehl';
   const id = cmd.id;
+  if (cmd.type === 'exchange') {   // Rathaus: 1000 Rohstoffe einer Sorte gegen 1 Silber
+    const r = cmd.res, k = Math.floor(Number(cmd.count));
+    if (!RES.includes(r) && r !== 'gold') return 'Diesen Rohstoff kann man nicht tauschen.';
+    if (!(k >= 1) || k > 1000) return 'Wähle, wie viel Silber du haben willst.';
+    if ((S.lv.rathaus || 0) < 1) return 'Das Rathaus fehlt.';
+    if (S.res[r] < k * 1000) return 'Dafür fehlen ' + (k * 1000 - Math.floor(S.res[r])) + ' ' + ({ food: 'Nahrung', wood: 'Holz', stone: 'Stein', gold: 'Gold' })[r] + '.';
+    S.res[r] -= k * 1000; S.silver = (S.silver || 0) + k; return '';
+  }
   if (cmd.type === 'upgrade') {
     if (!B[id]) return 'Unbekanntes Gebäude';
     const why = blocker(S, id); if (why) return why;

@@ -10,7 +10,7 @@ import {
   reveal, flushBits, FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldCenter, fieldUnseen, revealField, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack, standIdx
 } from './core.js';
-import { startCampFight, startRaiderFight, powerOf, mutStep, mutCost, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { startCampFight, startRaiderFight, powerOf, mutStep, spyStep, mutCost, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
 import { HEROES, heroBusy, heroGather, heroXp, gathersXp } from './heroes.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
@@ -192,6 +192,7 @@ export function syncMatch(match, players, now) {
     note(ctx, p.id, 'scout', 'Feld ' + fieldName(sc.f) + ' erkundet', 'Dein Erkunder hat den Nebel gelichtet und gefunden: ' + names.join(', ') + '. Du findest es unter „Ressourcen“.');
   }
   for (const p of players) mutStep(p.state, w.gt);
+  spyStep(ctx, players, w.gt);
   manageRaiders(ctx, players);
   w.help = (w.help || []).filter(h => { const hp = players.find(x => x.id === h.pid); return hp && inQueue(hp.state, h.bid) && (w.gt - h.t) < 86400 * 30; });
   vassalStep(ctx, dt, w.gt);
@@ -469,7 +470,7 @@ export function command(match, players, player, cmd, now) {
     m.path = [c, c]; m.arr = [0, 1]; m.phase = 'post'; m.mode = 'post'; m.tk = 'post'; m.tid = 'post' + hx + '_' + hy; m.site = { x: hx, y: hy }; m.load = {}; m.redir = true;
     return '';
   }
-  if (cmd.type === 'spy') return spy(ctx, player, Number(cmd.target));
+  if (cmd.type === 'spy') return spy(ctx, player, Number(cmd.target), cmd.silver);
   if (cmd.type === 'stationRecall') return recallStation(ctx, player, Number(cmd.host));
   if (cmd.type === 'stationDismiss') return dismissStation(ctx, player, Number(cmd.owner));
   if (cmd.type === 'holdRecall') return holdRecall(ctx, player, String(cmd.id));

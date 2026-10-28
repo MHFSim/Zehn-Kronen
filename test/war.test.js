@@ -289,4 +289,25 @@ assert.equal(allianceCap(10), 6); assert.equal(allianceCap(4), 3);
 }
 function sumT(t) { return Object.values(t).reduce((x, y) => x + y, 0); }
 
+// ---- Silber und Späher ----
+{
+  const { match, players } = mk(2); const [a, b] = players;
+  syncMatch(match, players, clock); a.state.res.food = 5400; a.state.res.wood = 400; b.state.res.stone = 3000; a.state.at = b.state.at = clock;
+  assert.match(run(match, players, clock, a, { type: 'exchange', res: 'wood', count: 1 }), /fehlen/);
+  assert.equal(run(match, players, clock, a, { type: 'exchange', res: 'food', count: 3 }), ''); assert.equal(a.state.silver, 3); assert.ok(a.state.res.food < 2500, '3000 Nahrung bezahlt');
+  assert.equal(run(match, players, clock, b, { type: 'exchange', res: 'stone', count: 2 }), ''); assert.equal(b.state.silver, 2);
+  assert.match(run(match, players, clock, a, { type: 'spy', target: b.id, silver: 0 }), /mindestens 1/);
+  assert.match(run(match, players, clock, a, { type: 'spy', target: b.id, silver: 9 }), /nur 3 Silber/);
+  // zu wenig Silber (2 gegen 2): scheitert nach 30 Minuten, Silber weg, Gegner erfährt davon
+  assert.equal(run(match, players, clock, a, { type: 'spy', target: b.id, silver: 2 }), ''); assert.equal(a.state.silver, 1);
+  assert.match(run(match, players, clock, a, { type: 'spy', target: b.id, silver: 1 }), /schon .* unterwegs/);
+  const rb = a.state.reports.length; adv(match, players, 1700); assert.equal(a.state.reports.length, rb, 'nach 28 Minuten noch kein Bericht');
+  adv(match, players, 200); assert.equal(a.state.spies.length, 0); assert.equal(a.state.silver, 1, 'Einsatz verloren');
+  assert.equal(a.state.reports[0].win, false); assert.match(b.state.feed[0].body, /P1.*erwischt/); assert.match(b.state.feed[0].title, /Späher erwischt/);
+  // mehr Silber als der Gegner: Erfolg, Silber kommt zurück, voller Bericht ohne Heldenstufen
+  a.state.silver = 5; assert.equal(run(match, players, clock, a, { type: 'spy', target: b.id, silver: 3 }), ''); adv(match, players, 1800);
+  const rep = a.state.reports[0]; assert.equal(rep.win, true); assert.equal(a.state.silver, 5, 'Einsatz zurück');
+  assert.ok(rep.spy.lv && rep.spy.tech && rep.spy.home && rep.spy.res && !JSON.stringify(rep.spy).includes('heroes'));
+}
+
 console.log('Alle Kriegstests bestanden.');

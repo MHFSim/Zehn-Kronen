@@ -5,7 +5,7 @@ import {
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
   T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, PACK_NAME, DAILY_SPEED_GIFT
 } from '/shared/rules.js';
-import { FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldAt, fieldCenter, PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
+import { FIELD, FG, SCOUT_SEC, SCOUT_SPEED, SPY_SEC, fieldName, fieldAt, fieldCenter, PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe, scoreOf, MUT_MAX, MUT_COST } from '/shared/war.js';
 import { HEROES, HERO_IDS, HERO_MAX, xpNeed, skillList, heroPrefers, heroForce, heroLv, raiderXp } from '/shared/heroes.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
@@ -387,7 +387,7 @@ function troopsHTML() {
 function signature() {
   if (msel) return mapSignature();
   if (!sel) return '';
-  return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy, S.research && S.research.id + S.research.target]);
+  return JSON.stringify([sel, S.lv, !!inQueue(S, sel), blocker(S, sel), S.queue.length, (S.train[sel] || []).map(o => o.count + o.unit), S.troops, pick, speed, RES.map(r => Math.floor(S.res[r] / 5)), busy, S.research && S.research.id + S.research.target, S.silver, Math.floor(S.res.gold / 1000)]);
 }
 // Der gewählte Anführer soll in der Heldenreihe sichtbar sein (auch bei automatischer Wahl)
 function showSelHero() {
@@ -396,13 +396,20 @@ function showSelHero() {
   if (l < row.scrollLeft || r > row.scrollLeft + row.clientWidth) row.scrollLeft = l - (row.clientWidth - on.offsetWidth) / 2;
 }
 { const si = document.getElementById('sheetInner'); if (si) new MutationObserver(showSelHero).observe(si, { childList: true, subtree: true }); }
+// Rathaus: Rohstoffe gegen Silber tauschen (1000 Rohstoffe = 1 Silber). Silber braucht man zum Spähen.
+function exchangeHTML() {
+  const rows = [['food', 'Nahrung'], ['wood', 'Holz'], ['stone', 'Stein'], ['gold', 'Gold']].map(([r, n]) => {
+    const k = Math.floor(S.res[r] / 1000), b = (c, label) => `<button class="btn ghost small" type="button" data-act="exch" data-r="${r}" data-n="${c}" ${k >= c && c > 0 ? '' : 'disabled'}>${label}</button>`;
+    return `<div class="urow"><div class="un"><b>${n}</b><small>${fmtN(S.res[r])} da · ${k} Silber möglich</small></div><div class="row">${b(1, '+1')}${b(5, '+5')}${b(k, 'Max')}</div></div>`; }).join('');
+  return `<div class="block exch"><h3>Silber <span class="silv">🥈 ${fmtN(S.silver || 0)}</span></h3><p class="note">1000 Rohstoffe, egal welche, werden zu 1 Silber. Mit Silber schickst du Späher los.</p>${rows}</div>`;
+}
 function renderSheet() {
   $('sheet').classList.add('parch'); $('sheet').classList.toggle('popup', !!msel);
   if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
   $('sheetInner').innerHTML = `<img class="sh-img" alt="" src="${imgOf(id)}"><div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
-    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${b.units && L ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'akademie' ? researchHTML() : ''}`;
+    <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${b.units && L ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'rathaus' && L ? exchangeHTML() : ''}${id === 'akademie' ? researchHTML() : ''}`;
   sheetSig = signature();
 }
 function updateSheet() {
@@ -455,6 +462,7 @@ function setupSheet() {
     if (act === 'cancel') return command({ type: 'cancel', id });
     if (act === 'askHelp') { const ok = await command({ type: 'askHelp', id }); if (ok) toast('Dein Bündnis wurde um Hilfe gebeten.', 'info'); return renderSheet(); }
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
+    if (act === 'exch') return void command({ type: 'exchange', res: el.dataset.r, count: Number(el.dataset.n) }).then(ok => ok && renderSheet());
     if (act === 'plus' || act === 'minus') {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
       pick[u] = Math.max(1, Math.min(MAX_TRAIN_COUNT, act === 'plus' ? n + step : n - step)); renderSheet();
@@ -752,7 +760,7 @@ function allyHTML() {
 }
 
 /* ---------- Mehr: Partie, Rangliste, Chronik, Erste Schritte, Einstellungen ---------- */
-const FEED_ICON = { attack: '⚔', battle: '🛡', station: '🤝', ally: '🤝', hold: '👑', out: '✖', free: '🕊', protect: '🛡', start: '🏁', end: '🏆', scout: '🧭', help: '🤝', hero: '🦸' };
+const FEED_ICON = { spy: '🔍', attack: '⚔', battle: '🛡', station: '🤝', ally: '🤝', hold: '👑', out: '✖', free: '🕊', protect: '🛡', start: '🏁', end: '🏆', scout: '🧭', help: '🤝', hero: '🦸' };
 let pushOn = null, pushMsg = '';
 async function pushStatus() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return (pushOn = 'unsupported');
@@ -784,7 +792,7 @@ function tutorialHTML() {
     ['Einen Räuber besiegen', rp.some(r => r.kind === 'camp' && r.win), 'Niedrige Stufen sind leicht. Die Prognose zeigt dir vorher den Ausgang.'],
     ['Einem Bündnis beitreten oder eines gründen', !!view.ally, 'Tab Bündnis. Zusammen seid ihr stärker und gewinnt gemeinsam.'],
     ['Einen Außenposten bauen', ((view.world.outposts || []).some(o => o.mine)), 'Braucht ein Bündnis mit gefülltem Lager (Bündnis → Revier & Lager); den ersten baut der Gründer, an einem der Türme am Kartenrand. Karte → Button „Außenposten“ → Karte verschieben → Hier bauen. Er vergrößert das Revier und ist nötig für Heiligtümer und Thron.'],
-    ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Karte → Burg eines Gegners → Spähen (50 Gold).'],
+    ['Einen Gegner ausspähen', rp.some(r => r.kind === 'spy'), 'Silber im Rathaus tauschen, dann Karte → Burg eines Gegners → Spähen (30 Minuten).'],
     ['Ein Heiligtum andocken', (match.holds || []).some(h => h.mine && h.id !== 'throne1'), 'Ein Außenposten-Viereck deines Bündnisses muss das weiße Viereck um ein Heiligtum berühren. Dann bekommt ihr +15 % auf einen Rohstoff.']
   ];
   const done = steps.filter(x => x[1]).length;
@@ -1403,7 +1411,7 @@ function autoSend(hit) {
 function fieldFoes(id) { return (view.world.marches || []).filter(m => m.phase === 'gather' && m.tid === id && !m.own && !m.friend); }
 function mapSignature() {
   const w = view.world, id = msel.id;
-  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase + (m.hero || '')), sendHero, w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
+  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, S.silver, (S.spies || []).length, ownMarches().map(m => m.id + m.phase + (m.hero || '')), sendHero, w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
 }
 function sendOpAll() { const q = (view.world.outposts || []).find(x => x.id === sendFromOp), g = q && q.garr ? q.garr[me.id] : null; return g ? { ...g } : {}; }
 function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
@@ -1443,6 +1451,14 @@ function pickerHTML(closeBtn) {
 }
 
 /* ---------- Revier: Bauplatz und Außenposten (gehören dem Bündnis) ---------- */
+// Spähen: Silber einsetzen, 30 Minuten unterwegs
+function spyBlock(p) {
+  const run = (S.spies || []).find(x => x.target === p.id), si = S.silver || 0;
+  if (run) return `<div class="row"><span class="note">🔍 Dein Späher ist unterwegs, noch ${fmtT(real(Math.max(0, run.done - gtNow())))} · Einsatz ${fmtN(run.stake)} Silber</span></div>`;
+  return `<div class="block"><h3>Spähen · ${fmtT(real(SPY_SEC))}</h3><p class="note">Setze Silber ein: Hat ${esc(p.name)} weniger Silber in der Burg, gelingt es und du bekommst dein Silber zurück. Sonst ist es weg und ${esc(p.name)} erfährt davon. Du hast ${fmtN(si)} Silber (Tausch im Rathaus).</p>
+    <div class="row"><input class="qn" id="spyStake" type="number" inputmode="numeric" min="1" max="${si}" value="${Math.min(si, Math.max(1, spyStakeN))}" aria-label="Silber einsetzen"><button class="btn" type="button" data-act="spy" data-pid="${p.id}" ${si >= 1 ? '' : 'disabled'}>Spähen</button></div></div>`;
+}
+let spyStakeN = 1;
 function siteCtx() {
   const m = view.match, gt = gtNow();
   return { mt: { seed: m.seed, world: { gt, alliances: Object.fromEntries((m.alliances || []).map(a => [a.id, a])), outposts: Object.fromEntries((view.world.outposts || []).map(o => [o.id, o])) } },
@@ -1614,7 +1630,7 @@ function renderMapSheet() {
             const why = p.vassalOf === me.id ? 'Das ist dein Vasall.' : p.vassalOf && isAlly(p.vassalOf) ? 'Dieser Vasall gehört einem Verbündeten.' : prot ? 'Steht unter Schutz.' : (() => { const { mt, pls } = siteCtx(); return castleSafe({ match: mt, players: pls }, { id: p.id, state: { pos: p.pos || [o.x, o.y] } }, gtNow()) ? 'Liegt im aktiven Revier ihres Bündnisses – nicht angreifbar.' : ''; })() || (view.match.phase !== 'running' ? 'Die Partie läuft nicht.' : '');
             body += (S.protUntil > gt ? '<p class="why">Wenn du angreifst, endet dein Schutz sofort.</p>' : '')
               + actionRow(armedKey === 'attack' + id ? 'Jetzt wirklich angreifen' : 'Angreifen', plan, why, free, armedKey === 'attack' + id ? 'danger' : '')
-              + `<div class="row"><button class="btn ghost" type="button" data-act="spy" data-pid="${p.id}" ${S.res.gold >= 50 ? '' : 'disabled'}>Spähen (50 Gold)</button><span class="note">Der Bericht erscheint unter Berichte.</span></div>`;
+              + spyBlock(p);
           }
         }
       }
@@ -1701,7 +1717,7 @@ function mapAct(act, el) {
   else if (act === 'assistA' || act === 'assistD') { const tid = msel.type === 'op' ? msel.id : msel.id; command({ type: 'march', mode: 'assist', target: tid, side: act === 'assistA' ? 'att' : 'def', troops: sendList() }).then(ok => { if (ok) { toast('Verstärkung ist unterwegs.', 'info'); closeSheet(); } }); }
   else if (act === 'halt') command({ type: 'halt', id: msel.id }).then(ok => ok && toast('Das Heer bleibt stehen.', 'info'));
   else if (act === 'sfCancel') { sendFrom = 0; sendFromOp = ''; closeSheet(); syncMoveBar(); }
-  else if (act === 'spy') command({ type: 'spy', target: Number(el.dataset.pid) }).then(ok => { if (ok) toast('Späher sind zurück: Bericht unter Berichte.', 'info'); });
+  else if (act === 'spy') { const st = $('spyStake'), n = st ? Math.floor(Number(st.value)) : 1; spyStakeN = n >= 1 ? n : 1; command({ type: 'spy', target: Number(el.dataset.pid), silver: n }).then(ok => { if (ok) { toast('Dein Späher ist unterwegs. Der Bericht kommt in ' + fmtT(real(SPY_SEC)) + ' unter Berichte.', 'info'); renderSheet(); } }); }
   else if (act === 'holdRecall') command({ type: 'holdRecall', id: msel.id });
   else if (act === 'build') command({ type: 'march', mode: 'build', x: msel.x, y: msel.y, troops: sendList() }).then(ok => { if (ok) { toast('Dein Bautrupp marschiert los.', 'info'); closeSheet(); } });
   else if (act === 'raid') { if (!twice('raid' + msel.id)) { renderSheet(); return true; } command({ type: 'march', mode: 'raid', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert zum Angriff auf den Außenposten.', 'info'); closeSheet(); } }); }
@@ -1748,9 +1764,10 @@ function reportHTML(r) {
     else d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + foeLine(r.defLabel || (r.kind === 'camp' ? 'Banditen' : 'Verteidiger'), r.def.start, r.def.left);
   }
   if (r.spy) {
-    const sp = r.spy;
-    d += `<dl class="stats"><dt>Rathaus / Mauer</dt><dd>${sp.rathaus} / ${sp.mauer}</dd><dt>Truppen daheim</dt><dd>${troopsLine(sp.home)}</dd><dt>Stadtwache</dt><dd>${troopsLine(sp.guard)}</dd>
-      <dt>Verbündete in der Burg</dt><dd>${fmtN(sp.stationed)}</dd><dt>Heere unterwegs</dt><dd>${fmtN(sp.away)} Einheiten</dd><dt>Rohstoffe (ca.)</dt><dd class="costs">${lootHTML(sp.res)}</dd>
+    const sp = r.spy, lvs = Object.keys(sp.lv || {}).filter(k => B[k] && sp.lv[k] > 0).map(k => `${B[k].name} ${sp.lv[k]}`).join(' · '), tch = Object.keys(sp.tech || {}).filter(k => T[k] && sp.tech[k] > 0).map(k => `${T[k].name} ${sp.tech[k]}`).join(' · ');
+    d += `<dl class="stats"><dt>Truppen daheim</dt><dd>${troopsLine(sp.home)}</dd>${sp.wounded && Object.keys(sp.wounded).length ? `<dt>Verwundete</dt><dd>${troopsLine(sp.wounded)}</dd>` : ''}<dt>Stadtwache</dt><dd>${troopsLine(sp.guard)}</dd>
+      <dt>Verbündete in der Burg</dt><dd>${fmtN(sp.stationed)}</dd><dt>Heere unterwegs</dt><dd>${fmtN(sp.away)} Einheiten</dd><dt>Rohstoffe</dt><dd class="costs">${lootHTML(sp.res)}</dd>
+      <dt>Gebäude</dt><dd>${lvs || '—'}</dd><dt>Forschung</dt><dd>${tch || 'keine'}</dd>
       <dt>Schutz</dt><dd>${sp.protectedFor ? 'noch ' + fmtT(real(sp.protectedFor)) : 'keiner'}</dd>${sp.vassalOf ? `<dt>Vasall von</dt><dd>${esc(sp.vassalOf)}</dd>` : ''}</dl>`;
   }
   if (r.text) d += `<p class="desc">${esc(r.text)}</p>`;
