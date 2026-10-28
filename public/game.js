@@ -3,7 +3,7 @@
 import {
   RES, RES_DE, B, U, GATT, MAX_TRAIN_ORDERS, MAX_TRAIN_COUNT, costOf, timeOf, cap, capFor, protectedPct, prodAt, troopCount, queuedTroops,
   maxQueues, inQueue, afford, unitTime, rate, blocker, advanceTo, homeTroops, awayTroops, woundedCount, lazarettCap, armySlots,
-  T, T_MAX, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
+  T, T_MAX, T_PRE_LV, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN
 } from '/shared/rules.js';
 import { PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe } from '/shared/war.js';
@@ -806,18 +806,36 @@ function techCardHTML(id) {
     ${act}
     <details class="tdet"><summary>Alle Stufen</summary>${rows}</details></div>`;
 }
+let techSel = '';
+const TN = { w: 148, h: 58, gx: 34, gy: 18, pad: 10 };
+function techTreeHTML() {
+  const ids = Object.keys(T), px = id => TN.pad + T[id].col * (TN.w + TN.gx), py = id => TN.pad + T[id].row * (TN.h + TN.gy);
+  const W = TN.pad * 2 + (Math.max(...ids.map(i => T[i].col)) + 1) * (TN.w + TN.gx) - TN.gx, H = TN.pad * 2 + (Math.max(...ids.map(i => T[i].row)) + 1) * (TN.h + TN.gy) - TN.gy;
+  const lines = ids.filter(i => T[i].pre).map(i => {
+    const p = T[i].pre, x1 = px(p) + TN.w, y1 = py(p) + TN.h / 2, x2 = px(i), y2 = py(i) + TN.h / 2, mx = (x1 + x2) / 2, on = techLv(S, p) >= T_PRE_LV;
+    return `<path class="tl ${on ? 'on' : ''}" d="M${x1} ${y1} H${mx} V${y2} H${x2}"/>`;
+  }).join('');
+  const nodes = ids.map(id => {
+    const t = T[id], L = techLv(S, id), run = S.research && S.research.id === id, locked = t.pre && techLv(S, t.pre) < T_PRE_LV, max = L >= T_MAX;
+    return `<button type="button" class="tn ${id === techSel ? 'sel' : ''} ${run ? 'run' : ''} ${locked ? 'lock' : ''} ${max ? 'max' : ''}" data-act="techSel" data-id="${id}" style="left:${px(id)}px;top:${py(id)}px;width:${TN.w}px;height:${TN.h}px">
+      <span class="tni">${bico(t.icon)}</span><span class="tnt"><b>${t.name}</b><span class="tnb"><i style="width:${L / T_MAX * 100}%"></i></span><small ${run ? 'data-rtime="1"' : ''}>${locked ? '🔒 ' + T[t.pre].name + ' ' + T_PRE_LV : run ? '⏳ ' + fmtT(real(S.research.left)) : L + ' / ' + T_MAX}</small></span></button>`;
+  }).join('');
+  return `<div class="tree"><div class="treein" style="width:${W}px;height:${H}px"><svg width="${W}" height="${H}">${lines}</svg>${nodes}</div></div>`;
+}
 function techHTML() {
   const A = S.lv.akademie, r = S.research;
+  if (!techSel || !T[techSel]) techSel = r ? r.id : Object.keys(T)[0];
   const strip = `<div class="strip"><div><b>${A}</b><span>Akademie</span></div><div><b>${Object.keys(T).reduce((a, id) => a + techLv(S, id), 0)}</b><span>Stufen erforscht</span></div><div><b>${Object.keys(T).length * T_MAX}</b><span>Stufen gesamt</span></div></div>`;
-  const note = A ? `<div class="note-box">Es wird immer nur eine Forschung gleichzeitig bearbeitet. Forschungsstufe n braucht Akademie 2n−1, die Akademie wird im Stadtmenü ausgebaut.${r ? ' Gerade in Arbeit: <b>' + T[r.id].name + '</b> → Stufe ' + r.target + '.' : ''}</div>`
+  const run = r ? `<div class="trun"><span class="tni">${bico(T[r.id].icon)}</span><div class="trb"><div class="trt"><b>${T[r.id].name} → Stufe ${r.target}</b><span class="time" data-rtime="1">${fmtT(real(r.left))}</span></div><div class="prog"><i data-rprog="1" style="width:${Math.max(0, 1 - r.left / r.total) * 100}%"></i></div></div><button class="btn small" type="button" data-speed="research:1">⚡ Beschleunigen</button></div>` : '';
+  const note = A ? `<div class="note-box">Es wird immer nur eine Forschung gleichzeitig bearbeitet. Eine Forschung wird frei, wenn ihr Vorgänger auf Stufe ${T_PRE_LV} ist. Stufe n braucht Akademie 2n−1.</div>`
     : `<div class="note-box">Die Akademie ist noch nicht gebaut${S.lv.rathaus >= B.akademie.unlock ? '.' : ' (ab Rathaus Stufe ' + B.akademie.unlock + ').'} Dort erforschst du bessere Erträge, stärkere Truppen und schnellere Märsche.</div>`;
-  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Forschung' : 'Noch nicht gebaut') + strip + note + Object.keys(T).map(techCardHTML).join('');
+  return phead('🎓', 'Akademie', A ? 'Stufe ' + A + ' · Techtree' : 'Noch nicht gebaut') + strip + run + techTreeHTML() + note + techCardHTML(techSel);
 }
 
 /* ---------- Panels (Bündnis, Mehr) ---------- */
 let panelName = '', panelSig = '';
 function panelSignature() {
-  if (panelName === 'tech') return JSON.stringify([S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
+  if (panelName === 'tech') return JSON.stringify([techSel, S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
@@ -848,6 +866,7 @@ function setupPanel() {
     const act = el.dataset.act, d = el.dataset, val = id => (document.getElementById(id) || {}).value || '';
     const go = () => { $('sidePanel').scrollTop = 0; renderPanel(true); };
     if (act === 'ttab') { trainTab = d.t; return go(); }
+    if (act === 'techSel') { techSel = d.id; return renderPanel(true); }
     if (act === 'techGo') return void command({ type: 'research', tech: d.id });
     if (act === 'toCityB') { closePanel(); await setMode('city'); return void openSheet(d.b); }
     if (act === 'train') return void command({ type: 'train', id: d.b, unit: d.u, count: pick[d.u] || 10 });
@@ -1361,13 +1380,28 @@ function repTable(head, start, left, w, dd) {
   const us = Object.keys(start || {}).filter(u => U[u]); if (!us.length) return '';
   return `<table class="rep"><thead><tr><th>${esc(head)}</th><th>Vor</th><th>Übrig</th>${w ? '<th>Verw.</th><th>Gef.</th>' : ''}</tr></thead><tbody>${us.map(u => `<tr><td>${U[u].name}</td><td>${fmtN(start[u])}</td><td>${fmtN((left || {})[u] || 0)}</td>${w ? `<td>${fmtN(w[u] || 0)}</td><td>${fmtN((dd || {})[u] || 0)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
 }
+const KIND_DE = { city: 'Sturm auf die Burg', raid: 'Angriff auf einen Außenposten', camp: 'Kampf um ein Banditenlager', field: 'Überfall auf dem Feld', hold: 'Kampf um eine Festung' };
+function fxHTML(r) {
+  const x = r.fx; if (!x) return '';
+  const pc = (a, b) => Math.round(Math.max(0, Math.min(1, b ? a / b : 0)) * 100), sm = o => Object.values(o || {}).reduce((a, b) => a + (+b || 0), 0);
+  const bar = (cls, v) => `<div class="fxbar"><i class="${cls}" style="width:${v}%"></i></div>`;
+  const mine = r.role === 'def' ? 'def' : 'att', wd = r.att ? sm(r.att.wounded) : 0, dd = r.att ? sm(r.att.dead) : 0;
+  const helpers = (list, lab) => list && list.length ? `<dt>${lab}</dt><dd>${list.map(esc).join(', ')}</dd>` : '';
+  return `<div class="fx"><div class="fxh"><b>${KIND_DE[x.kind] || 'Kampf'}</b><span>${r.win ? '🏆 Sieg' : '💀 Niederlage'} · ${fmtT(real(x.dur))} Kampfdauer</span></div>
+    <div class="fxrow"><span>Angreifer${x.att ? ' (' + esc(x.att) + ')' : ''}</span><b>${fmtN(x.na0)} → ${fmtN(x.naL)}</b></div>${bar('a', pc(x.naL, x.na0))}
+    <div class="fxrow"><span>Verteidiger</span><b>${fmtN(x.nd0)} → ${fmtN(x.ndL)}</b></div>${bar('d', pc(x.ndL, x.nd0))}
+    ${x.wall0 != null ? `<div class="fxrow"><span>Mauer</span><b>${Math.round(x.wall0 * 100)} % → ${Math.round(x.wall * 100)} %</b></div>${bar('w', Math.round(x.wall * 100))}` : ''}
+    <dl class="stats"><dt>Gefallen Angreifer</dt><dd>${fmtN(x.killD)}</dd><dt>Gefallen Verteidiger</dt><dd>${fmtN(x.killA)}</dd>
+    ${mine === 'att' && (wd || dd) ? `<dt>Dein Heer: tot / verwundet</dt><dd>${fmtN(dd)} / ${fmtN(wd)}</dd>` : ''}
+    <dt>Größte Stärke</dt><dd>${fmtN(Math.round(x.pkA))} (Angreifer) · ${fmtN(Math.round(x.pkD))} (Verteidiger)</dd>
+    ${helpers(x.helpA, 'Helfer des Angreifers')}${helpers(x.helpD, 'Helfer der Verteidiger')}</dl></div>`;
+}
 function reportHTML(r) {
-  let d = '';
+  let d = fxHTML(r);
   if (r.att && r.def) {
     if (r.role === 'def') { d += repTable('Angreifer', r.att.start, r.att.left); for (const g of r.def.groups || []) d += repTable(g.label, g.start, g.left, g.wounded, g.dead); }
     else if (r.role === 'att') d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + repTable('Verteidiger', r.def.start, r.def.left);
     else d += repTable('Dein Heer', r.att.start, r.att.left, r.att.wounded, r.att.dead) + repTable(r.defLabel || (r.kind === 'camp' ? 'Banditen' : 'Verteidiger'), r.def.start, r.def.left);
-    d += `<p class="note">${r.rounds ? r.rounds.length + ' Kampfrunden.' : ''}</p>`;
   }
   if (r.spy) {
     const sp = r.spy;

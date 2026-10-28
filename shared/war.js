@@ -204,6 +204,9 @@ function resolveFight(ctx, lead, bt, realT, win) {
   if (win) for (const u in f.D0) kD[u] = 0;
   const atts = [lead, ...fightMembers(w, lead, 'att')], defs = fightMembers(w, lead, 'def');
   const A = byId(players, lead.owner);
+  const nameOf = x => { const Pp = byId(players, x.owner); return Pp ? Pp.name : '?'; };
+  const fx = { kind, dur: Math.max(0, Math.round(bt - (lead.tStart == null ? bt : lead.tStart))), rounds: f.round, na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), naL: win ? Math.round(sum(f.A)) : 0, ndL: win ? 0 : Math.round(sum(f.D)), killA: Math.round(sum(f.D0) - (win ? 0 : sum(f.D))), killD: Math.round(sum(f.A0) - (win ? sum(f.A) : 0)), wall0: f.wall == null ? null : (f.wall0 == null ? 1 : f.wall0), wall: f.wall == null ? null : (win ? 0 : f.wall), pkA: f.pkA, pkD: f.pkD, helpA: atts.slice(1).map(nameOf), helpD: defs.map(nameOf), att: A ? A.name : '', win: !!win };
+  const PR = (Sx, rep, t) => pushReport(Sx, rep.att || rep.def ? { ...rep, fx } : rep, t);
   const startA = { ...f.A0 }, startD = { ...f.D0 }, leftD = {};
   for (const u in f.D) if (!win && Math.round(f.D[u]) > 0) leftD[u] = Math.round(f.D[u]);
   const lostOf = t => { const lost = {}; for (const u in t) { const l = win ? t[u] : Math.min(t[u], Math.round(t[u] * (1 - (kD[u] === undefined ? 1 : kD[u])))); if (l > 0) lost[u] = l; } return lost; };
@@ -214,9 +217,9 @@ function resolveFight(ctx, lead, bt, realT, win) {
     const c = x.fc, left = scaleT(c, kD), P = byId(players, x.owner);
     if (P) {
       const sa2 = settleAway(P.state, c, left); defHelp.push({ label: kind === 'field' ? 'Dein Heer auf dem Feld' : 'Helfer ' + P.name, start: c, left, wounded: sa2.wounded, dead: sa2.dead });
-      if (kind === 'field') pushReport(P.state, { kind: 'pvp', role: 'def', title: (!sum(left) ? 'Heer überfallen: ' : 'Überfall abgewehrt: ') + A.name, win: !!sum(left), target: { kind: x.tk, id: x.tid }, att: { start: startA, left: {} }, def: { start: c, left, groups: [{ label: 'Dein Heer auf dem Feld', start: c, left, wounded: sa2.wounded, dead: sa2.dead }] },
+      if (kind === 'field') PR(P.state, { kind: 'pvp', role: 'def', title: (!sum(left) ? 'Heer überfallen: ' : 'Überfall abgewehrt: ') + A.name, win: !!sum(left), target: { kind: x.tk, id: x.tid }, att: { start: startA, left: {} }, def: { start: c, left, groups: [{ label: 'Dein Heer auf dem Feld', start: c, left, wounded: sa2.wounded, dead: sa2.dead }] },
         text: !sum(left) ? A.name + ' hat dein Heer auf dem Feld vernichtet.' : 'Dein Heer hat ' + A.name + ' zurückgeschlagen und sammelt weiter.' }, realT);
-      else pushReport(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen haben verteidigt', win: !win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT);
+      else PR(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen haben verteidigt', win: !win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT);
     }
     x.troops = left;
     if (x.pre) {   // Heer stand auf dem Feld: Überlebende machen dort weiter
@@ -229,7 +232,7 @@ function resolveFight(ctx, lead, bt, realT, win) {
   for (const x of atts) {
     const c = cOf(lead, x), left = scaleT(c, kA), P = byId(players, x.owner), s2 = P ? settleAway(P.state, c, left) : null;
     if (x === lead) { ownLeft = left; sa = s2; }
-    else { if (P) pushReport(P.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg' : 'Niederlage') + ' im Kampf', win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); x.troops = left; if (!sum(left)) x.dead = true; else goBack(x, bt); }
+    else { if (P) PR(P.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg' : 'Niederlage') + ' im Kampf', win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); x.troops = left; if (!sum(left)) x.dead = true; else goBack(x, bt); }
   }
   lead.troops = ownLeft;
   A.state.stats.kills += sum(startD) - sum(leftD); if (win) A.state.stats.wins++;
@@ -239,13 +242,13 @@ function resolveFight(ctx, lead, bt, realT, win) {
     const o = map.byId[lead.tid], info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
     const rep = { kind: 'camp', title: (win ? 'Sieg über Banditenlager Stufe ' : 'Niederlage vor Banditenlager Stufe ') + o.lv, win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [] };
     if (win) { const loot = campLoot(o.lv); lead.load = loot; rep.loot = loot; w.camps[o.id] = { dead: bt + CAMP_RESPAWN }; }
-    pushReport(A.state, rep, realT); return fin();
+    PR(A.state, rep, realT); return fin();
   }
   if (kind === 'field') {
     const o = map.byId[lead.tid] || { k: 'post', id: lead.tid }, info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y }, won = defs.length > 0 && defs.every(x => x.dead);
     let loot = {};
     if (sum(ownLeft)) { const capa = capacityOf(ownLeft, A.state), tot = Object.values(gathered).reduce((a, b) => a + b, 0), k = tot > capa ? capa / tot : 1; for (const r in gathered) { const v = Math.floor(gathered[r] * k); if (v > 0) loot[r] = v; } lead.load = loot; }
-    pushReport(A.state, { kind: 'pvp', role: 'att', title: sum(ownLeft) && win ? (o.k === 'post' ? 'Heer überfallen' : 'Sammler überfallen') : 'Überfall gescheitert', win: sum(ownLeft) > 0 && win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [], loot,
+    PR(A.state, { kind: 'pvp', role: 'att', title: sum(ownLeft) && win ? (o.k === 'post' ? 'Heer überfallen' : 'Sammler überfallen') : 'Überfall gescheitert', win: sum(ownLeft) > 0 && win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [], loot,
       text: win ? 'Du hast die Sammler auf dem Feld besiegt.' : 'Die Sammler haben dich zurückgeschlagen.' }, realT);
     note(ctx, A.id, 'battle', win ? 'Überfall gelungen' : 'Überfall gescheitert', 'Dein Heer ' + (win ? 'hat die Sammler auf dem Feld besiegt.' : 'wurde auf dem Feld geschlagen.')); void won;
     return fin();
@@ -256,7 +259,7 @@ function resolveFight(ctx, lead, bt, realT, win) {
       if (hold) for (const pid of Object.keys(hold.garr)) {
         const P = byId(players, Number(pid)); if (!P) continue;
         const sp = settleAway(P.state, hold.garr[pid], {});
-        pushReport(P.state, { kind: 'hold', title: holdName(o) + ' verloren', win: false, target: info, text: A.name + ' hat die Besatzung geschlagen. Du hast ' + sum(hold.garr[pid]) + ' Truppen verloren (' + sum(sp.wounded) + ' verwundet).' }, realT);
+        PR(P.state, { kind: 'hold', title: holdName(o) + ' verloren', win: false, target: info, text: A.name + ' hat die Besatzung geschlagen. Du hast ' + sum(hold.garr[pid]) + ' Truppen verloren (' + sum(sp.wounded) + ' verwundet).' }, realT);
         note(ctx, P.id, 'hold', holdName(o) + ' verloren', A.name + tag(w, A.id) + ' hat deine Besatzung geschlagen.');
       }
       w.holds[o.id] = { group, since: bt, garr: { [A.id]: { ...ownLeft } } }; lead.dead = true;
@@ -274,7 +277,7 @@ function resolveFight(ctx, lead, bt, realT, win) {
       }
       fin();
     }
-    pushReport(A.state, { kind: 'hold', title: (win ? 'Sieg: ' : 'Niederlage: ') + holdName(o), win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [], defLabel: defender,
+    PR(A.state, { kind: 'hold', title: (win ? 'Sieg: ' : 'Niederlage: ') + holdName(o), win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [], defLabel: defender,
       text: win ? 'Deine Truppen halten jetzt ' + holdName(o) + '. Sie bleiben dort, bis du sie zurückrufst.' : '' }, realT);
     return;
   }
@@ -282,23 +285,23 @@ function resolveFight(ctx, lead, bt, realT, win) {
     const o = (w.outposts || {})[lead.tid], alD = o ? w.alliances[o.al] : null, lab = alD ? alD.name : 'Bündnis', mem = alD ? alD.members : [];
     const info = { kind: 'outpost', id: lead.tid, x: o ? o.x : 0, y: o ? o.y : 0 };
     const detail = { att: attInfo, def: { start: startD, left: leftD }, defLabel: 'Außenposten', rounds: [] };
-    if (!o) { pushReport(A.state, { kind: 'outpost', role: 'att', title: 'Außenposten nicht mehr da', win: false, target: info, text: 'Hier steht nichts mehr.' }, realT); return fin(); }
+    if (!o) { PR(A.state, { kind: 'outpost', role: 'att', title: 'Außenposten nicht mehr da', win: false, target: info, text: 'Hier steht nichts mehr.' }, realT); return fin(); }
     if (win) {
       let lost = 0;
       for (const pid of Object.keys(o.garr)) { const P = byId(players, Number(pid)); if (P) { const sd = settleAway(P.state, o.garr[pid], {}); lost += sum(o.garr[pid]); note(ctx, P.id, 'attack', 'Außenposten zerstört', A.name + ' hat einen Außenposten von „' + lab + '“ zerstört. Du hast ' + sum(o.garr[pid]) + ' Truppen verloren (' + sum(sd.wounded) + ' verwundet).'); } }
       delete w.outposts[o.id];
       const spoil = OP_COST.map(c => Math.floor(c * 0.3)), load = {}; RES.forEach((res, i) => { if (spoil[i] > 0) load[res] = spoil[i]; }); lead.load = load;
       chron(ctx, A.name + ' hat einen Außenposten von „' + lab + '“ zerstört.');
-      for (const pid of mem) { const P = byId(players, pid); if (!P) continue; if (!lost || !o.garr[pid]) note(ctx, pid, 'attack', 'Außenposten zerstört', A.name + ' hat einen Außenposten eures Bündnisses zerstört. Euer Revier ist kleiner geworden.'); pushReport(P.state, { kind: 'outpost', role: 'def', title: 'Außenposten zerstört', win: false, target: info, ...detail, text: A.name + ' hat einen Außenposten eures Bündnisses zerstört.' }, realT); }
-      pushReport(A.state, { kind: 'outpost', role: 'att', title: 'Sieg: Außenposten von „' + lab + '“ zerstört', win: true, target: info, loot: load, ...detail, text: 'Das Revier ist verschwunden. Du erbeutest einen Teil der Baukosten.' }, realT);
+      for (const pid of mem) { const P = byId(players, pid); if (!P) continue; if (!lost || !o.garr[pid]) note(ctx, pid, 'attack', 'Außenposten zerstört', A.name + ' hat einen Außenposten eures Bündnisses zerstört. Euer Revier ist kleiner geworden.'); PR(P.state, { kind: 'outpost', role: 'def', title: 'Außenposten zerstört', win: false, target: info, ...detail, text: A.name + ' hat einen Außenposten eures Bündnisses zerstört.' }, realT); }
+      PR(A.state, { kind: 'outpost', role: 'att', title: 'Sieg: Außenposten von „' + lab + '“ zerstört', win: true, target: info, loot: load, ...detail, text: 'Das Revier ist verschwunden. Du erbeutest einen Teil der Baukosten.' }, realT);
     } else {
       for (const pid of Object.keys(o.garr)) {
         const P = byId(players, Number(pid)), st = o.garr[pid], lost = lostOf(st), left = subTroops(st, lost);
         if (P) settleAway(P.state, st, left);
         if (sum(left)) o.garr[pid] = left; else delete o.garr[pid];
       }
-      for (const pid of mem) { const P = byId(players, pid); if (!P) continue; note(ctx, pid, 'battle', 'Außenposten verteidigt', A.name + ' hat einen Außenposten eures Bündnisses angegriffen und wurde zurückgeschlagen.'); pushReport(P.state, { kind: 'outpost', role: 'def', title: 'Außenposten verteidigt', win: true, target: info, ...detail }, realT); }
-      pushReport(A.state, { kind: 'outpost', role: 'att', title: 'Niederlage vor dem Außenposten von „' + lab + '“', win: false, target: info, ...detail }, realT);
+      for (const pid of mem) { const P = byId(players, pid); if (!P) continue; note(ctx, pid, 'battle', 'Außenposten verteidigt', A.name + ' hat einen Außenposten eures Bündnisses angegriffen und wurde zurückgeschlagen.'); PR(P.state, { kind: 'outpost', role: 'def', title: 'Außenposten verteidigt', win: true, target: info, ...detail }, realT); }
+      PR(A.state, { kind: 'outpost', role: 'att', title: 'Niederlage vor dem Außenposten von „' + lab + '“', win: false, target: info, ...detail }, realT);
     }
     return fin();
   }
@@ -311,7 +314,7 @@ function resolveFight(ctx, lead, bt, realT, win) {
     const P = byId(players, Number(pid)), st = SD.stationed[pid], lost = lostOf(st), left = subTroops(st, lost);
     if (P) {
       settleAway(P.state, st, left); groups.push({ label: 'Verbündeter ' + P.name, start: st, left });
-      if (sum(lost)) pushReport(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen bei ' + D.name + ' haben gekämpft', win: !win, target: info, text: A.name + ' griff die Burg von ' + D.name + ' an. Du hast ' + sum(lost) + ' Truppen verloren.' }, realT);
+      if (sum(lost)) PR(P.state, { kind: 'pvp', role: 'ally', title: 'Deine Truppen bei ' + D.name + ' haben gekämpft', win: !win, target: info, text: A.name + ' griff die Burg von ' + D.name + ' an. Du hast ' + sum(lost) + ' Truppen verloren.' }, realT);
     }
     if (sum(left)) SD.stationed[pid] = left; else delete SD.stationed[pid];
   }
@@ -321,8 +324,8 @@ function resolveFight(ctx, lead, bt, realT, win) {
   if (win) { loot = lootFrom(SD, capacityOf(ownLeft, A.state)); lead.load = loot; fate = fall(ctx, A, D, bt); }
   const fateText = fate === 'out' ? ' Die Burg wurde erobert, ' + D.name + ' ist ausgeschieden.' : fate === 'vassal' ? ' Die Burg wurde erobert, ' + D.name + ' ist jetzt dein Vasall.' : '';
   const det = { att: attInfo, def: { start: startD, left: leftD, groups }, rounds: [], loot };
-  pushReport(A.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg über die Burg von ' : 'Niederlage vor der Burg von ') + D.name, win, target: info, fate, ...det, text: fateText.trim() }, realT);
-  pushReport(SD, { kind: 'pvp', role: 'def', title: (win ? 'Burg gefallen: ' : 'Angriff abgewehrt: ') + A.name, win: !win, target: info, fate, ...det,
+  PR(A.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg über die Burg von ' : 'Niederlage vor der Burg von ') + D.name, win, target: info, fate, ...det, text: fateText.trim() }, realT);
+  PR(SD, { kind: 'pvp', role: 'def', title: (win ? 'Burg gefallen: ' : 'Angriff abgewehrt: ') + A.name, win: !win, target: info, fate, ...det,
     text: win ? (fate === 'out' ? 'Deine Burg ist gefallen. Du bist ausgeschieden.' : 'Deine Burg ist gefallen. Du bist jetzt Vasall von ' + A.name + '.') : 'Deine Verteidiger haben ' + A.name + ' zurückgeschlagen.' }, realT);
   note(ctx, D.id, 'battle', win ? (fate === 'out' ? 'Du bist ausgeschieden' : 'Deine Burg ist gefallen') : 'Angriff abgewehrt', A.name + (win ? ' hat deine Burg erobert.' : ' wurde zurückgeschlagen.'));
   note(ctx, A.id, 'battle', win ? 'Burg erobert' : 'Angriff gescheitert', 'Dein Heer ' + (win ? 'hat die Burg von ' + D.name + ' genommen.' : 'hat den Kampf vor der Burg von ' + D.name + ' verlassen oder verloren.'));
@@ -386,7 +389,7 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   for (const u in def) if (!(def[u] > 0)) delete def[u];
   const wv = Math.min(1, ((SD.wall || {}).v == null ? 1 : SD.wall.v) + (bt - ((SD.wall || {}).t || bt)) / 21600);   // Mauer wächst in 6 Stunden Spielzeit wieder zu
   startFight(ctx, m, def, wallMult(SD) * forceOf(SD), bt, 'city');
-  Object.assign(m.fight, { wall: wv, wb: wallMult(SD) - 1, fm: forceOf(SD) });
+  Object.assign(m.fight, { wall: wv, wall0: wv, wb: wallMult(SD) - 1, fm: forceOf(SD) });
   const who = [D.id]; const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) who.push(id);
   note(ctx, D.id, 'attack', 'Kampf um deine Burg!', A.name + tag(w, A.id) + ' kämpft mit ' + sum(m.troops) + ' Truppen vor deiner Burg. Schick Verstärkung und beobachte den Lebensbalken!');
   for (const id of who) if (id !== D.id) note(ctx, id, 'attack', 'Kampf um die Burg eines Verbündeten', A.name + ' kämpft vor der Burg von ' + D.name + '. Schick Verstärkung!');

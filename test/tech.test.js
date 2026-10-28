@@ -26,4 +26,7 @@ const att = { speer: 100 }, def = { speer: 100 };
 assert.equal(battle(att, def, 1, 1).win, false);
 assert.equal(battle(att, def, 1, 1.5).win, true);
 assert.equal(Object.keys(T).length, 7);
+const S2 = freshState(0); S2.lv.akademie = 9; S2.res = { food: 1e6, wood: 1e6, stone: 1e6, gold: 1e6 };
+assert.match(applyCommand(S2, { type: 'research', tech: 'forst' }), /Erst Ackerbau/);
+S2.tech.ackerbau = 2; assert.equal(applyCommand(S2, { type: 'research', tech: 'forst' }), '');
 console.log('Alle Forschungstests bestanden.');

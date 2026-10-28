@@ -48,15 +48,16 @@ export const U = {
 // Forschung (Akademie): jede Technik hat 5 Stufen, es wird immer nur eine erforscht.
 // per = Wirkung je Stufe, Kosten und Zeit wachsen mit der Stufe, Stufe n braucht Akademie 2n-1.
 export const T = {
-  ackerbau:    { name: 'Ackerbau',      icon: 'farm',    per: .08, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
-  forst:       { name: 'Forstwirtschaft', icon: 'saege', per: .08, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
-  steinmetz:   { name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
-  handel:      { name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
-  kriegskunst: { name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
-  marsch:      { name: 'Marschordnung',  icon: 'stall',  per: .06, steps: [.06, .08, .10, .12, .14], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
-  lasten:      { name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
+  ackerbau:    { col: 0, row: 0, pre: null, name: 'Ackerbau',      icon: 'farm',    per: .08, unit: 'Nahrung',   eff: 'food',  base: [60, 120, 80],  time: 50,  desc: 'Mehr Ertrag auf den Feldern: Nahrung' },
+  forst:       { col: 1, row: 0, pre: 'ackerbau', name: 'Forstwirtschaft', icon: 'saege', per: .08, unit: 'Holz',      eff: 'wood',  base: [120, 60, 80],  time: 50,  desc: 'Mehr Holz aus dem Sägewerk' },
+  steinmetz:   { col: 1, row: 1, pre: 'ackerbau', name: 'Steinmetzkunst', icon: 'stein',  per: .08, unit: 'Stein',     eff: 'stone', base: [100, 120, 60], time: 55,  desc: 'Mehr Stein aus dem Steinbruch' },
+  handel:      { col: 2, row: 1, pre: 'steinmetz', name: 'Handel',         icon: 'rathaus', per: .10, unit: 'Gold',     eff: 'gold',  base: [150, 100, 160], time: 70, desc: 'Mehr Steuergold' },
+  kriegskunst: { col: 0, row: 2, pre: null, name: 'Kriegskunst',    icon: 'kaserne', per: .04, unit: 'Kraft aller Truppen', eff: 'force', base: [200, 150, 250], time: 90, desc: 'Deine Truppen kämpfen stärker, im Angriff und in der Verteidigung' },
+  marsch:      { col: 1, row: 2, pre: 'kriegskunst', name: 'Marschordnung',  icon: 'stall',  per: .06, steps: [.06, .08, .10, .12, .14], unit: 'Marschtempo', eff: 'speed', base: [150, 150, 100], time: 75, desc: 'Deine Heere marschieren schneller' },
+  lasten:      { col: 1, row: 3, pre: 'kriegskunst', name: 'Tragkraft',      icon: 'lager',  per: .10, unit: 'Traglast',  eff: 'carry', base: [100, 200, 100], time: 65, desc: 'Deine Heere tragen mehr Beute und sammeln mehr' }
 };
 export const T_MAX = 5;
+export const T_PRE_LV = 2;   // Vorgänger im Techtree muss mindestens auf dieser Stufe sein
 export const techLv = (S, id) => (S.tech && S.tech[id]) || 0;
 // Gesamtbonus einer Forschung auf Stufe lv (Marschordnung steigt je Stufe stärker: +6, +8, +10, +12, +14 %)
 export const techBonus = (k, lv) => T[k].steps ? T[k].steps.slice(0, lv).reduce((a, b) => a + b, 0) : T[k].per * lv;
@@ -70,6 +71,7 @@ export function techBlocker(S, id) {
   if (lv > T_MAX) return 'Höchststufe erreicht';
   if (S.lv.akademie < techReq(lv)) return S.lv.akademie ? 'Akademie Stufe ' + techReq(lv) + ' nötig' : 'Erst die Akademie bauen';
   if (S.research) return S.research.id === id ? 'Wird bereits erforscht' : 'Die Akademie forscht schon';
+  if (t.pre && techLv(S, t.pre) < T_PRE_LV) return 'Erst ' + T[t.pre].name + ' auf Stufe ' + T_PRE_LV + ' erforschen';
   if (!afford(S, techCost(id, lv))) return 'Nicht genug Ressourcen';
   return '';
 }
