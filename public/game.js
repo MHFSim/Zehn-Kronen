@@ -6,8 +6,8 @@ import {
   T, T_MAX, T_PRE_LV, SPEED_IDS, SPEED_SLACK, FINDS, planSpeeds, techLv, techMult, techBonus, techReq, techCost, techTime, techBlocker, bonusOf, ITEMS, TELEPORT_COOLDOWN, QUEST_INFO, dailyDone, secUntilNextDay, PACK_NAME, DAILY_SPEED_GIFT
 } from '/shared/rules.js';
 import { FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldAt, fieldCenter, PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
-import { castleSafe, scoreOf, MUT_MAX } from '/shared/war.js';
-import { HEROES, HERO_IDS, HERO_MAX, xpNeed, skillList, heroPrefers, heroForce } from '/shared/heroes.js';
+import { castleSafe, scoreOf, MUT_MAX, MUT_COST } from '/shared/war.js';
+import { HEROES, HERO_IDS, HERO_MAX, xpNeed, skillList, heroPrefers, heroForce, heroLv, raiderXp } from '/shared/heroes.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
@@ -21,7 +21,7 @@ import { installIcons, banner, icon } from '/public/icons.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
-let sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
+let sendGroup = [], lastArmyTap = { id: 0, t: 0 }, sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -246,6 +246,14 @@ function renderArmyBtns() {
     el = document.createElement('div'); el.id = 'armyBtns'; el.className = 'armybtns'; document.body.appendChild(el);
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-army]'); if (!b) return; const id = Number(b.dataset.army), m = ownMarches().find(x => x.id === id); if (!m) return;
+      const nowT = Date.now(), dbl = lastArmyTap.id === id && nowT - lastArmyTap.t < 500; lastArmyTap = { id, t: nowT };
+      if (dbl && ownMarches().length >= 2) {   // Doppelklick auf ein Helden-Symbol: alle Heere wählen
+        lastArmyTap = { id: 0, t: 0 }; sendFromOp = ''; sendFrom = 0; closeSheet();
+        sendGroup = ownMarches().filter(x => ['post', 'gather', 'back', 'fight'].includes(x.phase) || (x.phase === 'out' && x.mode !== 'build')).map(x => x.id);
+        if (sendGroup.length < 2) { sendGroup = []; return toast('Gerade können keine zwei Heere umgeleitet werden.'); }
+        syncMoveBar(); return renderArmyBtns();
+      }
+      if (sendGroup.length) { sendGroup = []; syncMoveBar(); }
       if (sendFrom === id) { sendFrom = 0; closeSheet(); syncMoveBar(); return renderArmyBtns(); }
       if (!(['post', 'gather', 'back', 'fight'].includes(m.phase) || (m.phase === 'out' && m.mode !== 'build'))) return toast('Dieses Heer kann gerade nicht umgeleitet werden.');
       sendFromOp = ''; closeSheet(); sendFrom = id; syncMoveBar(); renderArmyBtns();
@@ -253,7 +261,7 @@ function renderArmyBtns() {
   }
   const show = mode === 'map' && !!S && !!view && !msel; el.hidden = !show; if (!show && !sendFrom) { /* bleibt versteckt */ }
   const ST = { out: '🚶', back: '↩', gather: '⛏', fight: '⚔', post: '⚑' };
-  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="apic">${H ? hpic(m.hero, H) : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
+  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id || sendGroup.includes(m.id) ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="apic">${H ? hpic(m.hero, H) : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 function renderPts() {
@@ -356,9 +364,9 @@ function openSheet(id) { msel = null; sel = id; document.body.classList.add('she
 // Hinweisleiste, solange ein Heer ein neues Ziel bekommt (wie in Rise of Kingdoms: Ziel antippen, das Heer zieht sofort los)
 function syncMoveBar() {
   let el = $('moveBar');
-  if (!sendFrom && !sendFromOp) { if (el) el.hidden = true; return; }
-  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span>➜ Ziel antippen – das Heer zieht sofort los</span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
-  el.hidden = false;
+  if (!sendFrom && !sendFromOp && !sendGroup.length) { if (el) el.hidden = true; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'moveBar'; el.className = 'movebar'; el.innerHTML = '<span></span><button class="btn ghost small" type="button">Abbrechen</button>'; el.querySelector('button').onclick = e => { e.stopPropagation(); sendFrom = 0; sendFromOp = ''; sendGroup = []; syncMoveBar(); closeSheet(); }; document.body.appendChild(el); }
+  el.querySelector('span').textContent = sendGroup.length ? '➜ Alle ' + sendGroup.length + ' Heere: Ziel antippen – sie ziehen gemeinsam los' : '➜ Ziel antippen – das Heer zieht sofort los'; el.hidden = false;
 }
 function closeSheet() { if (scoutEl) scoutEl.hidden = true; if (miniEl) miniEl.hidden = true; miniTile = null; sel = null; msel = null; if (wm) { wm.select(null); wm.setPreview(null); } document.body.classList.remove('sheet-open'); }
 
@@ -596,14 +604,30 @@ function renderBanner() {
 // Neue Meldungen als kurze Hinweise einblenden (Push erreicht dich, wenn die Seite zu ist)
 let feedToasted = null;
 const unreadFeed = () => S.feed.filter(f => f.id > (S.feedSeen || 0)).length;
+// Held ist aufgestiegen: goldene Anzeige mit Heldenbild
+let lvTimer = 0, lvQueue = [];
+function heroLevelUp(f) {
+  lvQueue.push(f); if (lvQueue.length > 1) return; showLvUp();
+}
+function showLvUp() {
+  const f = lvQueue[0]; if (!f) return;
+  const id = HERO_IDS.find(h => f.title.startsWith(HEROES[h].name)), H = id ? HEROES[id] : null, lv = (/Stufe (\d+)/.exec(f.body) || [])[1] || '';
+  let el = $('lvUp'); if (!el) { el = document.createElement('div'); el.id = 'lvUp'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.innerHTML = `<span class="lvpic">${H ? hpic(id, H) : '⭐'}</span><div><b>STUFE ${esc(lv)}</b><small>${esc(H ? H.name : 'Held')} ist aufgestiegen</small></div>`;
+  el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  clearTimeout(lvTimer); lvTimer = setTimeout(() => { el.hidden = true; lvQueue.shift(); if (lvQueue.length) setTimeout(showLvUp, 300); }, 3800);
+}
 function checkFeed() {
   const top = S.feed.length ? S.feed[0].id : 0;
   if (feedToasted === null) { feedToasted = S.feedSeen || 0; }
   const fresh = S.feed.filter(f => f.id > feedToasted);
   if (fresh.length) {
     feedToasted = top;
-    const bad = fresh.some(f => ['attack', 'battle', 'out'].includes(f.kind));
-    toast(fresh.length === 1 ? fresh[0].title + (fresh[0].body ? ' – ' + fresh[0].body : '') : fresh.length + ' neue Meldungen (Mehr)', bad ? '' : 'info');
+    for (const f of fresh) if (f.kind === 'hero' && /aufgestiegen/.test(f.title)) heroLevelUp(f);
+    const rest = fresh.filter(f => !(f.kind === 'hero' && /aufgestiegen/.test(f.title)));
+    if (!rest.length) return;
+    const bad = rest.some(f => ['attack', 'battle', 'out'].includes(f.kind));
+    toast(rest.length === 1 ? rest[0].title + (rest[0].body ? ' – ' + rest[0].body : '') : rest.length + ' neue Meldungen (Mehr)', bad ? '' : 'info');
   }
 }
 
@@ -1219,9 +1243,21 @@ function healHTML() {
   return `<div class="block"><h3>Verwundete (${fmtN(woundedCount(S))} von ${fmtN(lazarettCap(S))} Plätzen)</h3>${rows || '<p class="note">Niemand verwundet. Nach Kämpfen überleben bis zu 30 % der Verluste hier, wenn Platz ist.</p>'}${queue ? `<div class="block" style="padding:10px">${queue}</div>` : ''}</div>`;
 }
 
+// Alle gewählten Heere auf einmal losschicken (Gelände, Sammelfelder, Räuber)
+async function groupSend(hit, sx, sy) {
+  const o = hit && hit.type === 'obj' ? wm.map.byId[hit.id] : null;
+  let cmd;
+  if (!hit) { const t = wm.tileAtScreen(sx, sy); if (!t) return; cmd = { type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }; }
+  else if (hit.type === 'raider' || (o && ['farm', 'wood', 'stone'].includes(o.k))) cmd = { type: 'march', target: hit.id, troops: {} };
+  else return toast('Für alle Heere zugleich: Gelände, Rohstofffelder oder Räuber antippen.');
+  const ids = sendGroup.slice(); sendGroup = []; syncMoveBar(); let okN = 0;
+  for (const id of ids) { sendFrom = id; if (await command({ ...cmd })) okN++; }
+  sendFrom = 0; syncMoveBar(); renderArmyBtns(); if (okN) toast(okN + ' Heere ziehen gemeinsam los.', 'info');
+}
 function mapTap(sx, sy) {
   if (!wm || !mapReady) return;
   const hit = wm.pickAt(sx, sy);
+  if (sendGroup.length) { groupSend(hit, sx, sy); return; }
   if (!hit && (sendFrom || sendFromOp)) { const t = wm.tileAtScreen(sx, sy); command({ type: 'march', mode: 'post', x: t.x, y: t.y, troops: {} }).then(ok => { if (ok) { toast('Das Heer zieht dorthin.', 'info'); closeSheet(); } }); return; }
   if (!hit) {
     closeSheet(); const t = wm.tileAtScreen(sx, sy);
@@ -1549,11 +1585,12 @@ function renderMapSheet() {
   $('sheet').classList.add('popup');
   $('sheetInner').innerHTML = h; sheetSig = mapSignature();
 }
+const raiderXpText = lv => { const base = raiderXp(lv), hv = sendHero && HEROES[sendHero] && HEROES[sendHero].role !== 'gather' ? sendHero : '', low = hv && heroLv(S, hv) >= 2 * lv + 8; return hv ? `${fmtN(Math.round(base * (low ? .2 : 1)))} Erfahrung für ${HEROES[hv].name}${low ? ' (Held ist deutlich stärker)' : ''}` : `bis zu ${fmtN(base)} Erfahrung für den Helden`; };
 function raiderSheet(w) {
   const r = (w.raiders || []).find(x => x.id === msel.id); if (!r) return null;
   const def = campTroops(r.lv), mult = campMult(r.lv), plan = planFor(r), sel_ = sendList(), free = sendFrom || sendFromOp || ownMarches().length < armySlots(S), cl = campLoot(r.lv);
   let body = `<dl class="stats"><dt>Gegner</dt><dd>Räuber-Armee</dd><dt>Verteidiger</dt><dd>${troopsLine(def)}</dd><dt>Stärke</dt><dd>+${Math.round((mult - 1) * 100)} %</dd><dt>Beute</dt><dd class="costs">${lootHTML({ food: Math.round(cl.food / 2), wood: Math.round(cl.wood / 2), stone: Math.round(cl.stone / 2), gold: Math.round(cl.gold / 2) })}</dd>
-    <dt>Belohnung</dt><dd>Beschleuniger${r.lv >= 5 ? ' und Ressourcenpakete' : ''}</dd><dt>Zieht ab in</dt><dd>${fmtT(real(Math.max(0, r.until - gtNow())))}</dd></dl>`;
+    <dt>Erfahrung</dt><dd>${raiderXpText(r.lv)}</dd><dt>Mutkosten</dt><dd>${MUT_COST} Mut je Angriff</dd><dt>Belohnung</dt><dd>Beschleuniger${r.lv >= 5 ? ' und Ressourcenpakete' : ''}</dd><dt>Zieht ab in</dt><dd>${fmtT(real(Math.max(0, r.until - gtNow())))}</dd></dl>`;
   if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
   else {
     body += pickerHTML();
@@ -1694,7 +1731,7 @@ async function buildMap() {
   el.hidden = true; return true;
 }
 async function setMode(m) {
-  if (m !== 'map' && (sendFrom || sendFromOp)) { sendFrom = 0; sendFromOp = ''; syncMoveBar(); }
+  if (m !== 'map' && (sendFrom || sendFromOp || sendGroup.length)) { sendFrom = 0; sendFromOp = ''; sendGroup = []; syncMoveBar(); }
   placing = false;
   if (!$('reports').hidden) closeReports();
   if (panelName) closePanel();

@@ -7,7 +7,7 @@ import {
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   CAMP_RESPAWN, settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY, reversed, fightAt, joinDefenders, leaveDefenders, homeBack
 } from './core.js';
-import { HEROES, heroForce, keeperOf, heroXp, fightXp } from './heroes.js';
+import { HEROES, heroForce, keeperOf, heroXp, fightXp, raiderXp } from './heroes.js';
 import { addPack, PACK_NAME } from './rules.js';
 import { territory, touchesObj, removeOutposts, releaseAux, opGuard, checkRaid, OP_COST } from './outpost.js';
 
@@ -152,7 +152,7 @@ const rewardText = rw => [...Object.keys(rw.got).map(id => rw.got[id] + '× Besc
 function awardHeroXp(ctx, lead, atts, f, win, startA, startD, kind, bt) {
   const map = mapOf(ctx.match); let base, tlv = 0;
   if (kind === 'camp') { const o = map.byId[lead.tid]; tlv = o ? o.lv : 1; base = 40 + 25 * tlv; }
-  else if (kind === 'raider') { tlv = f.rlv; base = 40 + 25 * tlv; }
+  else if (kind === 'raider') { tlv = f.rlv; base = raiderXp(tlv); }
   else base = Math.min(1500, 40 + 1.2 * sum(startD));
   const totA = Math.max(1, sum(startA));
   for (const x of atts) {
@@ -613,7 +613,8 @@ export function spy(ctx, me, targetId) {
 export const scoreOf = S => S.out ? 0 : Math.round(Object.keys(S.lv).reduce((a, k) => a + S.lv[k], 0) * 10 + troopCount(S) * 2 + S.stats.conquests * 200 + S.stats.kills * 0.5 + Object.values(S.tech || {}).reduce((a, b) => a + b, 0) * 15);
 // Mut: Leiste (0–100). Jeder Angriff auf Räuber und Banditenlager kostet Mut, stündlich kehrt etwas zurück. Bremst zu schnelles Wachsen durch Dauerangriffe.
 export const MUT_MAX = 100, MUT_REGEN = 8, MUT_HOUR = 3600;
-export const mutCost = lv => 4 + Math.ceil((lv || 1) / 3);
+export const MUT_COST = 6;                  // Mut je Angriff auf Räuber
+export const mutCost = () => MUT_COST;
 export function mutStep(S, gt) {
   if (S.mut == null) { S.mut = MUT_MAX; S.mutAt = gt; }
   if (S.mut >= MUT_MAX) { S.mut = MUT_MAX; S.mutAt = gt; return; }

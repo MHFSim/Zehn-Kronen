@@ -107,6 +107,7 @@ export function heroXp(S, id, xp) {
 // Sammler-Helden lernen beim Sammeln (1 Erfahrung je 4 Rohstoffe), Kämpfer im Kampf
 export const gathersXp = id => !!HEROES[id] && HEROES[id].role === 'gather';
 // Gegen dasselbe Ziel gibt es innerhalb von 30 Minuten Spielzeit nur ein Viertel, Räuber/Lager weit unter der Heldenstufe geben fast nichts
+export const raiderXp = lv => 40 + 25 * lv;   // Erfahrung für den Helden bei einem Sieg über Räuber der Stufe lv
 export function fightXp(S, id, base, key, targetLv, gt) {
   if (!HEROES[id] || HEROES[id].role === 'gather') return 0;
   let xp = base;

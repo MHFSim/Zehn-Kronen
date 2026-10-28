@@ -406,7 +406,7 @@ export function command(match, players, player, cmd, now) {
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
     const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S, hid) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S, hid) : planMarch(map, S, o, troops, hid);
     if (plan.error) return plan.error;
-    if (mode === 'normal' && (o.k === 'camp' || o.k === 'raider') && !(src && src.tid === o.id)) {   // Mut kostet jeder Angriff auf Räuber und Banditenlager
+    if (mode === 'normal' && o.k === 'raider' && !(src && src.tid === o.id)) {   // Mut kostet nur der Angriff auf Räuber
       mutStep(S, w.gt); const cost = mutCost(o.lv);
       if (S.mut < cost) return 'Zu wenig Mut (' + Math.floor(S.mut) + ' von ' + cost + '). Mut erholt sich stündlich.';
       S.mut -= cost;

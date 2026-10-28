@@ -86,7 +86,7 @@ assert.match(rawCommand(match, players, p1, { type: 'march', target: 'raiderTest
 console.log('Alle Heldentests bestanden.');
 // Mut: Angriffe auf Räuber kosten Mut, stündlich kehrt etwas zurück
 { const { mutCost, mutStep, MUT_MAX, MUT_REGEN } = await import('../shared/war.js');
-  assert.ok(mutCost(30) > mutCost(1));
+  assert.equal(mutCost(30), 6); assert.equal(mutCost(1), 6);
   const M = {}; mutStep(M, 0); assert.equal(M.mut, MUT_MAX);
   M.mut = 50; M.mutAt = 0; mutStep(M, 3599); assert.equal(M.mut, 50); mutStep(M, 3600 * 2 + 5); assert.equal(M.mut, 50 + 2 * MUT_REGEN);
   mutStep(M, 3600 * 100); assert.equal(M.mut, MUT_MAX); }
