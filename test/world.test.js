@@ -2,7 +2,9 @@
 import { armySlots } from '../shared/rules.js';
 import assert from 'node:assert/strict';
 import { generateMap, findPath, N } from '../shared/mapgen.js';
-import { syncMatch, addPlayer, command, viewFor, setSpeed } from '../shared/world.js';
+import { syncMatch, addPlayer, command as rawCommand, viewFor, setSpeed } from '../shared/world.js';
+import { heroShim } from './helper.js';
+const command = heroShim(rawCommand);
 import { newWorld, mapOf, nodeLeft, marchPos } from '../shared/core.js';
 import { battle, campTroops, campMult } from '../shared/combat.js';
 

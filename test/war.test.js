@@ -1,7 +1,9 @@
 // Prüfung von Schutz, Bündnissen, Angriffen, Vasallen, Ausscheiden, Stationieren, Thron und Spielende: `npm test`
 import { cellXY } from '../shared/core.js';
 import assert from 'node:assert/strict';
-import { syncMatch, addPlayer, command, viewFor, startMatch, pauseMatch, resumeMatch, endMatch } from '../shared/world.js';
+import { syncMatch, addPlayer, command as rawCommand, viewFor, startMatch, pauseMatch, resumeMatch, endMatch } from '../shared/world.js';
+import { heroShim } from './helper.js';
+const command = heroShim(rawCommand);
 import { newWorld, mapOf, DAY, allianceCap, byId } from '../shared/core.js';
 import { territory, towersOf } from '../shared/outpost.js';
 

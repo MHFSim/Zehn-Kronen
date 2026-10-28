@@ -2,6 +2,7 @@
 // Wird von world.js (Ablauf), social.js (Bündnisse) und war.js (Kriege) gemeinsam benutzt.
 import { N, generateMap, findPath, pathTimes, NODE_MAX } from './mapgen.js';
 import { lazarettCap, woundedCount, techMult, woundRate, U } from './rules.js';
+import { heroEnsure, heroSpeed } from './heroes.js';
 import { forestCostFor, armySpeed, capacityOf, sum } from './combat.js';
 
 /* ---------- Regeln der Welt (alle Zeiten in Spielsekunden) ---------- */
@@ -42,6 +43,7 @@ export function ensureWorld(w) {
   if (!w.phase) w.phase = 'running';
   if (!w.alliances) w.alliances = {}; if (!w.nextAl) w.nextAl = 1;
   if (!w.pending) w.pending = []; if (!w.nextPend) w.nextPend = 1;
+  if (!w.raiders) w.raiders = []; if (!w.nextRaider) w.nextRaider = 1; if (w.raidNext == null) w.raidNext = 0;
   if (!w.holds) w.holds = {}; if (!w.chron) w.chron = []; if (!w.outposts) w.outposts = {}; if (!w.nextOp) w.nextOp = 1;
   if (w.weeks == null) w.weeks = 10; if (w.startGt == null) w.startGt = 0; w.endGt = 0;
   if (w.result === undefined) w.result = null;
@@ -51,6 +53,7 @@ export function ensureState(S) {
   S.away = S.away || {}; S.wounded = S.wounded || {}; S.reports = S.reports || []; S.nextRep = S.nextRep || 1;
   S.explored = S.explored || ''; if (S.slot == null) S.slot = -1; S.pos = S.pos || [0, 0];
   S.tech = S.tech || {}; S.research = S.research || null; S.items = S.items || {}; if (S.tpAt == null) S.tpAt = -1e9; if (S.startTp == null) S.startTp = 1; S.stationed = S.stationed || {}; S.protUntil = S.protUntil || 0; S.vassalOf = S.vassalOf || 0; S.vassalUntil = S.vassalUntil || 0;
+  heroEnsure(S);
   S.out = !!S.out; S.exAllies = S.exAllies || {}; S.feed = S.feed || []; S.nextFeed = S.nextFeed || 1; S.bonus = S.bonus || {};
   S.stats = S.stats || {}; for (const k of ['attacks', 'wins', 'conquests', 'kills', 'lost']) S.stats[k] = S.stats[k] || 0;
   return S;
@@ -111,19 +114,19 @@ export function flushBits(S) {
 }
 
 /* ---------- Wege und Märsche ---------- */
-export function planFrom(map, from, tx, ty, troops, S) {
+export function planFrom(map, from, tx, ty, troops, S, hero) {
   const total = sum(troops);
   if (total < 1) return { error: 'Keine Truppen ausgewählt' };
-  const fc = forestCostFor(troops), speed = armySpeed(troops) * (S ? techMult(S, 'speed') : 1);
+  const fc = forestCostFor(troops), speed = armySpeed(troops) * (S ? techMult(S, 'speed') * (hero ? heroSpeed(S, hero) : 1) : 1);
   const path = findPath(map, from[0], from[1], tx, ty, fc);
   if (!path) return { error: 'Es gibt keinen Weg dorthin' };
   const arr = pathTimes(map, path, speed, fc);
-  return { path, arr, speed, fc, duration: arr[arr.length - 1], capacity: capacityOf(troops, S) };
+  return { path, arr, speed, fc, duration: arr[arr.length - 1], capacity: capacityOf(troops, S, hero) };
 }
-export const planMarch = (map, S, obj, troops) => planFrom(map, S.pos, obj.x, obj.y, troops, S);
+export const planMarch = (map, S, obj, troops, hero) => planFrom(map, S.pos, obj.x, obj.y, troops, S, hero);
 
 // Angreifer und Helfer laufen nie ins feindliche Gebäude: Sie bleiben ein Stück davor stehen (dort kämpfen sie auch).
-const hostileM = m => m.mode === 'attack' || m.mode === 'raid' || m.mode === 'assist' || m.tk === 'camp';
+const hostileM = m => m.mode === 'attack' || m.mode === 'raid' || m.mode === 'assist' || m.tk === 'camp' || m.tk === 'raider';
 const standR = m => (m.tk === 'start' ? 3.2 : m.tk === 'outpost' ? 2.8 : 2) * (m.side === 'def' ? .42 : 1);
 export function standIdx(m) {
   const L = m.path.length - 1; if (!hostileM(m) || L < 1) return L;
@@ -167,7 +170,7 @@ export function leaveDefenders(w, tid, troops) {
 // Heer nach Hause schicken: direkter Weg vom jetzigen Ort, ohne Umweg über den früheren Ausgangspunkt
 export function homeBack(ctx, m, bt) {
   const P = byId(ctx.players, m.owner), end = (m.phase === 'fight' || m.phase === 'out') ? m.path[standIdx(m)] : m.path[m.path.length - 1];
-  const plan = P ? planFrom(mapOf(ctx.match), cellXY(end), P.state.pos[0], P.state.pos[1], m.troops, P.state) : null;
+  const plan = P ? planFrom(mapOf(ctx.match), cellXY(end), P.state.pos[0], P.state.pos[1], m.troops, P.state, m.hero) : null;
   if (plan && !plan.error && plan.path.length > 1) { m.path = plan.path; m.arr = plan.arr; } else reversed(m);
   m.phase = 'back'; m.t0 = bt; m.mode = 'home'; m.tk = 'start'; delete m.redir;
 }

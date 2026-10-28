@@ -115,3 +115,11 @@ Siehe [docs/BETRIEB.md](docs/BETRIEB.md) (Server, https, Push, Docker).
 
 ## Erkunder
 Der Nebel ist in 7×7 große Felder (A1–G7) geteilt; die Grenzen sieht man als helles Raster. Tipp auf ein Nebelfeld → Pop-up „Erkunden / Abbrechen“. Der Erkunder läuft zum Feld (Weg je nach Entfernung) und erkundet es 30 Minuten, dann ist das Feld aufgedeckt und er findet 1 Ressourcenpaket (2 bei weit entfernten Feldern). Es ist immer nur ein Erkunder gleichzeitig unterwegs; während er läuft, ist das Feld heller markiert und im HUD steht die Restzeit. Abbrechen ist jederzeit möglich (ohne Ertrag).
+
+## Helden und Räuber
+- 12 Helden (Kämpfer und Sammler), alle von Anfang an wählbar, Stufe 1 bis 60. Jedes Heer braucht einen Helden als Anführer; ein Held führt immer nur ein Heer.
+- Sammler-Helden lernen beim Sammeln, Kämpfer beim Angriff auf Banditenlager, Räuber, Spieler und Außenposten. Gegen dasselbe Ziel gibt es kurz hintereinander nur ein Viertel Erfahrung, gegen viel zu schwache Ziele fast nichts.
+- Boni sind klein und begrenzt (auf Stufe 1 ein Viertel des Maximalwerts) und gelten für beide Seiten gleich.
+- Burgwächter und Stellvertreter: der Wächter verstärkt die Verteidigung der Burg, solange er nicht unterwegs ist, sonst springt der Stellvertreter ein.
+- Beim Losschicken bevorzugt ein Held passende Truppen (Kavallerie, Infanterie, Fernkampf) bzw. Handkarren beim Sammeln.
+- Räuber (Stufe 1 bis 30) erscheinen als kleine Heere auf der Karte. Sieg bringt Heldenerfahrung, Speedups und Ressourcenpakete (tägliche Obergrenze gegen Dauerfarmen).

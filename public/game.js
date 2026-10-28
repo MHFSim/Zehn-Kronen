@@ -7,6 +7,7 @@ import {
 } from '/shared/rules.js';
 import { FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldAt, fieldCenter, PLAYER_COLORS, SIEGE_TIME, FIGHT_TIME, GATHER_SEC, planMarch, planFrom, marchPos, cellXY } from '/shared/core.js';
 import { castleSafe, scoreOf } from '/shared/war.js';
+import { HEROES, HERO_IDS, HERO_MAX, xpNeed, skillList, heroPrefers, heroForce } from '/shared/heroes.js';
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
@@ -17,7 +18,7 @@ import { buildingImage } from '/public/art.js';
 
 /* ---------- Verbindung zum Server ---------- */
 let S = null, speed = 1, offset = 0, me = null, match = null, live = false, view = null;
-let sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
+let sendHero = '', heroSel = '', sendFromOp = '', sendFrom = 0, mode = 'city', wm = null, mapReady = false, msel = null, send = {}, planCache = {};
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { credentials: 'same-origin' } : {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -250,7 +251,24 @@ function renderHud() {
   for (const m of ownMarches()) { const st = marchState(m); parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}${st.moving ? `<span class="mini"><i style="width:${Math.round(st.pct * 100)}%"></i></span>` : ''}</button>`); }
   if (ownMarches().filter(m => m.phase !== 'back').length >= 2) parts.push('<button class="chip go" type="button" data-recallall="1">⌂ Alle heimrufen</button>');
   $('hud').innerHTML = parts.join('');
-  renderPts(); renderHelpPop();
+  renderPts(); renderHelpPop(); renderArmyBtns();
+}
+// Runde Heer-Knöpfe rechts auf der Karte: das Symbol zeigt den Anführer; antippen wählt das Heer, der nächste Tipp auf die Karte schickt es dorthin
+function renderArmyBtns() {
+  let el = $('armyBtns');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'armyBtns'; el.className = 'armybtns'; document.body.appendChild(el);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-army]'); if (!b) return; const id = Number(b.dataset.army), m = ownMarches().find(x => x.id === id); if (!m) return;
+      if (sendFrom === id) { sendFrom = 0; closeSheet(); syncMoveBar(); return renderArmyBtns(); }
+      if (!(['post', 'gather', 'back', 'fight'].includes(m.phase) || (m.phase === 'out' && m.mode !== 'build'))) return toast('Dieses Heer kann gerade nicht umgeleitet werden.');
+      sendFromOp = ''; closeSheet(); sendFrom = id; syncMoveBar(); renderArmyBtns();
+    });
+  }
+  const show = mode === 'map' && !!S && !!view && !msel; el.hidden = !show; if (!show && !sendFrom) { /* bleibt versteckt */ }
+  const ST = { out: '🚶', back: '↩', gather: '⛏', fight: '⚔', post: '⚑' };
+  const html = ownMarches().slice(0, 5).map(m => { const H = HEROES[m.hero]; return `<button type="button" class="armybtn${sendFrom === m.id ? ' on' : ''}" data-army="${m.id}" style="--hc:${H ? H.col : '#7a7a7a'}" aria-label="${H ? esc(H.name) : 'Heer'}"><span class="apic">${H ? H.pic : '🛡️'}</span><i>${ST[m.phase] || ''}</i></button>`; }).join('');
+  if (el.innerHTML !== html) el.innerHTML = html;
 }
 function renderPts() {
   let el = $('ptsChip'); if (!el) { el = document.createElement('div'); el.id = 'ptsChip'; el.className = 'ptschip'; document.body.appendChild(el); }
@@ -358,6 +376,7 @@ function closeSheet() { if (scoutEl) scoutEl.hidden = true; if (miniEl) miniEl.h
 async function command(cmd) {
   if (busy) return false; busy = true;
   const moved = (sendFrom || sendFromOp) && cmd.type === 'march'; if (moved) cmd = sendFrom ? { ...cmd, from: sendFrom } : { ...cmd, fromOp: sendFromOp, troops: Object.keys(cmd.troops || {}).length ? cmd.troops : sendOpAll() };
+  if (cmd.type === 'march' && !cmd.from && !cmd.hero) cmd = { ...cmd, hero: sendHero };
   const r = await api('/api/cmd', cmd).catch(() => ({ ok: false, data: { error: 'Keine Verbindung zum Server.' } }));
   busy = false; if (moved) { sendFrom = 0; sendFromOp = ''; syncMoveBar(); }
   if (r.data && r.data.state) accept(r.data);
@@ -368,6 +387,12 @@ async function command(cmd) {
 }
 function setupSheet() {
   $('sheetInner').addEventListener('click', async e => {
+    const hc = e.target.closest('[data-hero]');
+    if (hc && !hc.disabled) {
+      sendHero = hc.dataset.hero; const pf = heroPrefers(sendHero)[0];
+      if (pf && pf !== 'trans' && !sendFrom && !sendFromOp) { const ns = {}; for (const u in S.troops) if (U[u].g === pf && S.troops[u] > 0) ns[u] = S.troops[u]; if (sum(ns)) { send = ns; toast(HEROES[sendHero].name + ' führt am liebsten ' + { inf: 'Infanterie', kav: 'Kavallerie', art: 'Fernkampf-Truppen' }[pf] + ' an.', 'info'); } }
+      return renderSheet();
+    }
     const el = e.target.closest('[data-act]'); if (!el) return;
     const act = el.dataset.act, u = el.dataset.u, id = sel;
     if (act === 'close') { sendFrom = 0; sendFromOp = ''; syncMoveBar(); return closeSheet(); }
@@ -658,7 +683,7 @@ function allyHTML() {
 }
 
 /* ---------- Mehr: Partie, Rangliste, Chronik, Erste Schritte, Einstellungen ---------- */
-const FEED_ICON = { attack: '⚔', battle: '🛡', station: '🤝', ally: '🤝', hold: '👑', out: '✖', free: '🕊', protect: '🛡', start: '🏁', end: '🏆', scout: '🧭', help: '🤝' };
+const FEED_ICON = { attack: '⚔', battle: '🛡', station: '🤝', ally: '🤝', hold: '👑', out: '✖', free: '🕊', protect: '🛡', start: '🏁', end: '🏆', scout: '🧭', help: '🤝', hero: '🦸' };
 let pushOn = null, pushMsg = '';
 async function pushStatus() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return (pushOn = 'unsupported');
@@ -744,7 +769,7 @@ function moreHTML() {
     <div class="block"><div class="row"><button class="btn ghost" data-act="logout" type="button">Abmelden</button></div>
       <div class="links"><a href="/impressum" target="_blank" rel="noopener">Impressum</a><a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></div></div>`;
   const SUBS = {
-    dev: ['🛠', 'Entwickler', devHTML()], game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
+    units: ['🪖', 'Militär', unitOverviewHTML()], dev: ['🛠', 'Entwickler', devHTML()], game: ['🏁', 'Partie', info], rank: ['🏆', 'Rangliste', rank], chron: ['📖', 'Chronik der Welt', chron],
     feed: ['🔔', 'Meldungen', feed], shop: ['🛒', 'Shop', shopHTML()], speed: ['⚡', 'Speedups', speedupsHTML()], daily: ['📅', 'Tägliche Aufgaben', dailyHTML()], packs: ['🎁', 'Ressourcen', packsHTML()], rules: ['📜', 'Spielregeln', rulesHTML()], combat: ['⚔️', 'Kampfregeln', combatRulesHTML()], settings: ['⚙️', 'Einstellungen', settings]
   };
   if (SUBS[moreSub]) { const [ico, t, body] = SUBS[moreSub]; return phead(ico, t, '', '<button class="pback" type="button" data-act="back">‹ Zurück</button>') + `<div class="block flat">${body}</div>`; }
@@ -752,7 +777,7 @@ function moreHTML() {
   const tile = (id, ico, t, s, n) => `<button type="button" class="tile" data-act="sub" data-t="${id}"><span class="tico">${ico}</span><b>${t}</b><small>${s}</small>${n ? `<span class="pbadge">${n}</span>` : ''}</button>`;
   return phead('☰', 'Mehr', esc(m.name) + ' · ' + state)
     + `<div class="profile"><span class="avatar" style="background:${PLAYER_COLORS[(S.slot || 0) % PLAYER_COLORS.length] || '#8a5412'}">${esc((me.name || '?').slice(0, 1).toUpperCase())}</span><div><b>${esc(me.name)}</b>${al ? ` <span class="tag">${esc(al.tag)}</span>` : ''}<div class="note">Rathaus ${S.lv.rathaus}${myRank >= 0 ? ` · Platz ${myRank + 1} von ${rk.players.length} · ${fmtN(mine.score)} Punkte` : ''}</div></div></div>`
-    + `<div class="hub">${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('daily', '📅', 'Tägliche Aufgaben', dailyDone(S) && !(S.daily || {}).claimed ? 'Belohnung bereit!' : dailySub(), dailyBadge())}${tile('packs', '🎁', 'Ressourcen', packN() ? packN() + ' Pakete' : 'keine Pakete', packN())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
+    + `<div class="hub">${tile('units', '🪖', 'Militär', 'Truppen im Überblick')}${tile('shop', '🛒', 'Shop', 'Teleporter', itemN('teleport'))}${tile('rank', '🏆', 'Rangliste', myRank >= 0 ? 'Du bist Platz ' + (myRank + 1) : 'Wer führt?')}${tile('feed', '🔔', 'Meldungen', unreadFeed() ? unreadFeed() + ' neu' : 'alles gelesen', unreadFeed())}${tile('daily', '📅', 'Tägliche Aufgaben', dailyDone(S) && !(S.daily || {}).claimed ? 'Belohnung bereit!' : dailySub(), dailyBadge())}${tile('packs', '🎁', 'Ressourcen', packN() ? packN() + ' Pakete' : 'keine Pakete', packN())}${tile('speed', '⚡', 'Speedups', SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0) ? fmtT(real(SPEED_IDS.reduce((a, i) => a + itemN(i) * ITEMS[i].sec, 0))) + ' gefunden' : 'noch keine gefunden', SPEED_IDS.reduce((a, i) => a + itemN(i), 0))}${tile('chron', '📖', 'Chronik', 'Ereignisse der Welt')}${window.zkSimMode ? tile('dev', '🛠', 'Entwickler', 'Test und Admin') : ''}${tile('reports', '📜', 'Berichte', unread() ? unread() + ' ungelesen' : 'Kämpfe und Funde', unread())}${tile('rules', '📜', 'Spielregeln', 'Ziel und Ablauf')}${tile('settings', '⚙️', 'Einstellungen', 'Konto, Mitteilungen')}</div>`;
 }
 
 /* ---------- Ausbilden (eigenes Menü) ---------- */
@@ -870,8 +895,40 @@ function panelSignature() {
   if (panelName === 'tech') return JSON.stringify([S.items, techSel, S.lv, S.tech, S.research && S.research.id + S.research.target, RES.map(r => Math.floor(S.res[r] / 50)), Object.keys(T).map(id => techBlocker(S, id)), S.troops]);
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
+  if (panelName === 'heroes') return JSON.stringify([S.heroes, S.defHero, S.defDeputy, heroSel, ownMarches().map(m => m.hero)]);
   if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
   return JSON.stringify([moreSub, moreSub === 'daily' ? [S.daily, S.packs && S.packs.length, Math.floor(serverNow() / 30000)] : 0, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
+}
+/* ---------- Helden ---------- */
+const FX_GLYPH = { shield: '🛡', wind: '💨', leaf: '🍃', grain: '🌾', chips: '🪵', sparks: '✨', dust: '💨', ward: '✦', glow: '✦', shadow: '✦', flame: '🔥', gust: '🌀' };
+const heroPortrait = (id, cls = '') => { const H = HEROES[id]; return `<div class="hport ${cls} fx-${H.fx}" style="--hc:${H.col}"><span class="haura"></span><span class="hface">${H.pic}</span><span class="hweap">${H.icon}</span><i></i><i></i><i></i><i></i></div>`; };
+const keeperNow = () => [S.defHero, S.defDeputy].find(id => id && HEROES[id] && !busyHero(id)) || '';
+function heroCardHTML(id) {
+  const H = HEROES[id], lv = heroLvl(id), xp = (S.heroes[id] || {}).xp || 0, need = xpNeed(lv), k = keeperNow();
+  const st = busyHero(id) ? '🚩 führt ein Heer' : id === k ? '🏰 bewacht die Burg' : id === S.defHero ? '🏰 Wächter (unterwegs)' : id === S.defDeputy ? '🛡 Stellvertreter' : '';
+  return `<button type="button" class="hcard" data-act="heroOpen" data-id="${id}" style="--hc:${H.col}">${heroPortrait(id)}
+    <div class="hinfo"><b>${H.name}</b><small>${H.title}</small><span class="hlv">Stufe ${lv}${lv >= HERO_MAX ? ' · Maximum' : ''}</span>
+    <div class="hbar"><i style="width:${lv >= HERO_MAX ? 100 : Math.min(100, Math.round(xp / need * 100))}%"></i></div><small class="hsk">${heroBonusText(id)}</small>${st ? `<small class="hst">${st}</small>` : ''}</div></button>`;
+}
+function heroDetailHTML(id) {
+  const H = HEROES[id], lv = heroLvl(id), xp = (S.heroes[id] || {}).xp || 0, need = xpNeed(lv);
+  const sk = skillList(S, id).map(k => `<div class="mrow"><div><b>${k.name}</b><div class="note">${k.text}</div></div><div class="hsv"><b>+${(Math.round(k.val * 1000) / 10).toString().replace('.', ',')} %</b><small>Stufe ${HERO_MAX}: +${Math.round(k.top * 100)} %</small></div></div>`).join('');
+  const how = H.role === 'gather' ? 'Lernt beim <b>Sammeln</b> auf Feldern (1 Erfahrung je 4 gesammelte Rohstoffe). Kämpfe bringen ihm nichts.' : 'Lernt im <b>Kampf</b>: Banditenlager und Räuber besiegen, Spieler oder Außenposten angreifen. Gegen viel zu schwache Ziele gibt es kaum Erfahrung.';
+  const st = busyHero(id) ? 'führt gerade ein Heer an' : id === keeperNow() ? 'bewacht die Burg' : 'bereit in der Burg';
+  return phead('🦸', H.name + ' ' + H.title, 'Stufe ' + lv + ' von ' + HERO_MAX, '<button class="pback" type="button" data-act="heroBack">‹ Zurück</button>')
+    + `<div class="hdetail" style="--hc:${H.col}">${heroPortrait(id, 'big')}<div class="hstory"><p class="desc">${H.story}</p><p class="note">Zustand: <b>${st}</b></p>
+      <div class="hbar big"><i style="width:${lv >= HERO_MAX ? 100 : Math.min(100, Math.round(xp / need * 100))}%"></i><span>${lv >= HERO_MAX ? 'Höchststufe' : fmtN(xp) + ' / ' + fmtN(need) + ' Erfahrung'}</span></div></div></div>
+    <div class="block flat"><h3>Fähigkeiten</h3>${sk}</div>
+    <div class="block flat"><h3>Erfahrung</h3><p class="note">${how}</p></div>
+    <div class="block flat"><h3>Burgverteidigung</h3><p class="note">Der Wächter verstärkt die Verteidigung deiner Burg, solange er nicht unterwegs ist. Dann springt der Stellvertreter ein.${H.keeper ? ' <b>' + H.name + ' ist dafür besonders geeignet.</b>' : ''}</p>
+      <div class="row"><button class="btn small" type="button" data-act="keeperSet" data-id="${id}" data-r="main" ${S.defHero === id ? 'disabled' : ''}>Zum Wächter</button><button class="btn ghost small" type="button" data-act="keeperSet" data-id="${id}" data-r="dep" ${S.defDeputy === id ? 'disabled' : ''}>Zum Stellvertreter</button></div></div>`;
+}
+function heroesHTML() {
+  if (heroSel) return heroDetailHTML(heroSel);
+  const k = keeperNow(), nm = id => id ? HEROES[id].name : '–';
+  return phead('🦸', 'Helden', 'Anführer deiner Heere') + `<p class="note">Jedes Heer braucht einen Helden als Anführer. Sammler-Helden werden beim Sammeln stärker, die übrigen im Kampf. Tippe einen Helden an für Details.</p>
+    <div class="block flat"><h3>Burgwächter</h3><p class="note">${k ? '🏰 <b>' + HEROES[k].name + '</b> bewacht gerade die Burg.' : '<span class="why">Niemand bewacht gerade die Burg.</span>'} Wächter: ${nm(S.defHero)} · Stellvertreter: ${nm(S.defDeputy)}. Tippe einen Helden an, um ihn zum Wächter zu machen.</p></div>
+    <div class="hgrid">${HERO_IDS.map(heroCardHTML).join('')}</div>`;
 }
 function renderPanel(force) {
   if (!panelName || !view) return;
@@ -879,7 +936,7 @@ function renderPanel(force) {
   const el = $('sidePanelInner'), keep = {};
   el.querySelectorAll('input,select').forEach(i => { if (i.id) keep[i.id] = [i.value, document.activeElement === i]; });
   const top = $('sidePanel').scrollTop, box = $('chatBox'), atEnd = !box || box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
-  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : panelName === 'tech' ? techHTML() : panelName === 'units' ? phead('🪖', 'Einheiten', 'Deine Truppen im Überblick') + unitOverviewHTML() : moreHTML();
+  el.innerHTML = panelName === 'ally' ? allyHTML() : panelName === 'train' ? trainHTML() : panelName === 'tech' ? techHTML() : panelName === 'units' ? phead('🪖', 'Einheiten', 'Deine Truppen im Überblick') + unitOverviewHTML() : panelName === 'heroes' ? heroesHTML() : moreHTML();
   for (const id in keep) { const i = document.getElementById(id); if (i) { i.value = keep[id][0]; if (keep[id][1]) i.focus(); } }
   const nb = $('chatBox'); if (nb) nb.scrollTop = atEnd ? nb.scrollHeight : nb.scrollTop;
   $('sidePanel').scrollTop = top;
@@ -888,6 +945,7 @@ function renderPanel(force) {
 function fitTree() {}
 window.addEventListener('resize', () => { if (panelName === 'tech') fitTree(); });
 function openPanel(name) {
+  if (name === 'heroes') heroSel = '';
   if (!$('reports').hidden) closeReports();
   closeSheet(); panelName = name; panelSig = ''; if (name === 'more') { moreSub = ''; moreFrom = ''; } if (name === 'ally') allyTab = ''; renderPanel(true); $('sidePanel').hidden = false; document.body.classList.add('reports-open'); setNav(name);
   if (name === 'tech') { fitTree(); requestAnimationFrame(fitTree); }
@@ -915,6 +973,12 @@ function setupPanel() {
     if (act === 'devAdmin') { closePanel(); document.getElementById('swap').click(); return; }
     if (act === 'sub' && d.t === 'reports') return openReports();
     if (act === 'sub') { moreFrom = ''; moreSub = d.t; if (d.t === 'feed' && unreadFeed()) api('/api/cmd', { type: 'readFeed' }).then(r => { if (r.ok) { S.feedSeen = S.feed.length ? S.feed[0].id : 0; renderNav(); } }); return go(); }
+    if (act === 'heroOpen') { heroSel = d.id; return go(); }
+    if (act === 'heroBack') { heroSel = ''; return go(); }
+    if (act === 'keeperSet') {
+      let a = S.defHero, b = S.defDeputy; if (d.r === 'main') { a = d.id; if (b === d.id) b = ''; } else { b = d.id; if (a === d.id) a = ''; }
+      const ok = await command({ type: 'setKeeper', hero: a, deputy: b }); if (ok) toast(HEROES[d.id].name + (d.r === 'main' ? ' bewacht jetzt die Burg.' : ' ist jetzt Stellvertreter.'), 'info'); return renderPanel(true);
+    }
     if (act === 'back') { moreSub = ''; if (moreFrom) { moreFrom = ''; return closePanel(); } return go(); }
     if (act === 'claimDaily') { const ok = await command({ type: 'claimDaily' }); if (ok) toast('3 Stunden Speedups erhalten!', 'info'); return renderPanel(true); }
     if (act === 'openPack') { const ok = await command({ type: 'openPack', pid: Number(d.pid) }); if (ok) toast('Ressourcenpaket eingelöst.', 'info'); return renderPanel(true); }
@@ -1097,7 +1161,7 @@ function showEnd(force) {
 }
 
 /* ---------- Karte: Bedienung ---------- */
-const OBJ_NAME = { farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', tower: 'Turm', start: 'Burg' };
+const OBJ_NAME = { raider: 'Räuber', farm: 'Kornfeld', wood: 'Holzfällerlager', stone: 'Steinbruch', camp: 'Banditenlager', ruin: 'Alte Ruine', sanct: 'Heiligtum', throne: 'Der Thron', tower: 'Turm', start: 'Burg' };
 const KIND_SHORT = { site: 'Bauplatz', outpost: 'Außenposten', start: 'Burg', farm: 'Feld', wood: 'Holz', stone: 'Bruch', camp: 'Lager', ruin: 'Ruine', sanct: 'Heiligtum', throne: 'Thron', tower: 'Turm' };
 const gtNow = () => { const w = view.world; return w.gt + (Date.now() + offset - w.at) / 1000 * speed; };
 const ownMarches = () => view ? view.world.marches.filter(m => m.own) : [];
@@ -1180,11 +1244,12 @@ function selectMap(hit, keepSend) {
   sel = null; msel = hit; wm.select(hit);
   if (sendFromOp) send = sendOpAll();
   else if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); send = sm ? { ...sm.troops } : {}; }
-  else if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; autoSend(hit); const ob = hit.type === 'obj' ? wm.map.byId[hit.id] : null; if (!ob || !['farm', 'wood', 'stone'].includes(ob.k)) delete send.handkarren; }   // Handkarren nur beim Farmen automatisch dabei
+  else if (!keepSend) { send = {}; for (const u in S.troops) if (S.troops[u] > 0) send[u] = S.troops[u]; autoSend(hit); sendHero = bestHero(hit); const ob = hit.type === 'obj' ? wm.map.byId[hit.id] : null; if (!ob || !['farm', 'wood', 'stone'].includes(ob.k)) delete send.handkarren; }   // Handkarren nur beim Farmen automatisch dabei
   document.body.classList.add('sheet-open');
   if (hit.type === 'obj') { const o = wm.map.byId[hit.id]; revealMap(o.x + .5, o.y + .5); }
   else if (hit.type === 'op') { const o = (view.world.outposts || []).find(x => x.id === hit.id); if (o) revealMap(o.x + .5, o.y + .5); }
   else if (hit.type === 'site') revealMap(hit.x + .5, hit.y + .5);
+  else if (hit.type === 'raider') { const r = (view.world.raiders || []).find(x => x.id === hit.id); if (r) revealMap(r.x + .5, r.y + .5); }
   else { const m = view.world.marches.find(x => x.id === hit.id); if (m) { const p = marchPos(m, gtNow()); revealMap(p.x, p.y); } }
   renderSheet();
 }
@@ -1207,24 +1272,40 @@ function autoSend(hit) {
 function fieldFoes(id) { return (view.world.marches || []).filter(m => m.phase === 'gather' && m.tid === id && !m.own && !m.friend); }
 function mapSignature() {
   const w = view.world, id = msel.id;
-  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase), w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
+  return JSON.stringify([msel, send, S.troops, S.lv.rathaus, ownMarches().map(m => m.id + m.phase + (m.hero || '')), sendHero, w.camps[id] || 0, w.nodes[id], fieldFoes(id).map(m => m.id), w.ruins[id], w.outposts, RES.map(r => Math.floor(S.res[r] / 50)), busy, (view.match.players || []).map(p => p.id + ':' + p.out + p.vassalOf + p.ally + (p.protUntil > gtNow())), view.match.holds, view.match.phase, armedKey, S.stationed, S.res.gold >= 50]);
 }
 function sendOpAll() { const q = (view.world.outposts || []).find(x => x.id === sendFromOp), g = q && q.garr ? q.garr[me.id] : null; return g ? { ...g } : {}; }
 function sendList() { const t = {}; for (const u in send) if (send[u] > 0) t[u] = send[u]; return t; }
 function planFor(o) {
-  if (sendFromOp) { const t0 = sendOpAll(), q = (view.world.outposts || []).find(x => x.id === sendFromOp); if (!q || !sum(t0)) return null; const k0 = o.id + 'op' + sendFromOp + JSON.stringify(t0) + wm.roadSig.length; if (planCache.key !== k0) planCache = { key: k0, plan: planFrom(wm.map, [q.x, q.y], o.x, o.y, t0, S) }; return planCache.plan; }
-  const t = sendList(), key = o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
+  if (sendFromOp) { const t0 = sendOpAll(), q = (view.world.outposts || []).find(x => x.id === sendFromOp); if (!q || !sum(t0)) return null; const k0 = sendHero + o.id + 'op' + sendFromOp + JSON.stringify(t0) + wm.roadSig.length; if (planCache.key !== k0) planCache = { key: k0, plan: planFrom(wm.map, [q.x, q.y], o.x, o.y, t0, S, sendHero) }; return planCache.plan; }
+  const t = sendList(), key = sendHero + o.id + JSON.stringify(t) + S.pos + wm.roadSig.length;
   if (!sum(t)) return null;
-  if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, (sm.phase === 'post' || sm.phase === 'gather') ? cellXY(sm.path[sm.path.length - 1]) : (q => [Math.floor(q.x), Math.floor(q.y)])(marchPos(sm, gtNow())), o.x, o.y, t, S) : planMarch(wm.map, S, o, t) }; }
+  if (planCache.key !== key) { const sm = sendFrom && view.world.marches.find(x => x.id === sendFrom); planCache = { key: key + sendFrom, plan: sm ? planFrom(wm.map, (sm.phase === 'post' || sm.phase === 'gather') ? cellXY(sm.path[sm.path.length - 1]) : (q => [Math.floor(q.x), Math.floor(q.y)])(marchPos(sm, gtNow())), o.x, o.y, t, S, sm.hero) : planMarch(wm.map, S, o, t, sendHero) }; }
   return planCache.plan;
 }
+/* ---------- Helden als Anführer ---------- */
+const heroLvl = id => (S.heroes && S.heroes[id] ? S.heroes[id].lv : 1);
+const busyHero = id => ownMarches().some(m => m.hero === id);
+function bestHero(hit) {
+  const free = HERO_IDS.filter(id => !busyHero(id)); if (!free.length) return '';
+  const o = hit && hit.type === 'obj' ? wm.map.byId[hit.id] : null, k = o ? o.k : hit ? hit.type : '';
+  const want = k === 'farm' ? ['gorm', 'mira'] : k === 'wood' ? ['thorin', 'mira'] : k === 'stone' ? ['ilsa', 'mira'] : (k === 'camp' || k === 'raider') ? ['draven'] : (k === 'start' || k === 'op' || k === 'throne' || k === 'sanct') ? ['kael', 'seraphine'] : ['seraphine'];
+  return want.find(id => free.includes(id)) || free.sort((a, b) => heroLvl(b) - heroLvl(a))[0];
+}
+const heroBonusText = id => skillList(S, id).map(k => '+' + (Math.round(k.val * 1000) / 10).toString().replace('.', ',') + ' % ' + k.name).join(' · ');
+function heroPickHTML() {
+  if (!sendHero || busyHero(sendHero)) sendHero = bestHero(msel);
+  return `<div class="block hpick"><h3>Anführer</h3><div class="hrow">${HERO_IDS.map(id => { const H = HEROES[id], b = busyHero(id);
+    return `<button type="button" class="hchip${id === sendHero ? ' on' : ''}" data-hero="${id}" ${b ? 'disabled' : ''}><span class="hpic fx-${H.fx}" style="--hc:${H.col}">${H.pic}</span><b>${H.name}</b><small>${b ? 'unterwegs' : 'Stufe ' + heroLvl(id)}</small></button>`; }).join('')}</div>
+    ${sendHero ? `<p class="note">${HEROES[sendHero].name}: ${heroBonusText(sendHero)}</p>` : '<p class="why">Alle Helden sind unterwegs.</p>'}</div>`;
+}
 function pickerHTML() {
-  if (sendFromOp) return `<div class="block picker"><h3>Besatzung weiterschicken</h3><p class="note">${troopsLine(sendOpAll())} ziehen vom Außenposten zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`;
+  if (sendFromOp) return heroPickHTML() + `<div class="block picker"><h3>Besatzung weiterschicken</h3><p class="note">${troopsLine(sendOpAll())} ziehen vom Außenposten zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`;
   if (sendFrom) { const sm = view.world.marches.find(x => x.id === sendFrom); return `<div class="block picker"><h3>Marschieren</h3><p class="note">${sm ? (sm.troops.n != null ? fmtN(sm.troops.n) + ' Einheiten' : troopsLine(sm.troops)) : ''} ziehen von ihrem Standort zum Ziel.</p><div class="row"><button class="btn ghost small" type="button" data-act="sfCancel">Abbrechen</button></div></div>`; }
   const us = Object.keys(U).filter(u => S.troops[u] > 0);
   if (!us.length) return '<p class="note">Du hast keine Truppen zu Hause. Bilde sie in der Kaserne aus (Stadt).</p>';
-  const tot = sendList(), cp = capacityOf(tot, S);
-  return `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="shalf">Hälfte</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => {
+  const tot = sendList(), cp = capacityOf(tot, S, sendHero);
+  return heroPickHTML() + `<div class="block picker"><h3>Heer <span class="quick"><button class="btn ghost small" type="button" data-act="sall">Alle</button><button class="btn ghost small" type="button" data-act="shalf">Hälfte</button><button class="btn ghost small" type="button" data-act="snone">Keine</button></span></h3>${us.map(u => {
     const max = S.troops[u], val = Math.max(0, Math.min(max, send[u] || 0));
     return `<div class="urow"><div class="un"><b>${U[u].name}</b><small>${fmtN(max)} daheim</small></div><input class="qr" type="range" min="0" max="${max}" value="${val}" data-q="send" data-u="${u}" aria-label="${U[u].name}"><input class="qn" type="number" inputmode="numeric" min="0" max="${max}" value="${val}" data-q="send" data-u="${u}" aria-label="Anzahl"></div>`; }).join('')}
     <p class="note usum">${fmtN(sum(tot))} Einheiten · tragen ${fmtN(cp)}</p></div>`;
@@ -1320,7 +1401,9 @@ function opSheet(w) {
 }
 function renderMapSheet() {
   const w = view.world; let h = '';
-  if (msel.type === 'march') {
+  if (msel.type === 'raider') {
+    h = raiderSheet(w); if (!h) { closeSheet(); return; }
+  } else if (msel.type === 'march') {
     const m = w.marches.find(x => x.id === msel.id);
     if (!m) { closeSheet(); return; }
     const tgt = wm.map.byId[m.tid] || null, mine = m.own, st = marchState(m);
@@ -1372,7 +1455,7 @@ function renderMapSheet() {
       else {
         body += pickerHTML();
         if (plan && !plan.error) {
-          const r = battle(sel_, def, mult, forceOf(S)), lost = sum(sel_) - sum(r.attLeft);
+          const r = battle(sel_, def, mult, forceOf(S) * (sendHero ? heroForce(S, sendHero, sel_, 'att', 'camp') : 1)), lost = sum(sel_) - sum(r.attLeft);
           body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Prognose</dt><dd class="${r.win ? '' : 'why'}">${r.win ? `Sieg · du verlierst ${fmtN(lost)} von ${fmtN(sum(sel_))} (rund 30 % davon kommen verwundet ins Lazarett, wenn dort Platz ist)` : 'Niederlage · dein Heer wird aufgerieben'}</dd></dl>`;
         }
         body += actionRow('Angreifen', plan, '', free);
@@ -1432,13 +1515,29 @@ function renderMapSheet() {
     h = `<div class="sh-head"><h2>${title}</h2>${lv}<button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
   }
   const MI = { farm: '🌾', wood: '🪵', stone: '🪨', camp: '⚔️', ruin: '🏛️', sanct: '✨', throne: '👑', tower: '🗼', start: '🏰' };
-  const ico = msel.type === 'march' ? '🚩' : msel.type === 'site' ? '🏗️' : msel.type === 'op' ? '🗼' : MI[(wm.map.byId[msel.id] || {}).k] || '📍';
+  const ico = msel.type === 'raider' ? '☠️' : msel.type === 'march' ? '🚩' : msel.type === 'site' ? '🏗️' : msel.type === 'op' ? '🗼' : MI[(wm.map.byId[msel.id] || {}).k] || '📍';
   h = h.replace('<div class="sh-head">', `<div class="sh-head"><span class="sh-ico">${ico}</span>`).replace('data-act="close">Schließen</button>', 'data-act="close" aria-label="Schließen">✕</button>');
   $('sheet').classList.add('popup');
   $('sheetInner').innerHTML = h; sheetSig = mapSignature();
 }
+function raiderSheet(w) {
+  const r = (w.raiders || []).find(x => x.id === msel.id); if (!r) return null;
+  const def = campTroops(r.lv), mult = campMult(r.lv), plan = planFor(r), sel_ = sendList(), free = sendFrom || sendFromOp || ownMarches().length < armySlots(S), cl = campLoot(r.lv);
+  let body = `<dl class="stats"><dt>Gegner</dt><dd>Räuber-Armee</dd><dt>Verteidiger</dt><dd>${troopsLine(def)}</dd><dt>Stärke</dt><dd>+${Math.round((mult - 1) * 100)} %</dd><dt>Beute</dt><dd class="costs">${lootHTML({ food: Math.round(cl.food / 2), wood: Math.round(cl.wood / 2), stone: Math.round(cl.stone / 2), gold: Math.round(cl.gold / 2) })}</dd>
+    <dt>Belohnung</dt><dd>Beschleuniger${r.lv >= 5 ? ' und Ressourcenpakete' : ''}</dd><dt>Zieht ab in</dt><dd>${fmtT(real(Math.max(0, r.until - gtNow())))}</dd></dl>`;
+  if (view.match.phase !== 'running') body += '<p class="why">Die Partie läuft nicht.</p>';
+  else {
+    body += pickerHTML();
+    if (plan && !plan.error) {
+      const r2 = battle(sel_, def, mult, forceOf(S) * (sendHero ? heroForce(S, sendHero, sel_, 'att', 'camp') : 1)), lost = sum(sel_) - sum(r2.attLeft);
+      body += `<dl class="stats"><dt>Marsch</dt><dd>${fmtT(real(plan.duration))}</dd><dt>Prognose</dt><dd class="${r2.win ? '' : 'why'}">${r2.win ? `Sieg · du verlierst ${fmtN(lost)} von ${fmtN(sum(sel_))}` : 'Niederlage · dein Heer wird aufgerieben'}</dd></dl>`;
+    }
+    body += actionRow('Angreifen', plan, '', free);
+  }
+  return `<div class="sh-head"><h2>Räuber</h2><span class="lvl">Stufe ${r.lv}</span><button class="close" type="button" data-act="close">Schließen</button></div>${body}`;
+}
 function actionRow(label, plan, why, free, cls = '', act = 'march', minT = 0) {
-  const bad = why || (!sum(sendList()) ? 'Wähle Truppen aus.' : sum(sendList()) < minT ? 'Mindestens ' + minT + ' Truppen nötig.' : !free ? 'Alle Heere sind unterwegs.' : plan && plan.error ? plan.error : '');
+  const bad = why || (!sum(sendList()) ? 'Wähle Truppen aus.' : !sendFrom && !sendHero ? 'Wähle einen Helden als Anführer.' : sum(sendList()) < minT ? 'Mindestens ' + minT + ' Truppen nötig.' : !free ? 'Alle Heere sind unterwegs.' : plan && plan.error ? plan.error : '');
   return `<div class="row"><button class="btn ${cls}" type="button" data-act="${act}" ${bad ? 'disabled' : ''}>${label}</button>${bad ? `<span class="why">${bad}</span>` : ''}</div>`;
 }
 function updateMapSheet() {
@@ -1456,6 +1555,7 @@ function mapAct(act, el) {
   else if (act === 'shalf') { send = {}; for (const k in S.troops) if (S.troops[k] > 0) send[k] = Math.ceil(S.troops[k] / 2); renderSheet(); }
   else if (act === 'snone') { send = {}; renderSheet(); }
   else if (act === 'toCity') setMode('city');
+  else if (act === 'march' && msel.type === 'raider') { command({ type: 'march', target: msel.id, troops: sendList() }).then(ok => { if (ok) { toast('Dein Heer marschiert gegen die Räuber.', 'info'); closeSheet(); } }); }
   else if (act === 'march') {
     const o = wm.map.byId[msel.id], pl = o.k === 'start' ? view.match.players.find(x => x.slot === o.slot) : null;
     const mode = o.k === 'start' ? (pl && isAlly(pl.id) ? 'station' : 'attack') : (o.k === 'sanct' || o.k === 'throne') ? 'occupy' : undefined;
@@ -1582,7 +1682,7 @@ function setupNav() {
   });
   $('nav').addEventListener('click', e => {
     const b = e.target.closest('button[data-nav]'); if (!b) return;
-    if (b.dataset.nav === 'ally' || b.dataset.nav === 'units' || b.dataset.nav === 'more' || b.dataset.nav === 'train' || b.dataset.nav === 'tech') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
+    if (b.dataset.nav === 'ally' || b.dataset.nav === 'heroes' || b.dataset.nav === 'more' || b.dataset.nav === 'train' || b.dataset.nav === 'tech') { if (panelName === b.dataset.nav) return closePanel(); return openPanel(b.dataset.nav); }
     setMode(b.dataset.nav);
   });
   $('reportsInner').addEventListener('click', e => { if (e.target.closest('[data-act=rclose]')) closeReports(); const t = e.target.closest('[data-act=rtab]'); if (t) { repTab = t.dataset.t; renderReports(); } });

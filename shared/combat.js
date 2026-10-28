@@ -1,8 +1,9 @@
 // Zehn Kronen – Kampfrechnung ohne Zustand: Einheiten, Konter, Rundenkampf, Lager und Wächter.
 import { U, techMult } from './rules.js';
+import { heroCarry } from './heroes.js';
 
 export const sum = t => Object.values(t).reduce((a, b) => a + b, 0);
-export const capacityOf = (troops, S) => Math.floor(Object.keys(troops).reduce((s, u) => s + troops[u] * U[u].c, 0) * (S ? techMult(S, 'carry') : 1));
+export const capacityOf = (troops, S, hero) => Math.floor(Object.keys(troops).reduce((s, u) => s + troops[u] * U[u].c, 0) * (S ? techMult(S, 'carry') * (hero ? heroCarry(S, hero) : 1) : 1));
 // Kraft der Truppen eines Spielers (Kriegskunst) als Faktor für Angriff, Verteidigung und Leben
 export const forceOf = S => S ? techMult(S, 'force') : 1;
 export const armySpeed = troops => Math.min(...Object.keys(troops).filter(u => troops[u] > 0).map(u => U[u].s));

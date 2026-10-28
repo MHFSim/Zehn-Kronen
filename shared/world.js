@@ -10,8 +10,9 @@ import {
   reveal, flushBits, FIELD, FG, SCOUT_SEC, SCOUT_SPEED, fieldName, fieldCenter, fieldUnseen, revealField, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
   settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack, standIdx
 } from './core.js';
-import { startCampFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
+import { startCampFight, startRaiderFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
+import { HEROES, heroBusy, heroGather, heroXp, gathersXp } from './heroes.js';
 import { releaseAux, opReady, refreshRoads, arriveBuild, arriveGarrison, checkBuild, SITE_OK, checkRaid, checkGarrison, noteRaid, OP_COST, recallGarrison, moveGarrison, dismantle, settleTerritory, donate, teleport, refundStore, clanGather, clanIncome, clanFields, FIELD_INCOME, storeOf } from './outpost.js';
 import { RES, gatherFinds, findsText, addPack, PACK_NAME, ensureDaily, questAdd, speedUp, inQueue } from './rules.js';
 
@@ -25,6 +26,12 @@ function onArrive(ctx, m, bt, realT) {
   const S = p.state;
   advanceTo(S, realT, match.speed);
   const back = () => homeBack(ctx, m, bt);
+  if (m.tk === 'raider') {   // Räuber-Armee
+    const r = (w.raiders || []).find(x => x.id === m.tid);
+    if (!r) { pushReport(S, { kind: 'camp', title: 'Räuber verschwunden', win: false, target: { kind: 'raider', id: m.tid }, text: 'Die Räuber sind schon weitergezogen oder jemand war schneller. Dein Heer kehrt um.' }, realT); return back(); }
+    const lead = fightAt(w, r.id); if (lead) { attachTo(ctx, lead, m); return; }
+    return startRaiderFight(ctx, m, r, bt);
+  }
   if (m.mode === 'post') { m.phase = 'post'; return; }
   if (m.mode === 'attack' && m.tk === 'post') { const [px, py] = cellXY(m.path[m.path.length - 1]); return arriveField(ctx, m, { k: 'post', id: m.tid, x: px, y: py }, bt, realT, back); }
   if (m.mode === 'build') return arriveBuild(ctx, m, bt, realT, back);
@@ -40,13 +47,13 @@ function onArrive(ctx, m, bt, realT) {
       pushReport(S, { kind: 'gather', title: 'Feld besetzt', win: false, target: info, text: 'Hier sammelt schon ein anderes Heer. Dein Heer kehrt ohne Beute zurück.' }, realT);
       return back();
     }
-    const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops, S), amount = Math.floor(Math.min(cap, left));
+    const left = nodeLeft(w, o, bt), cap = capacityOf(m.troops, S, m.hero), amount = Math.floor(Math.min(cap, left));
     if (amount < NODE_EMPTY) {
       pushReport(S, { kind: 'gather', title: 'Feld erschöpft', win: false, target: info, text: 'Das Feld ist fast leer. Das Heer kehrt ohne Beute zurück.' }, realT);
       return back();
     }
     w.nodes[o.id] = { left: left, t: bt };
-    m.phase = 'gather'; m.tStart = bt; m.tEnd = bt + GATHER_SEC * amount; m.amount = amount; m.res = NODE_RES[o.k];
+    m.phase = 'gather'; m.tStart = bt; m.tEnd = bt + GATHER_SEC * amount / (m.hero ? heroGather(S, m.hero, NODE_RES[o.k]) : 1); m.amount = amount; m.res = NODE_RES[o.k];
     return;
   }
   if (o.k === 'camp') {
@@ -75,6 +82,7 @@ function onGatherEnd(ctx, m, bt, realT) {
   const n = w.nodes[o.id] || { left: nodeLeft(w, o, bt), t: bt };
   { const rest = n.left - m.amount; w.nodes[o.id] = { left: rest < NODE_EMPTY ? 0 : rest, t: bt }; }
   m.load = { [m.res]: m.amount };
+  if (m.hero && gathersXp(m.hero)) { const up = heroXp(p.state, m.hero, m.amount / 4); if (up) note(ctx, p.id, 'hero', HEROES[m.hero].name + ' ist aufgestiegen', HEROES[m.hero].name + ' hat Stufe ' + p.state.heroes[m.hero].lv + ' erreicht.'); }
   clanGather(ctx, m, o, bt);
   const found = gatherFinds(p.state, m.id, m.tEnd - m.tStart); if (Object.keys(found).length) note(ctx, p.id, 'gather', 'Beschleuniger gefunden', 'Beim Sammeln hat dein Heer ' + findsText(found) + ' gefunden.');
   m.phase = 'back'; m.t0 = bt; reversed(m);
@@ -83,7 +91,7 @@ function onHome(ctx, m, bt, realT) {
   const { match, players } = ctx, p = byId(players, m.owner); m.dead = true;
   if (!p) return;
   if (m.redir) {   // umgeleitetes Heer: vom Ausgangspunkt (Posten oder Außenposten) noch nach Hause laufen
-    const here = m.path[m.path.length - 1], plan = planFrom(mapOf(match), cellXY(here), p.state.pos[0], p.state.pos[1], m.troops, p.state);
+    const here = m.path[m.path.length - 1], plan = planFrom(mapOf(match), cellXY(here), p.state.pos[0], p.state.pos[1], m.troops, p.state, m.hero);
     if (!plan.error && plan.path.length > 1) { m.path = plan.path; m.arr = plan.arr; m.phase = 'back'; m.t0 = bt; m.mode = 'home'; m.tk = 'start'; delete m.redir; m.dead = false; return; }
   }
   const S = p.state; advanceTo(S, realT, match.speed);
@@ -109,6 +117,26 @@ function migrate(ctx) {
 }
 
 /* ---------- Abgleich der ganzen Partie ---------- */
+/* ---------- Räuber: kleine KI-Armeen auf der Karte (Stufe 1 bis 30) ---------- */
+const RAID_LIFE = 4 * 3600, RAID_EVERY = 900;
+const rnd1 = s => { const x = Math.sin(s * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+function manageRaiders(ctx, players) {
+  const w = ctx.match.world, map = mapOf(ctx.match), alive = players.filter(p => p.state.slot >= 0 && !p.state.out).length;
+  w.raiders = (w.raiders || []).filter(r => r.until > w.gt || fightAt(w, r.id) || w.marches.some(m => !m.dead && m.tid === r.id && m.tk === 'raider' && m.phase === 'out'));
+  const want = Math.min(30, 3 + 2 * alive);
+  if (w.raiders.length >= want || w.gt < (w.raidNext || 0)) return;
+  const starts = map.objects.filter(o => o.k === 'start');
+  for (let i = 0; i < 40; i++) {
+    const sd = w.nextRaider * 977 + i * 131 + Math.floor(w.gt / 60), x = Math.floor(rnd1(sd) * N), y = Math.floor(rnd1(sd + 7) * N);
+    if (!map.pass[y * N + x] || !SITE_OK(map, x, y)) continue;
+    if (starts.some(o => Math.hypot(o.x - x, o.y - y) < 18)) continue;
+    if (map.objects.some(o => Math.hypot(o.x - x, o.y - y) < 4) || w.raiders.some(r => Math.hypot(r.x - x, r.y - y) < 12)) continue;
+    const lv = 1 + Math.floor(29 * Math.pow(rnd1(sd + 13), 1.7));
+    w.raiders.push({ id: 'raider' + w.nextRaider++, lv, x, y, until: w.gt + RAID_LIFE });
+    w.raidNext = w.gt + RAID_EVERY; return;
+  }
+  w.raidNext = w.gt + 60;
+}
 export function syncMatch(match, players, now) {
   if (!match.world) match.world = newWorld(now, { phase: 'running' });
   const w = ensureWorld(match.world), ctx = mkCtx(match, players, now);
@@ -150,6 +178,7 @@ export function syncMatch(match, players, now) {
     for (let i = 0; i < n; i++) { addPack(S, i ? '' : th); names.push(PACK_NAME[i ? '' : th] || 'Ressourcenpaket'); }
     note(ctx, p.id, 'scout', 'Feld ' + fieldName(sc.f) + ' erkundet', 'Dein Erkunder hat den Nebel gelichtet und gefunden: ' + names.join(', ') + '. Du findest es unter „Ressourcen“.');
   }
+  manageRaiders(ctx, players);
   w.help = (w.help || []).filter(h => { const hp = players.find(x => x.id === h.pid); return hp && inQueue(hp.state, h.bid) && (w.gt - h.t) < 86400 * 30; });
   vassalStep(ctx, dt, w.gt);
   for (const p of players) {   // Schutz läuft bald aus: einmal Bescheid geben
@@ -248,6 +277,12 @@ export function command(match, players, player, cmd, now) {
     S.scout = { f, t0: w.gt, go, end: w.gt + go + SCOUT_SEC }; return '';
   }
   if (cmd.type === 'scoutCancel') { if (!S.scout) return 'Dein Erkunder ist nicht unterwegs.'; S.scout = null; return ''; }
+  if (cmd.type === 'setKeeper') {   // Burgwächter und Stellvertreter wählen
+    const a = String(cmd.hero || ''), b = String(cmd.deputy || '');
+    if ((a && !HEROES[a]) || (b && !HEROES[b])) return 'Diesen Helden gibt es nicht.';
+    if (a && a === b) return 'Wächter und Stellvertreter müssen verschieden sein.';
+    S.defHero = a; S.defDeputy = b; return '';
+  }
   if (cmd.type === 'askHelp') {   // Bündnis um Hilfe beim Bauen bitten
     const al = allianceOf(w, player.id), q = inQueue(S, cmd.id);
     if (!al || al.members.length < 2) return 'Du brauchst ein Bündnis mit mindestens einem weiteren Mitglied.';
@@ -293,6 +328,7 @@ export function command(match, players, player, cmd, now) {
     const map = mapOf(match), mode = cmd.mode || 'normal';
     if (!['normal', 'attack', 'station', 'occupy', 'build', 'garrison', 'raid', 'post', 'assist'].includes(mode)) return 'Unbekannte Marschart';
     let o = map.byId[String(cmd.target)], opx = null;
+    if (mode === 'normal' && String(cmd.target).startsWith('raider')) { const r = (w.raiders || []).find(x => x.id === String(cmd.target)); o = r ? { k: 'raider', id: r.id, x: r.x, y: r.y, lv: r.lv } : null; }
     if (mode === 'build') { const x = Math.floor(Number(cmd.x)), y = Math.floor(Number(cmd.y)); o = { k: 'site', id: 'site' + x + '_' + y, x, y }; }
     else if (mode === 'post') { const x = Math.floor(Number(cmd.x)), y = Math.floor(Number(cmd.y)); o = { k: 'post', id: 'post' + x + '_' + y, x, y }; }
     else if (mode === 'attack' && String(cmd.target).startsWith('post')) { const pm = w.marches.find(g => !g.dead && g.phase === 'post' && g.tid === String(cmd.target)); o = pm ? { k: 'post', id: pm.tid, x: pm.site.x, y: pm.site.y } : null; }
@@ -303,7 +339,7 @@ export function command(match, players, player, cmd, now) {
     }
     else if (mode === 'garrison' || mode === 'raid') { opx = (w.outposts || {})[String(cmd.target)]; o = opx ? { k: 'outpost', id: opx.id, x: opx.x, y: opx.y } : null; }
     if (!o) return 'Dieses Ziel gibt es nicht';
-    if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin')) return 'Dieses Ziel gibt es nicht';
+    if (mode === 'normal' && !(NODE_KINDS.includes(o.k) || o.k === 'camp' || o.k === 'ruin' || o.k === 'raider')) return 'Dieses Ziel gibt es nicht';
     let fromOp = null;
     if (cmd.fromOp != null) {
       const al0 = allianceOf(w, player.id); fromOp = (w.outposts || {})[String(cmd.fromOp)];
@@ -316,6 +352,9 @@ export function command(match, players, player, cmd, now) {
     if (cmd.from != null && !src) return 'Dieses Heer kann gerade nicht umgeleitet werden';
     if (!src && w.marches.filter(m => m.owner === player.id).length >= armySlots(S)) return 'Alle Heere sind unterwegs (' + armySlots(S) + ')';
     if (src && (src.phase === 'post' || src.phase === 'gather') && o.id === src.tid) return 'Das Heer ist schon dort';
+    const hid = (src && src.hero) || String(cmd.hero || '');
+    if (!HEROES[hid]) return 'Wähle einen Helden als Anführer des Heeres.';
+    if (!(src && src.hero) && heroBusy(w, player.id, hid)) return HEROES[hid].name + ' führt schon ein anderes Heer an.';
     const troops = src ? { ...src.troops } : {};
     if (!src) for (const u of Object.keys(U)) {
       const n = Math.floor(Number((cmd.troops || {})[u] || 0));
@@ -351,7 +390,7 @@ export function command(match, players, player, cmd, now) {
       target = c.target || null;
     }
     if (target && o.k === 'start') o = { ...o, x: target.state.pos[0], y: target.state.pos[1] };
-    const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S) : planMarch(map, S, o, troops);
+    const plan = src ? planFrom(map, cellXY(curCell(src, w.gt)), o.x, o.y, troops, S, hid) : fromOp ? planFrom(map, [fromOp.x, fromOp.y], o.x, o.y, troops, S, hid) : planMarch(map, S, o, troops, hid);
     if (plan.error) return plan.error;
     let carry = null;
     if (src) {
@@ -370,6 +409,7 @@ export function command(match, players, player, cmd, now) {
     else for (const u in troops) { S.troops[u] -= troops[u]; S.away[u] = (S.away[u] || 0) + troops[u]; }
     if (mode === 'build') { const st = storeOf(allianceOf(w, player.id)); RES.forEach((r, i) => { st[r] -= OP_COST[i]; }); }
     const m = launch(ctx, player, troops, plan, mode === 'normal' ? { tk: o.k, tid: o.id } : mode === 'build' ? { tk: 'site', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'post' ? { tk: 'post', tid: o.id, mode, site: { x: o.x, y: o.y } } : mode === 'assist' ? { tk: o.k, tid: o.id, mode, side: assistSide } : { tk: o.k, tid: o.id, mode });
+    m.hero = hid;
     if (src || fromOp) m.redir = true;
     if (carry && Object.keys(carry).length) m.carry = carry;
     if (mode === 'assist' && assistSide === 'att') { if (isProtected(S, w.gt)) S.protUntil = w.gt; S.stats.attacks++; }
@@ -450,14 +490,14 @@ export function viewFor(match, players, me, now) {
       if (op && myAl && op.al === myAl.id) incoming.push({ id: m.id, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', target: 'einen Außenposten', targetId: 0, mine: false, op: true, siege: lead, eta: m.t0 + m.arr[m.arr.length - 1] });
     }
     if (lead && m.fight) {
-      const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null, kind = op ? 'op' : dp ? 'city' : 'other';
+      const bo = map.byId[m.tid], op = (w.outposts || {})[m.tid], dp = bo && bo.k === 'start' ? players.find(x => x.state.slot === bo.slot) : null, oal = op ? w.alliances[op.al] : null, kind = op ? 'op' : dp ? 'city' : 'other', rd = (w.raiders || []).find(x => x.id === m.tid);
       const involved = kind !== 'other' || m.owner === me.id || w.marches.some(x => x.lead === m.id && x.owner === me.id);
       const mineF = m.owner === me.id || friends.includes(m.owner) || (dp && friends.includes(dp.id)) || (op && myAl && op.al === myAl.id) || w.marches.some(x => x.lead === m.id && x.owner === me.id);
-      if (involved) sieges.push({ mine: !!mineF, id: m.id, tid: m.tid, kind, tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : bo && bo.k === 'camp' ? 'Banditenlager Stufe ' + bo.lv : bo && bo.k === 'throne' ? 'den Thron' : bo && bo.k === 'sanct' ? 'ein Heiligtum' : 'ein Heer auf dem Feld', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, pw: hideFoe(fightView(mkCtx(match, players, now), m), (m.owner === me.id || friends.includes(m.owner) || w.marches.some(x => x.lead === m.id && x.side === 'att' && (x.owner === me.id || friends.includes(x.owner)))) ? 'att' : ((dp && friends.includes(dp.id)) || (op && myAl && op.al === myAl.id) || w.marches.some(x => x.lead === m.id && x.side === 'def' && x.owner === me.id)) ? 'def' : ''), px: marchPos(m, gt).x, py: marchPos(m, gt).y });
+      if (involved) sieges.push({ mine: !!mineF, id: m.id, tid: m.tid, kind, tname: dp ? dp.name : oal ? 'Außenposten [' + oal.tag + ']' : bo && bo.k === 'camp' ? 'Banditenlager Stufe ' + bo.lv : rd ? 'Räuber Stufe ' + rd.lv : bo && bo.k === 'throne' ? 'den Thron' : bo && bo.k === 'sanct' ? 'ein Heiligtum' : 'ein Heer auf dem Feld', tpid: dp ? dp.id : 0, tal: op ? op.al : dp ? (allianceOf(w, dp.id) || {}).id || 0 : 0, from: m.name, fromTag: (allianceOf(w, m.owner) || {}).tag || '', tStart: m.tStart, pw: hideFoe(fightView(mkCtx(match, players, now), m), (m.owner === me.id || friends.includes(m.owner) || w.marches.some(x => x.lead === m.id && x.side === 'att' && (x.owner === me.id || friends.includes(x.owner)))) ? 'att' : ((dp && friends.includes(dp.id)) || (op && myAl && op.al === myAl.id) || w.marches.some(x => x.lead === m.id && x.side === 'def' && x.owner === me.id)) ? 'def' : ''), px: marchPos(m, gt).x, py: marchPos(m, gt).y });
     }
     if (!friend && !sees(p.x, p.y)) continue;
     marches.push({ id: m.id, owner: m.owner, name: m.name, slot: m.slot, own, friend, phase: m.phase, mode: m.mode, troops: friend ? m.troops : { n: sum(m.troops) },
-      tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, lead: m.lead, side: m.side, amount: m.amount, res: m.res, load: own ? m.load : undefined });
+      hero: m.hero, tk: m.tk, tid: m.tid, path: m.path, arr: m.arr, t0: m.t0, tStart: m.tStart, tEnd: m.tEnd, lead: m.lead, side: m.side, amount: m.amount, res: m.res, load: own ? m.load : undefined });
   }
   const nodes = {};
   for (const id in w.nodes) nodes[id] = Math.floor(nodeLeft(w, map.byId[id], gt));
@@ -489,6 +529,6 @@ export function viewFor(match, players, me, now) {
     help: (w.help || []).filter(h => h.pid === me.id || (friends.includes(h.pid) && !h.by.includes(me.id))).map(h => { const hp = players.find(x => x.id === h.pid); return { id: h.id, pid: h.pid, name: hp ? hp.name : '?', bid: h.bid, mine: h.pid === me.id, n: h.by.length }; }),
     ally, invites: mineInv, requests: myReq, incoming, sieges, gchat: (w.chat || []).slice(-60), myStations,
     state: S,
-    world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches, outposts }
+    world: { gt, at: w.at, nodes, camps, ruins: w.ruins, marches, outposts, raiders: (w.raiders || []).map(r => ({ id: r.id, lv: r.lv, x: r.x, y: r.y, until: r.until })) }
   };
 }

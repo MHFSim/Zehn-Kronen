@@ -102,7 +102,7 @@ async function load() {
             <button class="btn small" data-cheat="finish" data-id="${m.id}" type="button">Bau, Ausbildung, Forschung fertig</button></div>
           <div class="cbox"><b>Bündnis &amp; Revier</b><div class="inline"><input id="cst${m.id}" type="number" min="1" value="5000"><button class="btn small" data-cheat="store" data-id="${m.id}" type="button">Bündnislager füllen</button></div>
             <button class="btn ghost small" data-cheat="outposts" data-id="${m.id}" type="button">Außenposten sofort fertig</button></div>
-          <div class="cbox"><b>Shop-Gegenstände</b><div class="inline"><input id="ctp${m.id}" type="number" min="0" placeholder="Teleporter"><input id="c5${m.id}" type="number" min="0" placeholder="5 Min."><input id="c60${m.id}" type="number" min="0" placeholder="1 Std."><input id="c480${m.id}" type="number" min="0" placeholder="8 Std."></div>
+          <div class="cbox"><b>Shop-Gegenstände</b><div class="inline"><input id="ctp${m.id}" type="number" min="0" placeholder="Teleporter"><input id="c5${m.id}" type="number" min="0" placeholder="5 Min."><input id="c60${m.id}" type="number" min="0" placeholder="1 Std."><input id="c480${m.id}" type="number" min="0" placeholder="8 Std."><input id="chl${m.id}" type="number" min="1" max="60" placeholder="Helden-Stufe"></div>
             <div class="inline"><button class="btn small" data-cheat="items" data-id="${m.id}" type="button">Geben</button><button class="btn ghost small" data-cheat="resetTp" data-id="${m.id}" type="button">Teleporter-Pause aufheben</button></div></div>
           <div class="cbox"><b>Welt</b><div class="inline"><button class="btn ghost small" data-cheat="revealAll" data-id="${m.id}" type="button">Karte aufdecken</button><button class="btn ghost small" data-cheat="respawn" data-id="${m.id}" type="button">Lager &amp; Vorkommen erneuern</button></div>
             <div class="inline"><button class="btn ghost small" data-cheat="protOff" data-id="${m.id}" type="button">Schutz aufheben</button><button class="btn ghost small" data-cheat="protOn" data-id="${m.id}" type="button">4 Tage Schutz</button></div>
@@ -128,7 +128,7 @@ document.addEventListener('click', async e => {
   else if (k === 'troops') { c.kind = 'troops'; c.count = v('ctc'); c.unit = v('ctu'); }
   else if (k === 'levels') { c.kind = 'levels'; c.level = v('clv'); }
   else if (k === 'store') { c.kind = 'store'; c.amount = v('cst'); }
-  else if (k === 'items') { c.kind = 'items'; c.teleport = v('ctp'); c.sp5 = v('c5'); c.sp60 = v('c60'); c.sp480 = v('c480'); }
+  else if (k === 'items') { c.kind = 'items'; c.teleport = v('ctp'); c.sp5 = v('c5'); c.sp60 = v('c60'); c.sp480 = v('c480'); c.heroLv = v('chl'); }
   else if (k === 'resetTp') { c.kind = 'items'; c.resetTp = true; }
   else if (k === 'revealAll') c.kind = 'reveal';
   else if (k === 'protOff') { c.kind = 'protection'; c.on = false; }

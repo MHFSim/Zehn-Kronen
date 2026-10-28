@@ -3,6 +3,7 @@ import { B, U, RES, cap, addPack } from './rules.js';
 import { ensureState, reveal, flushBits } from './core.js';
 import { N } from './mapgen.js';
 import { syncMatch } from './world.js';
+import { HERO_IDS } from './heroes.js';
 
 const num = (v, d = 0, max = 1e9) => Math.max(0, Math.min(max, Math.floor(Number(v)) || d));
 
@@ -57,6 +58,7 @@ export function cheat(match, players, c, now) {
         const S = p.state; S.items = S.items || {};
         for (const id of ['teleport', 'sp1', 'sp5', 'sp15', 'sp60']) if (num(c[id])) S.items[id] = (S.items[id] || 0) + num(c[id], 0, 999);
         for (let i = 0; i < num(c.pack, 0, 20); i++) addPack(S, ['', 'food', 'wood', 'stone'][i % 4]);
+        if (num(c.heroLv)) for (const id of HERO_IDS) { S.heroes[id].lv = Math.max(1, Math.min(60, num(c.heroLv, 1, 60))); S.heroes[id].xp = 0; }
         if (c.resetTp) S.tpAt = -1e9;
       }
       return '';

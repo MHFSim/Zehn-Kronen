@@ -7,6 +7,8 @@ import {
   mapOf, byId, isProtected, allied, groupOf, groupLabel, groupMembers, allianceOf, removeMember, pushReport, note, chron,
   CAMP_RESPAWN, settleAway, settleHome, sendHome, addTroops, fmtDur, ensureState, GATHER_SEC, cellXY, reversed, fightAt, joinDefenders, leaveDefenders, homeBack
 } from './core.js';
+import { HEROES, heroForce, keeperOf, heroXp, fightXp } from './heroes.js';
+import { addPack, PACK_NAME } from './rules.js';
 import { territory, touchesObj, removeOutposts, releaseAux, opGuard, checkRaid, OP_COST } from './outpost.js';
 
 const FIELD_K = ['farm', 'wood', 'stone'];
@@ -112,7 +114,7 @@ export function arriveField(ctx, m, o, bt, realT, back) {
     const D = byId(players, g.owner); advanceTo(D.state, realT, match.speed);
     const frac = g.phase === 'gather' && g.tEnd > g.tStart ? Math.max(0, Math.min(1, (bt - g.tStart) / (g.tEnd - g.tStart))) : 0;
     g.pre = { phase: g.phase, tStart: g.tStart, tEnd: g.tEnd, amount: g.amount, res: g.res, got: g.phase === 'gather' ? Math.floor(g.amount * frac) : 0 };
-    def = merge(def, g.troops); const k = sum(g.troops); fn += k; ff += k * forceOf(D.state);
+    def = merge(def, g.troops); const k = sum(g.troops); fn += k; ff += k * forceOf(D.state) * heroForce(D.state, g.hero, g.troops, 'def', 'field');
   }
   startFight(ctx, m, def, fn ? ff / fn : 1, bt, 'field');
   for (const g of gs.list) {
@@ -129,7 +131,38 @@ export function arriveField(ctx, m, o, bt, realT, back) {
    Beide Seiten können jederzeit Verstärkung schicken oder ihr Heer abziehen; die Lebensbalken folgen dem Stand der Truppen. */
 const NT = 600, MAXT = 1000;   // Der Kampf läuft in sehr kleinen Zeitschritten (alle paar Sekunden), die Einheiten fallen also laufend
 let CX = null;               // Kontext des laufenden Kampfbefehls (für den Heimweg)
-const multOf = (ctx, list) => { let n = 0, f = 0; for (const x of list) { const P = byId(ctx.players, x.owner), k = sum(x.fc || x.troops); n += k; f += k * (P ? forceOf(P.state) : 1); } return n ? f / n : 1; };
+// Belohnung für besiegte Räuber: Beschleuniger und Ressourcenpakete. Pro Tag gibt es für die ersten 12 Siege die volle Belohnung, danach die Hälfte (ohne Pakete).
+export const RAID_DAILY = 12;
+function raiderReward(S, lv, realT) {
+  const day = Math.floor(realT / 86400000); if (!S.raidDay || S.raidDay.day !== day) S.raidDay = { day, n: 0 };
+  S.raidDay.n++; S.items = S.items || {};
+  const full = S.raidDay.n <= RAID_DAILY, got = {};
+  const add = (id, n) => { n = full ? n : Math.floor(n / 2); if (n > 0) { S.items[id] = (S.items[id] || 0) + n; got[id] = (got[id] || 0) + n; } };
+  if (lv < 10) { add('sp1', 2 + (lv >> 1)); add('sp5', 1); }
+  else if (lv < 20) { add('sp5', 2); add('sp15', 1); }
+  else if (lv < 30) { add('sp15', 2); add('sp5', 2); if (lv >= 25) add('sp60', 1); }
+  else { add('sp60', 1); add('sp15', 2); }
+  const packs = !full ? 0 : lv < 5 ? 0 : lv < 15 ? 1 : lv < 30 ? 2 : 3, names = [];
+  for (let i = 0; i < packs; i++) { const th = ['', 'food', 'wood', 'stone'][(lv + i) % 4]; addPack(S, th); names.push(PACK_NAME[th] || 'Ressourcenpaket'); }
+  return { got, names };
+}
+const SP_NAME = { sp1: '1 Min.', sp5: '5 Min.', sp15: '15 Min.', sp60: '1 Std.' };
+const rewardText = rw => [...Object.keys(rw.got).map(id => rw.got[id] + '× Beschleuniger ' + SP_NAME[id]), ...rw.names].join(', ') || 'keine (Tageslimit erreicht)';
+// Erfahrung für Helden, die im Kampf angeführt haben (Kämpfer-Helden; Sammler-Helden lernen nur beim Sammeln)
+function awardHeroXp(ctx, lead, atts, f, win, startA, startD, kind, bt) {
+  const map = mapOf(ctx.match); let base, tlv = 0;
+  if (kind === 'camp') { const o = map.byId[lead.tid]; tlv = o ? o.lv : 1; base = 40 + 25 * tlv; }
+  else if (kind === 'raider') { tlv = f.rlv; base = 40 + 25 * tlv; }
+  else base = Math.min(1500, 40 + 1.2 * sum(startD));
+  const totA = Math.max(1, sum(startA));
+  for (const x of atts) {
+    const P = byId(ctx.players, x.owner); if (!P || !x.hero || !HEROES[x.hero]) continue;
+    const xp = fightXp(P.state, x.hero, base * Math.min(1, sum(cOf(lead, x)) / totA) * (win ? 1 : 0.2), kind + ':' + lead.tid, tlv, bt);
+    if (heroXp(P.state, x.hero, xp)) note(ctx, P.id, 'hero', HEROES[x.hero].name + ' ist aufgestiegen', HEROES[x.hero].name + ' hat Stufe ' + P.state.heroes[x.hero].lv + ' erreicht.');
+  }
+}
+const foeOf = kind => kind === 'camp' || kind === 'raider' ? 'camp' : 'player';
+const multOf = (ctx, list, kind) => { let n = 0, f = 0; for (const x of list) { const P = byId(ctx.players, x.owner), k = sum(x.fc || x.troops); n += k; f += k * (P ? forceOf(P.state) * heroForce(P.state, x.hero, x.fc || x.troops, 'att', foeOf(kind)) : 1); } return n ? f / n : 1; };
 const cOf = (lead, x) => x === lead ? lead.troops : (x.fc || x.troops);
 const scaleT = (t, k) => { const l = {}; for (const u in t) { const n = Math.round(t[u] * (k[u] || 0)); if (n > 0) l[u] = n; } return l; };
 const ratio = (P, P0) => { const k = {}; for (const u in P0) k[u] = P0[u] > 0 ? Math.max(0, Math.min(1, (P[u] || 0) / P0[u])) : 0; return k; };
@@ -143,7 +176,7 @@ function ticksLeft(A, D, am, dm, k, from = 0, cap = MAXT) {
 }
 
 function startFight(ctx, m, def, dm, bt, kind) {
-  const A = { ...m.troops }, D = { ...def }, n0 = sum(A) + sum(D), P = byId(ctx.players, m.owner), am = P ? forceOf(P.state) : 1;
+  const A = { ...m.troops }, D = { ...def }, n0 = sum(A) + sum(D), P = byId(ctx.players, m.owner), am = P ? forceOf(P.state) * heroForce(P.state, m.hero, m.troops, 'att', foeOf(kind)) : 1;
   const dur = Math.max(600, Math.min(7200, 600 + 6600 * Math.min(1, n0 / 3000)));   // mindestens 10 Minuten, höchstens 2 Stunden
   const r0 = Math.max(1, ticksLeft(A, D, am, dm, .25, 0, 120) * .25), k = r0 / NT;   // so viele Kampfrunden-Einheiten verteilen sich auf die Kampfdauer
   m.phase = 'fight'; m.side = 'att'; m.tStart = bt; m.ft = bt + dur / NT;
@@ -178,7 +211,7 @@ export function freeOrphans(ctx, bt) {
 }
 export function stepFight(ctx, m, bt, realT) {
   CX = ctx;
-  const w = ctx.match.world, f = m.fight, att = [m, ...fightMembers(w, m, 'att')], am = multOf(ctx, att);
+  const w = ctx.match.world, f = m.fight, att = [m, ...fightMembers(w, m, 'att')], am = multOf(ctx, att, f.kind);
   if (f.wall != null) f.dm = f.fm * (1 + f.wb * f.wall);   // die Mauer hilft den Verteidigern nur, solange sie steht
   const before = power(f.D, 1), r = roundStep(f.A, f.D, am, f.dm, f.k); f.A = r.A; f.D = r.D; f.round++;
   if (f.wall != null) f.wall = Math.max(0, f.wall - 1.5 * Math.max(0, before - power(f.D, 1)) / Math.max(1, power(f.D0, 1)));   // Angreifer schlagen die Mauer nieder
@@ -190,12 +223,13 @@ export function stepFight(ctx, m, bt, realT) {
 // Anzeige: Lebensbalken beider Seiten (Stärke jetzt, höchste Stärke bisher) und geschätzte Restzeit (Spielsekunden)
 export function fightView(ctx, m) {
   const w = ctx.match.world, f = m.fight; if (!f) return null;
-  const am = multOf(ctx, [m, ...fightMembers(w, m, 'att')]), pa = power(f.A, am), pd = power(f.D, f.dm);
+  const am = multOf(ctx, [m, ...fightMembers(w, m, 'att')], f.kind), pa = power(f.A, am), pd = power(f.D, f.dm);
   return { kind: f.kind, pa: Math.round(pa), pd: Math.round(pd), pk: Math.round(Math.max(f.pkA, f.pkD, pa, pd)), fa: Math.min(1, pa / Math.max(1, power(f.A0, am))), fd: Math.min(1, pd / Math.max(1, power(f.D0, f.dm))), wall: f.wall == null ? null : f.wall, na: Math.round(sum(f.A)), nd: Math.round(sum(f.D)), na0: Math.round(sum(f.A0)), nd0: Math.round(sum(f.D0)), round: f.round,
     left: ticksLeft(f.A, f.D, am, f.dm, f.k, f.round) * f.dt, tot: Math.max(f.round, ticksLeft(f.A, f.D, am, f.dm, f.k, f.round) + f.round) * f.dt };
 }
 // Kampf gegen ein Banditenlager
 export function startCampFight(ctx, m, o, bt) { startFight(ctx, m, campTroops(o.lv), campMult(o.lv), bt, 'camp'); }
+export function startRaiderFight(ctx, m, r, bt) { startFight(ctx, m, campTroops(r.lv), campMult(r.lv), bt, 'raider'); m.fight.rlv = r.lv; }
 
 function resolveFight(ctx, lead, bt, realT, win) {
   CX = ctx;
@@ -234,6 +268,7 @@ function resolveFight(ctx, lead, bt, realT, win) {
     if (x === lead) { ownLeft = left; sa = s2; }
     else { if (P) PR(P.state, { kind: 'pvp', role: 'att', title: (win ? 'Sieg' : 'Niederlage') + ' im Kampf', win, target: { kind: x.tk, id: x.tid }, text: 'Du hast ' + (sum(c) - sum(left)) + ' von ' + sum(c) + ' Truppen verloren. Die Überlebenden marschieren heim.' }, realT); x.troops = left; if (!sum(left)) x.dead = true; else goBack(x, bt); }
   }
+  awardHeroXp(ctx, lead, atts, f, win, startA, startD, kind, bt);
   lead.troops = ownLeft;
   A.state.stats.kills += sum(startD) - sum(leftD); if (win) A.state.stats.wins++;
   const fin = () => { delete lead.fight; delete lead.ft; delete lead.side; if (!sum(lead.troops)) lead.dead = true; else goBack(lead, bt); };
@@ -242,6 +277,24 @@ function resolveFight(ctx, lead, bt, realT, win) {
     const o = map.byId[lead.tid], info = { kind: o.k, id: o.id, lv: o.lv, x: o.x, y: o.y };
     const rep = { kind: 'camp', title: (win ? 'Sieg über Banditenlager Stufe ' : 'Niederlage vor Banditenlager Stufe ') + o.lv, win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [] };
     if (win) { const loot = campLoot(o.lv); lead.load = loot; rep.loot = loot; w.camps[o.id] = { dead: bt + CAMP_RESPAWN }; }
+    PR(A.state, rep, realT); return fin();
+  }
+  if (kind === 'raider') {
+    const r = (w.raiders || []).find(x => x.id === lead.tid), lv = f.rlv, info = { kind: 'raider', id: lead.tid, lv, x: r ? r.x : 0, y: r ? r.y : 0 };
+    const rep = { kind: 'camp', title: (win ? 'Sieg über Räuber Stufe ' : 'Niederlage gegen Räuber Stufe ') + lv, win, target: info, att: attInfo, def: { start: startD, left: leftD }, rounds: [] };
+    if (win) {
+      w.raiders = (w.raiders || []).filter(x => x.id !== lead.tid);
+      const cl = campLoot(lv), loot = { food: Math.round(cl.food / 2), wood: Math.round(cl.wood / 2), stone: Math.round(cl.stone / 2), gold: Math.round(cl.gold / 2) };
+      lead.load = loot; rep.loot = loot;
+      const tot = Math.max(1, atts.reduce((a, x) => a + sum(cOf(lead, x)), 0)), per = {};
+      for (const x of atts) per[x.owner] = (per[x.owner] || 0) + sum(cOf(lead, x));
+      for (const pid in per) {
+        if (per[pid] / tot < 0.2) continue;   // wer kaum mitgekämpft hat, bekommt keine Belohnung
+        const P = byId(players, Number(pid)); if (!P) continue;
+        const rw = raiderReward(P.state, lv, realT), txt = rewardText(rw);
+        if (P.id === A.id) rep.reward = txt; else note(ctx, P.id, 'camp', 'Räuber besiegt', 'Belohnung: ' + txt);
+      }
+    }
     PR(A.state, rep, realT); return fin();
   }
   if (kind === 'field') {
@@ -388,8 +441,10 @@ export function arriveCity(ctx, m, o, bt, realT, back) {
   for (const pid in SD.stationed) def = merge(def, SD.stationed[pid]);
   for (const u in def) if (!(def[u] > 0)) delete def[u];
   const wv = Math.min(1, ((SD.wall || {}).v == null ? 1 : SD.wall.v) + (bt - ((SD.wall || {}).t || bt)) / 21600);   // Mauer wächst in 6 Stunden Spielzeit wieder zu
-  startFight(ctx, m, def, wallMult(SD) * forceOf(SD), bt, 'city');
-  Object.assign(m.fight, { wall: wv, wall0: wv, wb: wallMult(SD) - 1, fm: forceOf(SD) });
+  const kp = keeperOf(SD, w, D.id), hf = heroForce(SD, kp, def, 'def', 'home');
+  startFight(ctx, m, def, wallMult(SD) * forceOf(SD) * hf, bt, 'city');
+  Object.assign(m.fight, { wall: wv, wall0: wv, wb: wallMult(SD) - 1, fm: forceOf(SD) * hf, keeper: kp });
+  if (kp) note(ctx, D.id, 'hero', HEROES[kp].name + ' verteidigt die Burg', HEROES[kp].name + ' ' + HEROES[kp].title + ' führt die Verteidigung an.');
   const who = [D.id]; const al = allianceOf(w, D.id); if (al) for (const id of al.members) if (id !== D.id) who.push(id);
   note(ctx, D.id, 'attack', 'Kampf um deine Burg!', A.name + tag(w, A.id) + ' kämpft mit ' + sum(m.troops) + ' Truppen vor deiner Burg. Schick Verstärkung und beobachte den Lebensbalken!');
   for (const id of who) if (id !== D.id) note(ctx, id, 'attack', 'Kampf um die Burg eines Verbündeten', A.name + ' kämpft vor der Burg von ' + D.name + '. Schick Verstärkung!');

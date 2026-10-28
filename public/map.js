@@ -906,7 +906,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.rebuildLabels(view);
     this.syncOutposts(view);
     const eg = this.roadEdges(view), sg = JSON.stringify(eg); if (sg !== this.roadSig) { this.roadSig = sg; this.setRoads(eg); }
-    this.syncMarches(view);
+    this.syncMarches(view); this.syncRaiders(view);
     this.smokeList = []; for (const id in this.obj) { const h = this.obj[id]; if (h.smokeOffs && h.smokeOn !== false) for (const off of h.smokeOffs) this.smokeList.push({ h, off }); }
     this.dirtyLabels = true;
   }
@@ -1001,6 +1001,7 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       place(h.lab, o.x + .5, h.grp.position.y + h.lab.up * h.grp.scale.y, o.y + .5, sb);
     }
     this.placeFightBars(place, sb);
+    for (const id in this.raiderObjs || {}) { const s = this.raiderObjs[id]; if (!s.grp.visible || dist > 120) { if (s.lab.vis !== false) { s.lab.el.style.display = 'none'; s.lab.vis = false; } continue; } place(s.lab, s.grp.position.x, s.grp.position.y + 2.5, s.grp.position.z, sb * .9); }
     for (const id in this.marchObjs) {
       const s = this.marchObjs[id]; if (!s.lab) continue;
       if (!s.grp.visible) { s.lab.el.style.display = 'none'; s.lab.vis = false; continue; }
@@ -1059,6 +1060,40 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     this.syncFightBars(view);
   }
 
+  /* ---------- Räuber: kleine KI-Armeen ---------- */
+  syncRaiders(view) {
+    this.raiderObjs = this.raiderObjs || {}; const keep = new Set();
+    for (const r of view.world.raiders || []) {
+      keep.add(r.id); let s = this.raiderObjs[r.id];
+      if (!s) {
+        const grp = new T.Group(), types = r.lv >= 15 ? ['schwer', 'leicht', 'schwert', 'bogen', 'speer'] : r.lv >= 6 ? ['schwert', 'speer', 'bogen', 'leicht'] : ['speer', 'schwert', 'bogen'], figs = [], col = 0x7a2626;
+        types.forEach((type, i) => {
+          const ug = this.unitGeo(type, col, false), g = new T.Group(), body = new T.Mesh(ug.body, this.matVC); body.castShadow = true; g.add(body);
+          for (const geo of [ug.la, ug.lb]) if (geo) { const l = new T.Mesh(geo, this.matVC); l.position.y = ug.hip; l.castShadow = true; g.add(l); }
+          for (const L of ug.legs || []) { const m2 = new T.Mesh(L.g, this.matVC); m2.position.set(L.x, L.y, L.z); m2.castShadow = true; g.add(m2); }
+          const a = i / types.length * Math.PI * 2, cav = type === 'leicht' || type === 'schwer';
+          g.position.set(Math.cos(a) * .85, 0, Math.sin(a) * .85); g.rotation.y = -a + Math.PI / 2; g.scale.setScalar(cav ? 1.5 : 1.7); grp.add(g); figs.push(g);
+        });
+        const pole = new T.Mesh(new T.CylinderGeometry(.04, .04, 2.1, 6), new T.MeshLambertMaterial({ color: 0x3a2a1a })); pole.position.y = 1.05; grp.add(pole);
+        const flag = new T.Mesh(new T.BoxGeometry(.75, .45, .04), new T.MeshLambertMaterial({ color: 0x1a1414 })); flag.position.set(.4, 1.8, 0); grp.add(flag);
+        const fire = new T.Mesh(new T.ConeGeometry(.18, .45, 6), new T.MeshBasicMaterial({ color: 0xff8a2a })); fire.position.set(0, .22, 0); grp.add(fire);
+        this.scene.add(grp);
+        s = this.raiderObjs[r.id] = { grp, figs, flag, fire, lab: this.mkBadge('', 0x4a1f1f) };
+      }
+      s.r = r; const x = r.x + .5, z = r.y + .5; s.grp.position.set(x, Math.max(0, this.yAt(x, z)), z);
+      s.fogHide = !this.exploredBit(r.x, r.y); s.grp.visible = !s.fogHide;
+      this.setBadge(s.lab, '☠ Räuber ' + r.lv, 0x4a1f1f);
+    }
+    for (const id in this.raiderObjs) if (!keep.has(id)) { const s = this.raiderObjs[id]; this.scene.remove(s.grp); s.lab.el.remove(); delete this.raiderObjs[id]; }
+  }
+  animRaiders(t) {
+    for (const id in this.raiderObjs) {
+      const s = this.raiderObjs[id]; if (!s.grp.visible) continue;
+      s.figs.forEach((g, i) => { g.position.y = Math.abs(Math.sin(t * 2.2 + i * 1.3)) * .05; });
+      s.flag.rotation.y = Math.sin(t * 3) * .25; s.fire.scale.y = 1 + Math.sin(t * 9 + 1) * .25; s.fire.scale.x = s.fire.scale.z = 1 + Math.sin(t * 7) * .12;
+    }
+  }
+
   /* ---------- Kampfbalken über dem Ziel ---------- */
   syncFightBars(view) {
     const keep = new Set(); this.fbars = this.fbars || {};
@@ -1076,10 +1111,11 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
   placeFightBars(place, sb) {
     const sp = this.view.match.speed || 1, gt = this.gtNow();
     for (const id in this.fbars) {
-      const b = this.fbars[id], sg = b.sg, h = this.obj[sg.tid], q = this.opObjs && this.opObjs[sg.tid], ms = this.marchObjs[sg.id];
+      const b = this.fbars[id], sg = b.sg, h = this.obj[sg.tid], q = this.opObjs && this.opObjs[sg.tid], ms = this.marchObjs[sg.id], rd = this.raiderObjs && this.raiderObjs[sg.tid];
       let x, y, z;
       if (h) { if (h.fogHide) { b.el.style.display = 'none'; b.vis = false; continue; } x = h.o.x + .5; z = h.o.y + .5; y = h.grp.position.y + ((h.h || 3) + .5) * h.grp.scale.y; }
       else if (q) { x = q.o.x + .5; z = q.o.y + .5; y = 5; }
+      else if (rd) { if (rd.fogHide) { b.el.style.display = 'none'; b.vis = false; continue; } x = rd.grp.position.x; z = rd.grp.position.z; y = rd.grp.position.y + 3.2; }
       else if (ms) { x = ms.grp.position.x; z = ms.grp.position.z; y = ms.grp.position.y + 3; }
       else { b.el.style.display = 'none'; b.vis = false; continue; }
       place(b, x, y, z, sb);
@@ -1342,9 +1378,10 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     if (this.sel && this.sel.type === 'obj') { const h = this.obj[this.sel.id]; if (h) ring = { x: h.o.x + .5, z: h.o.y + .5, r: (KIND_R[h.o.k] || 1.7) * 1.15 + Math.sin(t * 3) * .05 }; }
     else if (this.sel && this.sel.type === 'op') { const q = this.opObjs[this.sel.id]; if (q) ring = { x: q.o.x + .5, z: q.o.y + .5, r: 1.5 + Math.sin(t * 3) * .05 }; }
     else if (this.sel && this.sel.type === 'site') ring = { x: this.sel.x + .5, z: this.sel.y + .5, r: .9 + Math.sin(t * 4) * .07 };
+    else if (this.sel && this.sel.type === 'raider') { const s = this.raiderObjs && this.raiderObjs[this.sel.id]; if (s) ring = { x: s.grp.position.x, z: s.grp.position.z, r: 1.7 + Math.sin(t * 3) * .05 }; }
     else if (this.sel && this.sel.type === 'march') { const s = this.marchObjs[this.sel.id]; if (s) ring = { x: s.grp.position.x, z: s.grp.position.z, r: 1 }; }
     if (ring) { this.ringMesh.visible = true; this.ringMesh.position.set(ring.x, Math.max(0, this.yAt(ring.x, ring.z)) + .15, ring.z); this.ringMesh.scale.setScalar(ring.r); } else this.ringMesh.visible = false;
-    this.stepSmoke(t);
+    this.stepSmoke(t); this.animRaiders(t);
     this.projectLabels();
     this.renderer.render(this.scene, this.camera);
   }
@@ -1404,6 +1441,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       if (d < 1 && d < bd) { bd = d; best = { type, id, ...extra }; }
     };
     for (const id in this.marchObjs) { const s = this.marchObjs[id]; if (s.grp.visible) test('march', Number(id), s.grp.position.x, s.grp.position.y + .5, s.grp.position.z, .9); }
+    if (best) return best;
+    for (const id in this.raiderObjs || {}) { const s = this.raiderObjs[id]; if (s.grp.visible) test('raider', id, s.grp.position.x, s.grp.position.y + .9, s.grp.position.z, 1.6); }
     if (best) return best;
     for (const id in this.opObjs) { const q = this.opObjs[id]; if (q.fogHide) continue; test('op', id, q.o.x + .5, q.grp.position.y + 1.8, q.o.y + .5, 1.6); }
     if (best) return best;

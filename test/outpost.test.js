@@ -1,6 +1,8 @@
 // Prüfung von Revier, Außenposten, Bündnislager, Teleporter und Shop: `npm test`
 import assert from 'node:assert/strict';
-import { syncMatch, addPlayer, command, viewFor } from '../shared/world.js';
+import { syncMatch, addPlayer, command as rawCommand, viewFor } from '../shared/world.js';
+import { heroShim } from './helper.js';
+const command = heroShim(rawCommand);
 import { newWorld, mapOf, DAY } from '../shared/core.js';
 import { NODE_KINDS } from '../shared/mapgen.js';
 import { checkSite, checkTeleport, territory, touches, inside, cityR, towersOf, OP_R, OP_BUILD, OP_COST, storeOf, opBuildTime } from '../shared/outpost.js';

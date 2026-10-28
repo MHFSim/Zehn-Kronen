@@ -1,7 +1,9 @@
 // Tägliche Aufgaben, Ressourcenpakete, Bündnishilfe: `npm test`
 import assert from 'node:assert/strict';
 import { newWorld } from '../shared/core.js';
-import { syncMatch, addPlayer, command, viewFor } from '../shared/world.js';
+import { syncMatch, addPlayer, command as rawCommand, viewFor } from '../shared/world.js';
+import { heroShim } from './helper.js';
+const command = heroShim(rawCommand);
 import { questAdd, dailyDone, packContent, addPack, makeQuests, DAILY_SPEED_GIFT, ITEMS, SPEED_IDS } from '../shared/rules.js';
 import { scoreOf } from '../shared/war.js';
 
