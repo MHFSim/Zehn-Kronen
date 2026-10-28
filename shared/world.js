@@ -8,7 +8,7 @@ import { battle, campTroops, campMult, campLoot, sum, capacityOf, forceOf } from
 import {
   DAY, GATHER_SEC, CAMP_RESPAWN, VIEW_CITY, VIEW_ARMY, allianceCap, mapOf, newWorld, ensureWorld, ensureState, nodeLeft, NODE_EMPTY, campAlive,
   reveal, flushBits, planMarch, marchPos, nextT, reversed, launch, addTroops, pushReport, note, chron, byId, allianceOf, groupLabel, groupOf,
-  settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack
+  settleAway, fmtDur, cellXY, planFrom, allied, isProtected, fightAt, joinDefenders, homeBack, standIdx
 } from './core.js';
 import { startCampFight, attachTo, stepFight, fightView, fightMembers, withdraw, freeOrphans, arriveRaid, arriveAssist, checkAssist, afterLaunch, applyBonuses, arriveCity, arriveField, arriveHold, checkEnd, checkLaunch, dismissStation, holdRecall, protectNew, purge, rankingOf, recallStation, spy, vassalStep } from './war.js';
 import { socialCommand } from './social.js';
@@ -209,7 +209,8 @@ export function removePlayer(match, players, pid, now) {
 
 // Zelle, auf der ein stehendes oder laufendes Heer gerade ist
 function curCell(m, gt) {
-  if (m.phase === 'post' || m.phase === 'gather' || m.phase === 'fight') return m.path[m.path.length - 1];
+  if (m.phase === 'fight') return m.path[standIdx(m)];   // im Kampf steht das Heer vor dem Ziel, von dort geht es weiter
+  if (m.phase === 'post' || m.phase === 'gather') return m.path[m.path.length - 1];
   const p = marchPos(m, gt); return m.path[Math.min(m.path.length - 1, p.i + (p.frac >= .5 ? 1 : 0))];
 }
 // Heer von seinem jetzigen Ort nach Hause schicken (neu geplanter Weg)
