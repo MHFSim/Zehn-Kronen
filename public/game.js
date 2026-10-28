@@ -1009,7 +1009,7 @@ function heroStageHTML(id) {
   return `<div class="hscene fx-${H.fx}" style="--hc:${H.col}" key="${id}">
       <img class="hart" src="${HERO_ART[id] || HERO_PIC[id] || ''}" alt="" draggable="false"${HERO_POS[id] ? ' style="object-position:' + HERO_POS[id] + '"' : ''}><span class="hglow"></span>
       <i></i><i></i><i></i><i></i><i></i><i></i>
-      <div class="hover"><div class="htags"><span>${H.role === 'gather' ? 'Sammler' : 'Kämpfer'}</span>${sk.map(x => `<span>${SK_ICO[x.k] || ''} ${x.name}</span>`).join('')}</div>
+      <div class="hover"><div class="htags"><span>${H.role === 'gather' ? 'Sammler' : 'Kämpfer'}</span>${sk.map(x => `<span><i class="tki">${SK_ICO[x.k] || ''}</i><em>${x.name}</em></span>`).join('')}</div>
         <h2>${H.name}</h2><div class="hsub">${H.title}</div></div>
     </div>
     <div class="hbody" style="--hc:${H.col}">
