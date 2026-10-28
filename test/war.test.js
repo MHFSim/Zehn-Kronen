@@ -304,9 +304,9 @@ function sumT(t) { return Object.values(t).reduce((x, y) => x + y, 0); }
   const rb = a.state.reports.length; adv(match, players, 1700); assert.equal(a.state.reports.length, rb, 'nach 28 Minuten noch kein Bericht');
   adv(match, players, 200); assert.equal(a.state.spies.length, 0); assert.equal(a.state.silver, 1, 'Einsatz verloren');
   assert.equal(a.state.reports[0].win, false); assert.match(b.state.feed[0].body, /P1.*erwischt/); assert.match(b.state.feed[0].title, /Späher erwischt/);
-  // mehr Silber als der Gegner: Erfolg, Silber kommt zurück, voller Bericht ohne Heldenstufen
+  // mehr Silber als der Gegner: Erfolg (Silber trotzdem weg), voller Bericht ohne Heldenstufen
   a.state.silver = 5; assert.equal(run(match, players, clock, a, { type: 'spy', target: b.id, silver: 3 }), ''); adv(match, players, 1800);
-  const rep = a.state.reports[0]; assert.equal(rep.win, true); assert.equal(a.state.silver, 5, 'Einsatz zurück');
+  const rep = a.state.reports[0]; assert.equal(rep.win, true); assert.equal(a.state.silver, 2, 'Einsatz ist auch bei Erfolg weg');
   assert.ok(rep.spy.lv && rep.spy.tech && rep.spy.home && rep.spy.res && !JSON.stringify(rep.spy).includes('heroes'));
 }
 

@@ -1455,7 +1455,7 @@ function pickerHTML(closeBtn) {
 function spyBlock(p) {
   const run = (S.spies || []).find(x => x.target === p.id), si = S.silver || 0;
   if (run) return `<div class="row"><span class="note">🔍 Dein Späher ist unterwegs, noch ${fmtT(real(Math.max(0, run.done - gtNow())))} · Einsatz ${fmtN(run.stake)} Silber</span></div>`;
-  return `<div class="block"><h3>Spähen · ${fmtT(real(SPY_SEC))}</h3><p class="note">Setze Silber ein: Hat ${esc(p.name)} weniger Silber in der Burg, gelingt es und du bekommst dein Silber zurück. Sonst ist es weg und ${esc(p.name)} erfährt davon. Du hast ${fmtN(si)} Silber (Tausch im Rathaus).</p>
+  return `<div class="block"><h3>Spähen · ${fmtT(real(SPY_SEC))}</h3><p class="note">Setze Silber ein: Hat ${esc(p.name)} weniger Silber in der Burg, gelingt es. Sonst scheitert es und ${esc(p.name)} erfährt davon. Das eingesetzte Silber ist in beiden Fällen weg. Du hast ${fmtN(si)} Silber (Tausch im Rathaus).</p>
     <div class="row"><input class="qn" id="spyStake" type="number" inputmode="numeric" min="1" max="${si}" value="${Math.min(si, Math.max(1, spyStakeN))}" aria-label="Silber einsetzen"><button class="btn" type="button" data-act="spy" data-pid="${p.id}" ${si >= 1 ? '' : 'disabled'}>Spähen</button></div></div>`;
 }
 let spyStakeN = 1;
