@@ -555,9 +555,9 @@ void main(){
 
 // Grafik „Hoch": Wasser mit Himmelsspiegelung am flachen Blickwinkel, zweiter Wellenschicht und feinerem Glitzern
 const waterHi = fs => fs.replace('gl_FragColor=vec4(col,a);', `
-  float fr=pow(1.0-clamp(normalize(cameraPosition-vW).y,0.0,1.0),3.0); col=mix(col,vec3(.50,.64,.84),fr*.38);
+  float fr=pow(1.0-clamp(normalize(cameraPosition-vW).y,0.0,1.0),3.0); col=mix(col,vec3(.46,.58,.76),fr*.24);
   float w2=sin(vW.x*5.1-t*1.7+n*7.0)*sin(vW.z*4.6+t*1.4+n*6.0); col+=vec3(.035,.05,.06)*w2*(1.0-d*.5);
-  float sp2=pow(max(0.0,sin((vW.x-vW.z)*6.0+t*3.1+n*13.0)),60.0)*vn(p*6.0-t*.5); col+=vec3(.8,.86,.86)*sp2*.7*(1.0-d*.5);
+  float sp2=pow(max(0.0,sin((vW.x-vW.z)*6.0+t*3.1+n*13.0)),60.0)*vn(p*6.0-t*.5); col+=vec3(.8,.86,.86)*sp2*.4*(1.0-d*.5);
   gl_FragColor=vec4(col,a);`);
 const SKIRT = { camp: [[112, 94, 68], 2.1], ruin: [[112, 106, 90], 1.9] };
 const KIND_R = { start: 2.8, tower: 2.4, throne: 3.4, sanct: 2.3, farm: 1.7, wood: 1.6, stone: 1.6, camp: 1.9, ruin: 1.7 };
@@ -589,7 +589,7 @@ export class WorldMap {
     sh.radius = hi ? 2.5 : 1; sh.bias = hi ? -.0004 : -.0006;
     let redo = false;
     if (!this.rim) { this.rim = new T.DirectionalLight(0x9fbcff, 0); this.rim.position.set(-34, 16, -42); this.scene.add(this.rim, this.rim.target); redo = true; }
-    this.rim.intensity = hi ? .42 : 0; this.hemi.intensity = hi ? .7 : .82; this.sun.intensity = hi ? 1.42 : 1.2; this.sun.color.setHex(hi ? 0xffd08a : 0xffd9a0);
+    this.rim.intensity = hi ? .42 : 0; this.hemi.intensity = hi ? .64 : .82; this.sun.intensity = hi ? 1.22 : 1.2; this.sun.color.setHex(hi ? 0xffd08a : 0xffd9a0);
     if (!r.shadowMap.enabled) { r.shadowMap.enabled = true; this.sun.castShadow = true; this.perf1 = 0; redo = true; }
     this.grace = this.time + 4; this.hiDown = 0;
     if (redo) this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
@@ -1532,12 +1532,12 @@ function makePost(r, scene, camera, W, H) {
     rt.texture.encoding = T.sRGBEncoding;   // Materialien schreiben wie auf dem Bildschirm sRGB-kodiert, so passen auch die eigenen Shader
     const c = new T.EffectComposer(r, rt); c.setPixelRatio(pr); c.setSize(W, H);
     c.addPass(new T.RenderPass(scene, camera));
-    const bloom = new T.UnrealBloomPass(new T.Vector2(W, H), .2, .5, .9); c.addPass(bloom);
+    const bloom = new T.UnrealBloomPass(new T.Vector2(W, H), .1, .45, .96); c.addPass(bloom);
     if (!ms && T.FXAAShader) { const fx = new T.ShaderPass(T.FXAAShader); fx.material.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); c.addPass(fx); c.fxaa = fx; }
     const grade = new T.ShaderPass({
       uniforms: { tDiffuse: { value: null } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-      fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c=texture2D(tDiffuse,vUv); vec3 col=c.rgb; float l=dot(col,vec3(.299,.587,.114)); col=mix(vec3(l),col,1.1); col=(col-.5)*1.06+.5; col*=vec3(1.02,1.0,.97); float d=distance(vUv,vec2(.5)); col*=1.0-smoothstep(.42,.95,d)*.3; gl_FragColor=vec4(col,c.a); }'
+      fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c=texture2D(tDiffuse,vUv); vec3 col=c.rgb; float l=dot(col,vec3(.299,.587,.114)); col=mix(vec3(l),col,1.06); col=(col-.5)*1.03+.5; col*=vec3(.97,.96,.93); float d=distance(vUv,vec2(.5)); col*=1.0-smoothstep(.42,.95,d)*.3; gl_FragColor=vec4(col,c.a); }'
     });
     c.addPass(grade);
     return { c, bloom, pr, setSize(w, h) { c.setSize(w, h); bloom.resolution.set(w, h); if (c.fxaa) c.fxaa.material.uniforms.resolution.value.set(1 / (w * this.pr), 1 / (h * this.pr)); }, render(dt) { c.render(dt); }, dispose() { try { c.renderTarget1.dispose(); c.renderTarget2.dispose(); } catch (e) { /* egal */ } } };

@@ -310,7 +310,7 @@ export class CityView {
     r.setPixelRatio(hi ? Math.min(dpr, 3) : Math.min(dpr, 2)); if (this.W) r.setSize(this.W, this.H);
     const sz = hi ? 4096 : 2048; if (sh.mapSize.x !== sz) { sh.mapSize.set(sz, sz); if (sh.map) { sh.map.dispose(); sh.map = null; } }
     sh.radius = hi ? 2.5 : 1; sh.bias = hi ? -.0004 : -.0006;
-    this.fillL.intensity = hi ? .55 : .35; this.hemiL.intensity = hi ? .72 : .8; this.sun.intensity = hi ? 1.65 : 1.55; r.toneMappingExposure = hi ? 1.34 : 1.28;
+    this.fillL.intensity = hi ? .45 : .35; this.hemiL.intensity = hi ? .66 : .8; this.sun.intensity = hi ? 1.4 : 1.55; r.toneMappingExposure = hi ? 1.12 : 1.28;
   }
   resize() {
     const w = window.innerWidth, h = window.innerHeight; this.W = w; this.H = h; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); if (this.post) this.post.setSize(w, h);
