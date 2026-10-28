@@ -252,7 +252,7 @@ function renderHud() {
   for (const m of ownMarches()) { const st = marchState(m); parts.push(`<button class="chip go" type="button" data-march="${m.id}">${marchLine(m)}${st.moving ? `<span class="mini"><i style="width:${Math.round(st.pct * 100)}%"></i></span>` : ''}</button>`); }
   if (ownMarches().filter(m => m.phase !== 'back').length >= 2) parts.push('<button class="chip go" type="button" data-recallall="1">⌂ Alle heimrufen</button>');
   $('hud').innerHTML = parts.join('');
-  renderPts(); renderHelpPop(); renderArmyBtns();
+  renderPts(); renderHelpPop(); renderArmyBtns(); if (view && S) placeStep();
 }
 // Runde Heer-Knöpfe rechts auf der Karte: das Symbol zeigt den Anführer; antippen wählt das Heer, der nächste Tipp auf die Karte schickt es dorthin
 function renderArmyBtns() {
