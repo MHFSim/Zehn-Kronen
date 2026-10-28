@@ -111,6 +111,17 @@ export function socialCommand(ctx, me, cmd) {
       if (mine.chat.length > MAX_CHAT) mine.chat.splice(0, mine.chat.length - MAX_CHAT);
       return '';
     }
+    case 'allyAnnounce': {   // Ankündigungen: nur der Anführer schreibt, alle Mitglieder lesen
+      if (!mine) return 'Du bist in keinem Bündnis.';
+      if (mine.leader !== me.id) return 'Nur der Anführer kann Ankündigungen schreiben.';
+      const text = String(cmd.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400);
+      if (!text) return 'Leere Ankündigung.';
+      mine.ann = mine.ann || [];
+      mine.ann.push({ id: mine.nextMsg++, t: Math.round(ctx.realT || ctx.now || Date.now()), pid: me.id, name: me.name, text });
+      if (mine.ann.length > 30) mine.ann.splice(0, mine.ann.length - 30);
+      for (const id of mine.members) if (id !== me.id) note(ctx, id, 'ally', 'Ankündigung im Bündnis', text.slice(0, 120));
+      return '';
+    }
     default: return 'Unbekannter Befehl';
   }
 }

@@ -530,7 +530,7 @@ export function viewFor(match, players, me, now) {
     const h = w.holds[oid], mine = myAl ? h.group === 'a' + myAl.id : h.group === 'p' + me.id;
     return { id: oid, group: h.group, label: groupLabel(w, players, h.group), since: h.since, mine, garr: mine ? h.garr : undefined, total: Object.values(h.garr).reduce((a, t) => a + sum(t), 0) };
   });
-  const ally = myAl ? { id: myAl.id, name: myAl.name, tag: myAl.tag, color: myAl.color || '', leader: myAl.leader, members: myAl.members, store: { ...storeOf(myAl) }, fields: clanFields(match, players, myAl, w.gt), fieldIncome: FIELD_INCOME, chat: myAl.chat.slice(-60),
+  const ally = myAl ? { id: myAl.id, name: myAl.name, tag: myAl.tag, color: myAl.color || '', leader: myAl.leader, members: myAl.members, store: { ...storeOf(myAl) }, fields: clanFields(match, players, myAl, w.gt), fieldIncome: FIELD_INCOME, chat: myAl.chat.slice(-60), ann: (myAl.ann || []).slice(-30),
     requests: w.pending.filter(x => x.al === myAl.id && x.kind === 'request').map(x => ({ id: x.id, pid: x.pid, name: nameOf(x.pid) })),
     invites: w.pending.filter(x => x.al === myAl.id && x.kind === 'invite').map(x => ({ id: x.id, pid: x.pid, name: nameOf(x.pid) })) } : null;
   const myStations = players.filter(p => p.id !== me.id && p.state.stationed && p.state.stationed[me.id]).map(p => ({ host: p.id, name: p.name, troops: p.state.stationed[me.id] }));

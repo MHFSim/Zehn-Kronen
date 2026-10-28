@@ -264,7 +264,7 @@ function renderPts() {
   const t = `🏅 <b>${fmtN(scoreOf(S))}</b> Punkte`; if (el.innerHTML !== t) el.innerHTML = t;
   let mu = $('mutChip'); if (!mu) { mu = document.createElement('div'); mu.id = 'mutChip'; mu.className = 'ptschip'; document.body.appendChild(mu); }
   mu.hidden = false; mu.style.top = ((tb ? tb.offsetHeight : 60) + 6 + el.offsetHeight + 6) + 'px';
-  const t2 = `💪 Mut <b>${Math.floor(S.mut == null ? MUT_MAX : S.mut)}</b>/${MUT_MAX}`; if (mu.innerHTML !== t2) mu.innerHTML = t2;
+  const t2 = `💪 <b>${Math.floor(S.mut == null ? MUT_MAX : S.mut)}</b>`; if (mu.innerHTML !== t2) { mu.innerHTML = t2; mu.title = 'Mut (max. ' + MUT_MAX + ')'; mu.classList.add('small'); }
 }
 // Bündnishilfe: kleine Popups mit Hilfe-Symbol
 function renderHelpPop() {
@@ -643,7 +643,7 @@ function allyHTML() {
     return phead('🛡️', 'Bündnis', 'Du bist in keinem Bündnis') + ptabs([['inv', 'Einladungen', invs.length], ['list', 'Bündnisse'], ['found', 'Gründen']], tab, 'atab') + body;
   }
   const lead = a.leader === me.id, reqN = (a.requests || []).length;
-  const tab = ['ov', 'lager', 'chat', 'adm'].includes(allyTab) ? allyTab : 'ov';
+  const tab = ['ov', 'lager', 'chat', 'shop', 'adm'].includes(allyTab) ? allyTab : 'ov';
   const members = a.members.map(id => {
     const p = match.players.find(x => x.id === id) || {};
     const st = p.out ? 'ausgeschieden' : p.vassalOf ? 'Vasall' : p.protUntil > gtNow() ? 'geschützt' : '';
@@ -656,18 +656,19 @@ function allyHTML() {
   const invForm = a.members.length >= cap ? `<p class="note">Das Bündnis ist voll.</p>` : free.length ? `<div class="chatform"><select id="alInv">${free.map(p => `<option>${esc(p.name)}</option>`).join('')}</select><button class="btn small" data-act="allyInvite" type="button">Einladen</button></div>` : '<p class="note">Alle anderen Spieler sind schon in einem Bündnis oder ausgeschieden.</p>';
   const stat = Object.keys(S.stationed || {}).map(pid => `<div class="mrow"><div><b>${esc(pname(Number(pid)))}</b><div class="note">${troopsLine(S.stationed[pid])}</div></div><button class="btn ghost small" data-act="stationDismiss" data-pid="${pid}" type="button">Zurückschicken</button></div>`).join('');
   const mine = (view.myStations || []).map(x => `<div class="mrow"><div><b>${esc(x.name)}</b><div class="note">${troopsLine(x.troops)}</div></div><button class="btn ghost small" data-act="stationRecall" data-pid="${x.host}" type="button">Zurückrufen</button></div>`).join('');
-  const chat = (a.chat || []).map(c => `<div class="msg ${c.name === me.name ? 'mine' : ''}"><b>${esc(c.name)}</b><small>${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<p class="note">Noch keine Nachrichten. Schreib die erste!</p>';
+  const chat = (a.ann || []).slice().reverse().map(c => `<div class="msg"><b>${esc(c.name)}</b><small>${ago(c.t)}</small><br>${esc(c.text)}</div>`).join('') || '<p class="note">Noch keine Ankündigungen.</p>';
   const body = tab === 'ov' ? `<div class="block"><h3>Mitglieder</h3>${members}</div>
       <div class="block"><h3>Verstärkung</h3><p class="note">In deiner Burg: ${fmtN(stationTotal())} von ${fmtN(60 * S.lv.rathaus)} fremden Truppen (Platz wächst mit dem Rathaus). Sie helfen bei der Verteidigung. Neue schickst du über die Karte: Burg des Verbündeten antippen, Stationieren.</p>${stat || '<p class="note">Im Moment liegen keine fremden Truppen bei dir.</p>'}
       <h3 style="margin-top:12px">Deine Truppen bei Verbündeten</h3>${mine || '<p class="note">Keine.</p>'}</div>`
     : tab === 'lager' ? revierHTML()
-    : tab === 'chat' ? `<div class="block"><div class="msgs" id="chatBox">${chat}</div><div class="chatform"><input id="alMsg" maxlength="300" placeholder="Nachricht an das Bündnis" autocomplete="off"><button class="btn small" data-act="allyChat" type="button">Senden</button></div></div>`
+    : tab === 'chat' ? `<div class="block"><h3>Ankündigungen</h3>${lead ? '<div class="chatform"><input id="alMsg" maxlength="400" placeholder="Ankündigung an alle Mitglieder" autocomplete="off"><button class="btn small" data-act="allyAnnounce" type="button">Senden</button></div>' : '<p class="note">Hier schreibt nur der Anführer. Zum Unterhalten nutze den Bündnis-Chat auf der Karte (Sprechblase links unten).</p>'}<div class="msgs" id="chatBox" style="max-height:none;margin-top:8px">${chat}</div></div>`
+    : tab === 'shop' ? shopHTML()
     : `${reqs ? `<div class="block"><h3>Beitrittsanfragen</h3>${reqs}</div>` : ''}
       ${lead ? `<div class="block"><h3>Farbe des Reviers</h3><div class="swatches">${['#c8372d', '#2f6fd1', '#e2b02e', '#3f9d4c', '#8a4bc4', '#e0782b', '#27a7a1', '#d9609c', '#9aa5b1', '#b9d03a', '#ffffff', '#1c1c1c'].map(c => `<button type="button" class="sw ${(a.color || '').toLowerCase() === c ? 'on' : ''}" style="background:${c}" data-act="allyColor" data-c="${c}" aria-label="Farbe ${c}"></button>`).join('')}</div><p class="note">So sehen alle Mitglieder euer Revier und eure Außenposten.</p></div>` : ''}
       <div class="block"><h3>Spieler einladen</h3>${invd}${invForm}</div>
       <div class="block"><h3>Regeln</h3>${intro}</div>
       <div class="block"><button class="btn ${armedKey === 'leave' ? 'danger' : 'ghost'}" data-act="allyLeave" type="button">${armedKey === 'leave' ? 'Wirklich austreten' : 'Bündnis verlassen'}</button>${lead ? '<p class="note">Als Anführer kannst du die Führung vorher übergeben. Verlässt du es, übernimmt das nächste Mitglied.</p>' : ''}</div>`;
-  return phead('🛡️', `${esc(a.name)} <span class="tag">${esc(a.tag)}</span>`, `${a.members.length} von ${cap} Mitgliedern`) + ptabs([['ov', 'Übersicht'], ['lager', 'Revier & Lager'], ['chat', 'Chat'], ['adm', lead ? 'Verwaltung' : 'Einladen', reqN]], tab, 'atab') + body;
+  return phead('🛡️', `${esc(a.name)} <span class="tag">${esc(a.tag)}</span>`, `${a.members.length} von ${cap} Mitgliedern`) + ptabs([['ov', 'Übersicht'], ['lager', 'Revier'], ['chat', 'Ansagen'], ['shop', 'Shop'], ['adm', lead ? 'Verwaltung' : 'Einladen', reqN]], tab, 'atab') + body;
 }
 
 /* ---------- Mehr: Partie, Rangliste, Chronik, Erste Schritte, Einstellungen ---------- */
@@ -884,7 +885,7 @@ function panelSignature() {
   if (panelName === 'train') return JSON.stringify([trainTab, S.lv, S.troops, pick, Object.fromEntries(Object.entries(S.train).map(([k, l]) => [k, l.map(o => o.unit + o.count)])), U && Object.keys(U).map(u => afford(S, U[u].cost.map(c => c * (pick[u] || 10))))]);
   if (panelName === 'units') return JSON.stringify([S.troops, S.away, S.wounded, S.train, S.lv]);
   if (panelName === 'heroes') return JSON.stringify([S.heroes, S.defHero, S.defDeputy, heroSel, ownMarches().map(m => m.hero)]);
-  if (panelName === 'ally') return JSON.stringify([allyTab, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
+  if (panelName === 'ally') return JSON.stringify([allyTab, allyTab === 'shop' ? [Math.floor(S.res.gold / 10), S.items, S.tpAt, S.startTp] : 0, view.world.outposts, Math.floor(gtNow() / 300), view.ally, view.invites, view.requests, match.alliances, match.players.map(p => p.id + ':' + p.ally + p.out + p.vassalOf), S.stationed, view.myStations, match.cap, S.lv.rathaus, armedKey]);
   return JSON.stringify([moreSub, moreSub === 'daily' ? [S.daily, S.packs && S.packs.length, Math.floor(serverNow() / 30000)] : 0, view.world.outposts, match.phase, match.ranking, (match.chron || []).length, S.feed.length, S.feedSeen, S.lv, S.reports.length, view.ally && view.ally.store, Math.floor(S.res.gold / 10), S.items, S.tpAt, !!view.ally, (match.holds || []).map(h => h.id + h.label), pushOn, pushMsg, S.stats]);
 }
 /* ---------- Helden ---------- */
@@ -1007,6 +1008,7 @@ function setupPanel() {
     if (act === 'allyKick') { if (!twice('kick' + d.pid)) return renderPanel(true); return void command({ type: 'allyKick', pid: Number(d.pid) }); }
     if (act === 'allyLead') { if (!twice('lead' + d.pid)) return renderPanel(true); return void command({ type: 'allyLead', pid: Number(d.pid) }); }
     if (act === 'allyLeave') { if (!twice('leave')) return renderPanel(true); return void command({ type: 'allyLeave' }); }
+    if (act === 'allyAnnounce') { const t = val('alMsg').trim(); if (!t) return; const ok = await command({ type: 'allyAnnounce', text: t }); if (ok) renderPanel(true); return; }
     if (act === 'allyChat') { const t = val('alMsg').trim(); if (!t) return; const ok = await command({ type: 'allyChat', text: t }); if (ok) { const i = document.getElementById('alMsg'); if (i) { i.value = ''; i.focus(); } } return; }
     if (act === 'stationRecall') return void command({ type: 'stationRecall', host: Number(d.pid) });
     if (act === 'stationDismiss') return void command({ type: 'stationDismiss', owner: Number(d.pid) });
@@ -1020,7 +1022,7 @@ function setupPanel() {
       if (r.ok) { document.getElementById('pwOld').value = ''; document.getElementById('pwNew').value = ''; }
     }
   });
-  $('sidePanelInner').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'alMsg') { e.preventDefault(); $('sidePanelInner').querySelector('[data-act=allyChat]').click(); } });
+  $('sidePanelInner').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'alMsg') { e.preventDefault(); const bt = $('sidePanelInner').querySelector('[data-act=allyAnnounce],[data-act=allyChat]'); if (bt) bt.click(); } });
 }
 
 
@@ -1040,6 +1042,19 @@ function placeInfo(t) {
   const chip = (ico, name, k) => `<span class="${cnt[k] ? '' : 'z'}" title="${name}: ${cnt[k]}${cnt[k] ? ' (Stufe ' + lv[k] + ' gesamt)' : ''}">${ico} ${cnt[k]}</span>`;
   $('placeInfo').innerHTML = chip('🌾', 'Nahrung', 'farm') + chip('🪵', 'Holz', 'wood') + chip('🪨', 'Stein', 'stone')
     + (cnt.sanct ? `<span title="Heiligtum">✨ ${cnt.sanct}</span>` : '') + (cnt.throne ? '<span title="Thron">👑</span>' : '');
+}
+// Pfeil am Bildschirmrand, wenn die eigene Burg nicht im Blick ist
+function homeStep() {
+  let el = $('homeArrow');
+  if (!el) { el = document.createElement('button'); el.id = 'homeArrow'; el.hidden = true; el.innerHTML = '<span class="ha-ico">🏰</span><i class="ha-tip"></i>'; document.body.appendChild(el); el.onclick = () => { if (S && S.pos) wm.panTo(S.pos[0] + .5, S.pos[1] + .5); }; }
+  if (mode !== 'map' || !S || S.slot < 0 || S.out || !S.pos || panelName || !wm.screenOf) { el.hidden = true; return; }
+  const p = wm.screenOf(S.pos[0] + .5, wm.yAt ? Math.max(0, wm.yAt(S.pos[0] + .5, S.pos[1] + .5)) : 0, S.pos[1] + .5), W = wm.W, H = wm.H, m = 36;
+  const behind = p.z > 1;
+  if (!behind && p.x > 0 && p.x < W && p.y > 0 && p.y < H) { el.hidden = true; return; }
+  const cx = W / 2, cy = H / 2; let dx = p.x - cx, dy = p.y - cy; if (behind) { dx = -dx; dy = -dy; }
+  const k = Math.min((W / 2 - m) / Math.abs(dx || 1e-6), (H / 2 - m - 70) / Math.abs(dy || 1e-6));
+  el.hidden = false; el.style.left = (cx + dx * k) + 'px'; el.style.top = (cy + dy * k) + 'px';
+  el.querySelector('.ha-tip').style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
 }
 function placeStep() {
   const show = mode === 'map' && view && (view.ally || S.startTp > 0) && !msel && view.match.phase === 'running' && !panelName && $('reports').hidden;
@@ -1329,7 +1344,7 @@ function pickerHTML() {
 function siteCtx() {
   const m = view.match, gt = gtNow();
   return { mt: { seed: m.seed, world: { gt, alliances: Object.fromEntries((m.alliances || []).map(a => [a.id, a])), outposts: Object.fromEntries((view.world.outposts || []).map(o => [o.id, o])) } },
-    pls: m.players.map(p => ({ id: p.id, name: p.name, state: { out: p.out, slot: p.slot, pos: p.pos, lv: { rathaus: p.rathaus } } })) };
+    pls: m.players.map(p => ({ id: p.id, name: p.name, state: { out: p.out, slot: p.slot, pos: p.pos, lv: { rathaus: p.rathaus }, explored: p.id === me.id ? S.explored : '' } })) };
 }
 const opOwnerName = o => { const a = (view.match.alliances || []).find(x => x.id === o.al); return a ? '[' + a.tag + '] ' + a.name : '?'; };
 function siteSheet(w) {
@@ -1672,7 +1687,7 @@ async function buildMap() {
     focusMap(own.x + .5, own.y + .5, Math.min(60, Math.max(34, 26000 / Math.max(360, window.innerWidth) * 1.2)));
     setupInput();
     let last = performance.now();
-    const loop = now => { mapLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode !== 'map' || document.hidden || document.body.classList.contains('reports-open')) return; placeStep(); wm.frame(dt); };   // hinter einem Menü wird die Karte nicht gezeichnet
+    const loop = now => { mapLoop = requestAnimationFrame(loop); const dt = Math.min(.1, (now - last) / 1000); last = now; if (mode !== 'map' || document.hidden || document.body.classList.contains('reports-open')) return; placeStep(); wm.frame(dt); homeStep(); };   // hinter einem Menü wird die Karte nicht gezeichnet
     mapLoop = requestAnimationFrame(loop);
     document.body.classList.remove('mode-map');
   } catch (e) { document.body.classList.remove('mode-map'); toast(String(e.message || e)); el.hidden = true; return false; }

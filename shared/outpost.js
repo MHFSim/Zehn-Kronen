@@ -7,7 +7,7 @@ import { N, isWater, roadPaths, setMapRoads, NODE_KINDS, NODE_RES } from './mapg
 import { battle, sum, forceOf } from './combat.js';
 import {
   mapOf, byId, groupOf, groupLabel, allianceOf, pushReport, note, chron, settleAway, sendHome, fmtDur, planFrom, launch,
-  reveal, flushBits, VIEW_CITY, THRONE_HOLD, cellXY, joinDefenders, leaveDefenders
+  reveal, flushBits, isExplored, VIEW_CITY, THRONE_HOLD, cellXY, joinDefenders, leaveDefenders
 } from './core.js';
 import { RES, TELEPORT_COOLDOWN } from './rules.js';
 
@@ -110,7 +110,10 @@ export function checkSite(match, players, me, x, y, gt) {
   const mineActive = rects.some(r => r.ready && r.group === group);
   if (!mineActive) {
     const zone = t => ({ x0: t.x - TOWER_PAD, y0: t.y - TOWER_PAD, x1: t.x + TOWER_PAD, y1: t.y + TOWER_PAD });
-    if (!towersOf(map).some(t => overlaps(nr, zone(t), 1))) return 'Der erste Außenposten beginnt an einem der Türme am Rand der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
+    const near = towersOf(map).filter(t => overlaps(nr, zone(t), 1));
+    if (!near.length) return 'Der erste Außenposten beginnt an einem der Türme am Rand der Karte: Das Viereck muss das weiße Feld um den Turm berühren.';
+    const MP = byId(players, me.id);
+    if (MP && !near.some(t => isExplored(MP.state, t.x, t.y))) return 'Dieser Turm liegt noch im Nebel. Erkunde das Feld zuerst, dann kannst du dort einen Außenposten errichten.';
   } else if (!rects.some(r => r.ready && r.group === group && overlaps(nr, r, 1))) return 'Ein Außenposten muss das Revier deines Bündnisses berühren.';
   return '';
 }

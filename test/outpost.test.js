@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { syncMatch, addPlayer, command as rawCommand, viewFor } from '../shared/world.js';
 import { heroShim } from './helper.js';
 const command = heroShim(rawCommand);
-import { newWorld, mapOf, DAY } from '../shared/core.js';
+import { newWorld, mapOf, DAY, reveal } from '../shared/core.js';
 import { NODE_KINDS } from '../shared/mapgen.js';
 import { checkSite, checkTeleport, territory, touches, inside, cityR, towersOf, OP_R, OP_BUILD, OP_COST, storeOf, opBuildTime } from '../shared/outpost.js';
 
@@ -34,6 +34,9 @@ assert.equal(territory(match, players, 0).length, 0, 'die Burg ist kein Revier m
 // Der erste Außenposten beginnt an einem Turm in der Ecke – nicht an der Burg
 const tw = towersOf(map).sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy))[0]; assert.equal(towersOf(map).length, 10, 'zehn Türme');
 { const near = findSite(a, [cx, cy], [R + OP_R, R + 2, 12, 20]); if (near) assert.match(checkSite(match, players, a, near[0], near[1], gt()), /Turm/); }
+{ let fog = null; for (let dx = -2 * OP_R; dx <= 2 * OP_R && !fog; dx += 2) for (let dy = -2 * OP_R; dy <= 2 * OP_R && !fog; dy += 2) { const w = checkSite(match, players, a, tw.x + dx, tw.y + dy, gt()); if (/Nebel/.test(w)) fog = w; }
+  assert.ok(fog, 'Turm im Nebel: kein Außenposten'); }
+for (const P of players) for (const t of towersOf(map)) reveal(P.state, t.x, t.y, 6);
 let site = null; for (let dx = -2 * OP_R; dx <= 2 * OP_R && !site; dx += 2) for (let dy = -2 * OP_R; dy <= 2 * OP_R && !site; dy += 2) if (!checkSite(match, players, a, tw.x + dx, tw.y + dy, gt())) site = [tw.x + dx, tw.y + dy];
 assert.ok(site, 'Bauplatz am Turm');
 assert.match(checkSite(match, players, a, ...toward(cx, cy, 45), gt()), /Turm|Wasser|Zu nah/);

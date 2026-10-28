@@ -564,7 +564,7 @@ input,textarea,select{color:var(--ink)}
 .pico .ic{width:56%;height:56%;filter:drop-shadow(0 0 5px rgba(255,217,106,.6))}
 .pback{flex:none;background:rgba(0,0,0,.4);color:var(--g1);border:1px solid var(--gold-line);border-radius:999px;padding:7px 13px;font-weight:700;font-size:14px}
 .ptabs{display:flex;gap:6px;margin:0 0 14px;padding:4px;border-radius:14px;background:var(--glass);border:1px solid var(--gline)}
-.ptab{flex:1;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;position:relative;padding:9px 6px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-weight:700;font-size:14px}
+.ptab{flex:1;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;position:relative;padding:9px 2px;min-width:0;border:0;border-radius:10px;background:transparent;color:var(--muted);font-weight:700;font-size:14px}
 .ptab.on{background:linear-gradient(#e8c766,#b88a2a);color:#2b1a0d;box-shadow:0 0 12px rgba(232,199,102,.3),inset 0 1px 0 rgba(255,255,255,.4)}
 .pbadge{display:inline-grid;flex:none;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:#ef7a64;color:#fff;font-size:11px;font-weight:700}
 .block.flat{background:none;border:0;padding:0}
@@ -744,6 +744,12 @@ body.mode-map.sheet-open #chatBtn,body.mode-map.reports-open #chatBtn{display:no
 .mrow{border-top:1px solid var(--gline)}
 .report .rt b{color:#f4ecd4}
 .armybtn{border-width:2.5px;box-shadow:0 0 12px color-mix(in srgb,var(--hc) 60%,transparent),0 3px 9px #000a}
+#homeArrow{position:fixed;z-index:5;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2px solid var(--g1,#e8c766);background:radial-gradient(#2a3342,#0e131a);box-shadow:0 0 14px rgba(232,199,102,.5),0 3px 10px rgba(0,0,0,.6);padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffd96a}
+#homeArrow[hidden]{display:none}
+#homeArrow .ha-ico{display:flex}#homeArrow .ic{width:24px;height:24px}
+#homeArrow .ha-tip{position:absolute;inset:-9px;pointer-events:none}
+#homeArrow .ha-tip::after{content:"";position:absolute;right:-3px;top:50%;margin-top:-7px;border:7px solid transparent;border-left:11px solid #ffd96a;border-right:0}
+.ptschip.small{padding:3px 10px;font-size:12px}
 </style>
 </head>
 <body>
