@@ -408,7 +408,7 @@ function renderSheet() {
   if (msel) return renderMapSheet();
   if (!sel) return;
   const id = sel, b = B[id], L = S.lv[id];
-  $('sheetInner').innerHTML = `<img class="sh-img" alt="" src="${imgOf(id)}"><div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
+  $('sheetInner').innerHTML = `<div class="sh-head"><h2>${b.name}</h2><span class="lvl">${L ? 'Stufe ' + L : 'nicht gebaut'}</span><button class="close" type="button" data-act="close">Schließen</button></div>
     <p class="desc">${b.desc}</p>${statsHTML(id)}${upgradeHTML(id)}${unitsHTML(id)}${b.units && L ? troopsHTML() : ''}${id === 'lazarett' && L ? healHTML() : ''}${id === 'rathaus' && L ? exchangeHTML() : ''}${id === 'akademie' ? researchHTML() : ''}`;
   sheetSig = signature();
 }
@@ -462,6 +462,15 @@ function setupSheet() {
     if (act === 'cancel') return command({ type: 'cancel', id });
     if (act === 'askHelp') { const ok = await command({ type: 'askHelp', id }); if (ok) toast('Dein Bündnis wurde um Hilfe gebeten.', 'info'); return renderSheet(); }
     if (act === 'train') return command({ type: 'train', id, unit: u, count: pick[u] || 10 });
+    if (act === 'exch') {
+      const key = el.dataset.r + ':' + el.dataset.n;
+      if (el.dataset.ask !== '1') { // erst bestätigen lassen
+        document.querySelectorAll('[data-act="exch"][data-ask]').forEach(x => { x.textContent = x.dataset.lbl; delete x.dataset.ask; });
+        el.dataset.lbl = el.textContent; el.dataset.ask = '1'; el.textContent = 'Kaufen? ' + el.dataset.n + ' 🥈';
+        setTimeout(() => { if (el.isConnected && el.dataset.ask) { el.textContent = el.dataset.lbl; delete el.dataset.ask; } }, 4000);
+        return;
+      }
+    }
     if (act === 'exch') return void command({ type: 'exchange', res: el.dataset.r, count: Number(el.dataset.n) }).then(ok => ok && renderSheet());
     if (act === 'plus' || act === 'minus') {
       const n = pick[u] || 10, step = n >= 100 ? 50 : n >= 20 ? 10 : 5;
