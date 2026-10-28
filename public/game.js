@@ -11,7 +11,7 @@ import { HEROES, HERO_IDS, HERO_MAX, xpNeed, skillList, heroPrefers, heroForce, 
 import { cityR, checkSite, checkRaid, checkTeleport, touchesObj, OP_COST, OP_MIN_TROOPS, OP_BUILD, OP_BUILD_FAST, OP_HELP_MAX, opBuildTime, OP_R, maxOutposts, opGuard, opReady, CLAN_SHARE } from '/shared/outpost.js';
 import { battle, campTroops, campMult, campLoot, capacityOf, sum, holdGuard, forceOf } from '/shared/combat.js';
 import { NODE_MAX, N, MARCH_BOOST } from '/shared/mapgen.js';
-import { WorldMap } from '/public/map.js';
+import { WorldMap, KIT } from '/public/map.js';
 import { HERO_PIC } from '/public/heropics.js';
 import { HERO_ART, HERO_POS } from '/public/heroart.js';
 import { snd } from '/public/sound.js';
@@ -52,9 +52,10 @@ document.addEventListener('click', e => { if (e.target.closest && e.target.close
 document.addEventListener('scroll', e => { if (e.target && e.target.id === 'hdock') dockX = e.target.scrollLeft; }, true);
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-gfx]'); if (!b) return;
-  gfxQ = b.dataset.gfx === 'high' ? 'high' : 'std'; try { localStorage.setItem('zk.gfx', gfxQ); } catch (x) { /* egal */ }
-  if (wm) wm.setQuality(gfxQ); if (cv) cv.setQuality(gfxQ);
+  const nq = b.dataset.gfx === 'high' ? 'high' : 'std'; if (nq === gfxQ) return;
+  gfxQ = nq; try { localStorage.setItem('zk.gfx', gfxQ); } catch (x) { /* egal */ }
   document.querySelectorAll('[data-gfx]').forEach(x => x.classList.toggle('ghost', x.dataset.gfx !== gfxQ));
+  toast('Grafik wird umgestellt – das Spiel lädt neu …', 'info'); setTimeout(() => location.reload(), 900);   // die Modelle werden beim Start in der gewählten Auflösung gebaut
 });
 document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.sndv; if (k) snd.setVol(k, Number(e.target.value)); });
 setInterval(() => { snd.heroMenu(panelName === 'heroes'); }, 300);
@@ -599,6 +600,7 @@ function updateCity() {
 const CITY_3D = false;   // 3D-Stadt ist abgeschaltet (Text-Stadt); Code bleibt für später
 let cv = null, cvLoop = 0, cvFail = !CITY_3D;
 let gfxQ = 'std'; try { gfxQ = localStorage.getItem('zk.gfx') === 'high' ? 'high' : 'std'; } catch (e) { /* ohne Speicher: Standard */ }
+KIT.setHi(gfxQ === 'high');
 const colNum = c => typeof c === 'number' ? c : parseInt(String(c || '#3a6fd0').replace('#', ''), 16) || 0x3a6fd0;
 function ensureCity() {
   if (cv || cvFail || !S || !window.THREE) return !!cv;

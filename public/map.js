@@ -28,9 +28,10 @@ class MB {
   constructor() { this.p = []; this.n = []; this.c = []; this.tri = 0; }
   // Körper einfügen; jit = Helligkeitsschwankung je Dreieck (wirkt wie gemauerte Steine / Holzmaserung)
   push(g, col, x = 0, y = 0, z = 0, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0, jit = .1) {
-    g = g.index ? g.toNonIndexed() : g;
+    // Grafik „Hoch": runde Körper behalten gemeinsame Ecken und bekommen weiche Normalen (nicht kantig), Dreiecks-Helligkeitsrauschen wird schwächer
+    const smooth = MB.hi && !!g.index; if (smooth) jit *= .4; else g = g.index ? g.toNonIndexed() : g;
     const m = new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(new T.Euler(rx, ry, rz, 'YXZ')), new T.Vector3(sx, sy, sz));
-    g.applyMatrix4(m); g.computeVertexNormals();
+    g.applyMatrix4(m); g.computeVertexNormals(); if (smooth) g = g.toNonIndexed();
     const p = g.attributes.position.array, nn = g.attributes.normal.array, k0 = 1 + (hash(Math.round(x * 31), Math.round(z * 17), Math.round(y * 13)) - .5) * .08;
     for (let i = 0; i < p.length; i++) { this.p.push(p[i]); this.n.push(nn[i]); }
     for (let t = 0; t < p.length / 9; t++) {
@@ -1497,4 +1498,15 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 }
 
 /* ---------- Baukasten für die 3D-Stadtansicht (city3d.js) ---------- */
-export const KIT = { use: t => { T = t; }, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };
+// Grafik „Hoch": mehr Segmente für runde Formen (Zylinder, Kegel, Kugeln, Ringe, Felsbrocken); muss vor dem Aufbau der Modelle gesetzt werden
+let geoWrapped = false;
+function wrapGeos(t) {
+  if (geoWrapped) return; geoWrapped = true;
+  const w = (name, f) => { const O = t[name]; if (!O) return; t[name] = class extends O { constructor(...a) { super(...f(a)); } }; };
+  w('CylinderGeometry', a => { if (a[3] >= 5) a[3] = Math.min(a[3] * 2, 32); return a; });
+  w('ConeGeometry', a => { if (a[2] >= 5) a[2] = Math.min(a[2] * 2, 32); return a; });
+  w('SphereGeometry', a => { a[1] = Math.min((a[1] || 8) * 2, 28); a[2] = Math.min((a[2] || 6) * 2, 20); return a; });
+  w('TorusGeometry', a => { if (a[3] >= 5) a[3] = Math.min(a[3] * 2, 40); return a; });
+  w('IcosahedronGeometry', a => { if ((a[1] || 0) < 2) a[1] = (a[1] || 0) + 1; return a; });
+}
+export const KIT = { use: t => { T = t; if (MB.hi) wrapGeos(t); }, setHi: on => { MB.hi = !!on; }, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };
