@@ -599,7 +599,6 @@ function updateCity() {
 /* ---------- 3D-Stadt ---------- */
 const CITY_3D = false;   // 3D-Stadt ist abgeschaltet (Text-Stadt); Code bleibt für später
 let cv = null, cvLoop = 0, cvFail = !CITY_3D;
-const BURG_URL = '/public/models/burg.glb';
 let gfxQ = 'std'; try { gfxQ = localStorage.getItem('zk.gfx') === 'high' ? 'high' : 'std'; } catch (e) { /* ohne Speicher: Standard */ }
 KIT.setHi(gfxQ === 'high');
 // Grafik „Hoch": Nachbearbeitung nachladen (Leuchten, Glättung); schlägt das fehl, bleibt es beim normalen Bild
@@ -1834,7 +1833,6 @@ async function buildMap() {
   try {
     const r = await api('/api/map'); if (!r.ok) throw new Error(r.data.error || 'Karte nicht verfügbar');
     document.body.classList.add('mode-map');   // damit die Zeichenfläche eine Größe hat
-    await KIT.loadBurg(THREE, BURG_URL);
     wm = new WorldMap(THREE, $('stage')); wm.setQuality(gfxQ); wm.onFlash = () => { const f = document.createElement('div'); f.className = 'tpflash'; document.body.appendChild(f); setTimeout(() => f.remove(), 1400); }; wm.load(r.data); mapReady = true; wm.sync(view, me.id, offset);
     const own = wm.map.starts[S.slot] || { x: 48, y: 48 };
     focusMap(own.x + .5, own.y + .5, Math.min(60, Math.max(34, 26000 / Math.max(360, window.innerWidth) * 1.2)));

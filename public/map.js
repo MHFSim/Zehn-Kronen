@@ -930,16 +930,9 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
       if (h.nm !== nm) {
         h.nm = nm;
         if (h.castle) { h.grp.remove(h.castle); h.castle = null; }
-        if (h.extra) { h.grp.remove(h.extra); h.extra = null; }
         for (const f of h.flags) h.grp.remove(f); h.flags = [];
         h.slot.visible = !p;
-        if (p && BURG) {
-          const sc = [5.6, 6.1, 6.6][tier - 1], slot = p.slot % 10, mat = BURG.mats[slot] || (BURG.mats[slot] = burgMat(PLAYER_COLORS[slot]));
-          h.castle = new T.Mesh(BURG.geo, mat); h.castle.scale.setScalar(sc); h.castle.castShadow = true; h.castle.receiveShadow = true; h.grp.add(h.castle);
-          if (!this.burgSkirt) { const sb = new MB(); sb.cyl(1.2, 1.5, 2.6, 18, 0, -2.5, 0, [112, 106, 92], .05); this.burgSkirt = sb.build(); }
-          const sk = new T.Mesh(this.burgSkirt, this.matVC); sk.receiveShadow = true; h.grp.add(sk); h.extra = sk;
-          this.addFlags(h, [[0, BURG.top * sc + .15, 0]], 0xffffff); h.h = BURG.top * sc + 1; h.smokeOffs = null;
-        } else if (p) { const mdl = this.castleModel(tier, p.slot % 10); h.castle = this.mesh(mdl); h.grp.add(h.castle); this.addFlags(h, mdl.flags, 0xffffff); h.h = mdl.h; h.smokeOffs = mdl.smoke; h.smokeOn = true; } else { h.smokeOffs = null; }
+        if (p) { const mdl = this.castleModel(tier, p.slot % 10); h.castle = this.mesh(mdl); h.grp.add(h.castle); this.addFlags(h, mdl.flags, 0xffffff); h.h = mdl.h; h.smokeOffs = mdl.smoke; h.smokeOn = true; } else { h.smokeOffs = null; }
       }
       if (p) this.setFlagColor(h, parseInt(PLAYER_COLORS[p.slot % 10].slice(1), 16));
     }
@@ -1266,8 +1259,8 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
     if (this.ghost) this.ghost.visible = false;
     if (!p || !p.ghost) return;
     const h = Object.values(this.obj).find(q => q.o.k === 'start' && q.player && q.player.id === this.myId); if (!h || !h.castle) return;
-    if (!this.ghost) { this.ghost = new T.Mesh(h.castle.geometry, new T.MeshBasicMaterial({ vertexColors: !BURG, transparent: true, opacity: .62 })); this.scene.add(this.ghost); }
-    const g = this.ghost; g.geometry = h.castle.geometry; g.scale.copy(h.castle.scale); g.position.set(p.x + .5, this.baseY(p.x + .5, p.y + .5, 2), p.y + .5); g.material.color.set(p.ok ? 0xb8ffc0 : 0xffa090); g.visible = true;
+    if (!this.ghost) { this.ghost = new T.Mesh(h.castle.geometry, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .62 })); this.scene.add(this.ghost); }
+    const g = this.ghost; g.geometry = h.castle.geometry; g.position.set(p.x + .5, this.baseY(p.x + .5, p.y + .5, 2), p.y + .5); g.material.color.set(p.ok ? 0xb8ffc0 : 0xffa090); g.visible = true;
   }
   syncOutposts(view) {
     const ops = view.world.outposts || [], keep = new Set(), gt = this.gtNow();
@@ -1527,49 +1520,6 @@ float zn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix
 }
 
 /* ---------- Baukasten für die 3D-Stadtansicht (city3d.js) ---------- */
-// Burg-Modell (public/models/burg.glb, GLB mit Texturen): wird einmal geladen; nur das Dach wird je Spieler umgefärbt.
-// Schlägt das Laden fehl (kein Netz für den GLTF-Lader), bleibt die gebaute Burg aus Klötzen.
-let BURG = null;
-async function loadBurg(THREE, url) {
-  T = THREE; if (BURG) return BURG;
-  try {
-    if (!THREE.GLTFLoader) await new Promise(res => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'; sc.onload = sc.onerror = () => res(); document.head.appendChild(sc); });
-    if (!THREE.GLTFLoader) return null;
-    const buf = await (await fetch(url)).arrayBuffer();
-    const gltf = await new Promise((ok, no) => new THREE.GLTFLoader().parse(buf, '', ok, no));
-    let mesh = null; gltf.scene.updateMatrixWorld(true); gltf.scene.traverse(o => { if (o.isMesh && !mesh) mesh = o; });
-    if (!mesh) return null;
-    const geo = mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
-    // die mitgelieferte Rasen-Bodenplatte entfernen: alle Dreiecke ganz unten, die über den Turmfuß (Radius .2) hinausreichen
-    const pa = geo.attributes.position, I = geo.index.array, keep = [], rr = i => Math.hypot(pa.getX(i), pa.getZ(i));   // Achtung: die Daten sind verschachtelt, daher getX/getY/getZ
-    for (let i = 0; i < I.length; i += 3) {
-      const a = I[i], b = I[i + 1], c = I[i + 2], plate = Math.max(pa.getY(a), pa.getY(b), pa.getY(c)) < .06 && Math.max(rr(a), rr(b), rr(c)) > .215;
-      if (!plate) keep.push(a, b, c);
-    }
-    geo.setIndex(keep); geo.computeBoundingBox();
-    const src = mesh.material; for (const tx of [src.map, src.normalMap, src.roughnessMap]) if (tx) tx.anisotropy = 8;
-    BURG = { geo, map: src.map, normalMap: src.normalMap, roughnessMap: src.roughnessMap, top: geo.boundingBox.max.y, mats: {} };
-    return BURG;
-  } catch (e) { return null; }
-}
-const hueFS = `
-{ vec3 c0 = diffuseColor.rgb; float mx = max(c0.r, max(c0.g, c0.b)), mn = min(c0.r, min(c0.g, c0.b)), dd = mx - mn;
-  if (dd > .01 && mx > .01) {
-    float sat = dd / mx, hh;
-    if (mx == c0.r) hh = mod((c0.g - c0.b) / dd, 6.0); else if (mx == c0.g) hh = (c0.b - c0.r) / dd + 2.0; else hh = (c0.r - c0.g) / dd + 4.0;
-    hh /= 6.0;
-    float w = smoothstep(.44, .5, hh) * (1.0 - smoothstep(.68, .75, hh)) * smoothstep(.12, .3, sat);
-    float cl = dot(c0, vec3(.2126, .7152, .0722)), tl = max(dot(uRoof, vec3(.2126, .7152, .0722)), .04);
-    vec3 nc = clamp(uRoof * (cl / tl), 0.0, 1.0);
-    diffuseColor.rgb = mix(c0, nc, w);
-  } }`;
-function burgMat(slotColor) {
-  const m = new T.MeshStandardMaterial({ map: BURG.map, normalMap: BURG.normalMap, roughnessMap: BURG.roughnessMap, roughness: 1, metalness: 0, side: T.DoubleSide });
-  const col = new T.Color(slotColor).convertSRGBToLinear();
-  m.onBeforeCompile = sh => { sh.uniforms.uRoof = { value: col }; sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uRoof;').replace('#include <map_fragment>', '#include <map_fragment>' + hueFS); };
-  m.customProgramCacheKey = () => 'burg';
-  return m;
-}
 // Grafik „Hoch": Nachbearbeitung (Mehrfachglättung, sanftes Leuchten heller Stellen, Farbfeinschliff, Randabdunklung).
 // Die Bibliotheken dafür lädt game.js nach; fehlen sie, bleibt das normale Bild.
 function makePost(r, scene, camera, W, H) {
@@ -1604,4 +1554,4 @@ function wrapGeos(t) {
   w('TorusGeometry', a => { if (a[3] >= 5) a[3] = Math.min(a[3] * 2, 40); return a; });
   w('IcosahedronGeometry', a => { if ((a[1] || 0) < 2) a[1] = (a[1] || 0) + 1; return a; });
 }
-export const KIT = { use: t => { T = t; if (MB.hi) wrapGeos(t); }, setHi: on => { MB.hi = !!on; }, makePost, loadBurg, burg: () => BURG, burgMat, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };
+export const KIT = { use: t => { T = t; if (MB.hi) wrapGeos(t); }, setHi: on => { MB.hi = !!on; }, makePost, MB, crenels, wallSeg, tower, house, well, crate, barrel, buildCastle, buildFarm, buildWood, buildStone, buildOre, buildUnit, treeGeo, SMOKE_VS, SMOKE_FS, hash, mul, mixc, LIN, hexRGB, STONE, STONE_D, WOOD, WOOD_D, PLASTER, DARK, LIGHT, GOLD, IRON, CASTLE_ROOFS };
